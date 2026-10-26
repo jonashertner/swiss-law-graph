@@ -44,6 +44,18 @@ FEDERAL_COURTS = {"bger": "BGer", "bge": "BGE", "bvger": "BVGer", "bstger": "BSt
                   "hudoc_ch": "EGMR", "emark": "EMARK"}
 
 
+SUBSCRIPT = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+
+
+def plain(s: str) -> str:
+    """Fedlex titles carry markup (CO<sub>2</sub>, 1<sup>er</sup>, <p>, <em>, a stray <BD>): text only."""
+    s = re.sub(r"<sub>\s*(\d+)\s*</sub>", lambda m: m.group(1).translate(SUBSCRIPT), s, flags=re.I)
+    s = re.sub(r"<sup>\s*([^<]{1,4}?)\s*</sup>", r"\1", s, flags=re.I)
+    s = re.sub(r"<br\s*/?>", " ", s, flags=re.I)
+    s = re.sub(r"</?(?:p|em|i|strong|b|span|sub|sup|bd)\b[^>]*>", "", s, flags=re.I)
+    return re.sub(r"\s+", " ", s).strip()
+
+
 def r6(v: float) -> float:
     return float(f"{v:.6g}") if abs(v) < 1 else round(v, 5)
 
@@ -544,10 +556,10 @@ def main() -> None:
         for o in out_nodes:
             t = o.get("t") or {}
             if t.get(lang):
-                col.append(t[lang])
+                col.append(plain(t[lang]))
             else:
                 fb = next((l for l in ("de", "fr", "it") if t.get(l)), None)
-                col.append([t[fb], fb] if fb else None)
+                col.append([plain(t[fb]), fb] if fb else None)
         json.dump(col, open(SITE / f"titles.{lang}.json", "w"), ensure_ascii=False, separators=(",", ":"))
     for o in out_nodes:
         o.pop("t", None)

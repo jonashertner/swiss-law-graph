@@ -182,6 +182,23 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     Time-lapse = today's law by adoption year (survivorship: repealed acts absent; 133 undated acts
     appear only in the current year).
 
+21. Connections are brought to the act, not drawn across the map ("bring & go", Moscovich et al.,
+    CHI 2009): in the cone an act's partners sit on other floors and in other cantons, so lines to
+    them ran off-screen to 2–3 px dots. Selecting an act (default on, toggle "Verbindungen", key C)
+    gathers them around it in an overlay (#web buttons + #wedges SVG, crisp text, keyboard- and
+    screen-reader-reachable): above = stated bases (dashed = further bases), below = acts resting
+    on it (most cited first, with the articles they name; for BV/KV the articles most acts rest on),
+    left = legislation (→ provisions of this act naming the other, ← the reverse), right = case law
+    (co-citation pairs of decision 9, so "7 of 70" counts partners in that pruned network) and the
+    4 most-cited decisions. Headings say "shown of total"; "+ n" opens the panel list. Each partner
+    flies in from its projected real position; hover = its 3D link + a dotted thread to its place
+    (or to the screen edge towards it); click = go (the constellation re-forms around it). While it
+    is shown, 3D partner labels, edge chips, the 3D link fan, spine and legend step aside and a
+    spotlight veil dims the scene except the act. Tours show it at node stops (no decisions; the
+    courts stop keeps the 3D decisions); the descent and the opening do not.
+22. Fedlex titles carry markup (CO<sub>2</sub>, 1<sup>er</sup>, <p>, <em>, a stray <BD>): `05_site.py::plain`
+    writes text only (CO₂, 1er).
+
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
       Deterministic (ties broken explicitly); two runs give identical reports.
@@ -231,6 +248,9 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
       and the courts appear only at their own stop. Bugs found by screenshot runs: an edge-chip
       collision loop that oscillated forever (page hang), court layers without viewport uniforms
       (screen-filling ribbons), the apex selection highlighting all 18,000 acts.
+- [x] Step 9 connections (decision 21): constellation per selected act, desktop + phone (phone: smaller
+      caps, toolbar steps aside while it is shown; the sheet's × brings it back). Small spheres on
+      paper get more ink and a darker outline (gl.js) so uncited acts no longer vanish into the page.
 - [x] Step 5 partly: counts cross-checked with the opencaselaw MCP (BGE 143 IV 241 in-degree;
       Art. 41 OR — the MCP undercounts, see report D1); desktop + phone screenshots via Playwright.
 
@@ -244,12 +264,12 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
 - Decision search (by docket / BGE citation) and a decision panel with its own cites/cited-by.
 - PageRank as an optional authority measure (in-degree today).
 - EN titles exist for 471 SR entries only (fallback DE).
-- WebGL content is not screen-reader accessible; the panel, search and method dialog are.
+- WebGL content is not screen-reader accessible; the panel, search, method dialog and the connections
+  overlay (decision 21) are.
 - Real-device check of the 3D page (GPU phones): headless software rendering is all that was tested.
 - Legislation layer: article-level refs exist in the packs (`x`) for the article panel; the reverse
   ("which provisions of other acts name this article") needs article-precise targets, which the
   footnotes do not give (they name the act).
-- A guided tour (3–4 stops) for first-time visitors.
 - Cantonal law: article-level targets for bases naming a cantonal act's article (today the act);
   read the 1,786 unresolved mentions by hand per canton; TI/SZ from their own portals when reachable;
   communal law (BZO …) is out of scope of the cantonal collections.

@@ -156,9 +156,10 @@ export function makeOrbs(n) {
         float b = vState.y;
         float open = vState.z;
         if (uLight > 0.5) {          // paper: a matte body, deeper the more it is cited; selection = dark ring
-          vec3 body = mix(uPaper, ink(vColor), 0.5 + 0.5 * b);
+          vec3 body = mix(uPaper, ink(vColor), 0.7 + 0.3 * b);      // even an uncited act reads as ink, not paper
           float spec = pow(max(dot(n, normalize(l + v)), 0.0), 36.0);
-          vec3 c = body * (0.66 + 0.4 * diff) * (1.0 - 0.3 * rim) + vec3(0.3) * spec;
+          float edge = mix(0.55, 0.3, smoothstep(3.0, 24.0, vPix));   // small spheres: a darker outline to stand out
+          vec3 c = body * (0.66 + 0.4 * diff) * (1.0 - edge * rim) + vec3(0.3) * spec;
           c = mix(c, NIGHT, clamp(vState.w * 2.4 * smoothstep(0.45, 0.8, 1.0 - facing), 0.0, 1.0));
           float a = vState.x * smoothstep(0.35, 1.2, vPix) * mix(1.0, 0.05 + 0.3 * rim * rim, open);
           a *= mix(1.0, fogA(-vCenter.z), 0.85);

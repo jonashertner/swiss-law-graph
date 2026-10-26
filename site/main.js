@@ -252,7 +252,7 @@ function setMode(m, refocus = true) {
   treeDirty = true; edgesDirty = true;
   buildLegend(); applyLang();
   if (!refocus) return;
-  if (sel.i >= 0 && inLayout(sel.i)) { sel.art = null; refreshStates(); focusOn(sel.i); refreshPanel(); crumbs(); writeHash(); }
+  if (sel.i >= 0 && inLayout(sel.i)) { sel.art = null; refreshStates(); focusOn(sel.i); refreshPanel(); crumbs(); writeHash(); webFor(sel.i); }
   else { select(-1, null, false); home(); }
 }
 
@@ -465,8 +465,13 @@ function fitTree(phi, topPx = null) {
   for (const [y, r] of tree.plates) for (let a = 0; a < 32; a++) pts.push([r * Math.cos(a * Math.PI / 16), y, r * Math.sin(a * Math.PI / 16)]);
   const theta = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)).theta;
   const cam = camera.clone(), q = new THREE.Vector3(), tgt = new THREE.Vector3();
-  const phone = W <= 760, top = 1 - 2 * (topPx ?? (phone ? 120 : 92)) / H, bot = -1 + 2 * (phone ? 150 : 70) / H;
-  const left = phone ? -0.94 : -1 + 2 * 390 / W, right = phone ? 0.94 : 1 - 2 * 250 / W;   // legend left, floor names right
+  cam.clearViewOffset();
+  // the box the tree must fit, in screen px; the view offset puts the camera axis at the free area's centre
+  const phone = W <= 760, tour = story && (story.tr || story.descent), fr = freeRect();
+  const yTop = topPx ?? (phone ? 120 : 92), yBot = tour ? (storyTop || H - 280) - 14 : H - (phone ? 150 : 70);
+  const xL = phone ? W * 0.03 : tour ? 30 : 390, xR = W - (phone ? W * 0.03 : $("panel").hidden ? 250 : 444);   // legend left, floor names right
+  const top = (fr.cy - yTop) / (H / 2), bot = (fr.cy - yBot) / (H / 2);
+  const left = (xL - fr.cx) / (W / 2), right = (xR - fr.cx) / (W / 2);
   const bounds = (d, ty) => {
     tgt.set(0, ty, 0);
     cam.position.setFromSphericalCoords(d, phi, theta).add(tgt);
@@ -601,7 +606,7 @@ function writeTreeLines() {
   const lines = [], chain = new Set();
   if (sel.i >= 0) {                    // what rests on the selection; for the apex (all of it) only the first step
     let j = sel.i; while (j >= 0) { chain.add(j); j = P[j]; }
-    const sub = subtree(sel.i);
+    const sub = web ? [] : subtree(sel.i);           // with the constellation, what rests on it is shown there
     for (const d of sub.length <= 800 ? sub : kids[sel.i]) chain.add(d);
   }
   const size = LAY.tree.size, top = Math.log10(size[ROOT] + 1), light = theme === "light";
@@ -643,7 +648,7 @@ function writeTreeLines() {
     lines.push({ pts: branchPath(i), width: lv >= 5 ? 1.2 : 2.4, color: K[i] !== "act" ? HUE.bv : HUE[HK[i]] || HUE.n,
       alpha: lv >= 5 ? 0.5 : 0.95, flow: 0.6 });   // pulses run downwards: delegation
   }
-  if (sel.i >= 0) {                    // further bases of the selection, and acts naming it as a further basis
+  if (sel.i >= 0 && !web) {            // further bases of the selection, and acts naming it as a further basis (the constellation shows them)
     for (const b of basisOf[sel.i] || []) if (!b.prim) lines.push({ pts: radialLink(b.j, sel.i), width: 1.5, color: BASIS2, alpha: 0.8, flow: 0.5 });
     for (const d of dependents[sel.i] || []) if (!d.prim) lines.push({ pts: radialLink(sel.i, d.i), width: 1.2, color: BASIS2, alpha: 0.6, flow: 0.5 });
   }
@@ -720,8 +725,10 @@ function buildEdges() {
   };
   const quiet = isTree && !focus && !treeAll;                 // tree overview: the delegation tree alone
   const inFocus = (a, b) => !quiet && !sel.art && (!focus || focus.has(a) || focus.has(b));   // an article: only its own links
+  const hj = web ? (web.hot >= 0 ? web.hot : hoverLink) : -1;
+  const shown = web ? (a, b) => hj >= 0 && ((a === sel.i && b === hj) || (b === sel.i && a === hj)) : inFocus;   // the constellation draws the rest
   if (showCurrent) core.edges.forEach(([a, b, n], k) => {
-    if (!inFocus(a, b)) return;
+    if (!shown(a, b)) return;
     let w = n;
     const ey = period && edgeYears ? edgeYears[k] : null;
     if (period && edgeYears) {
@@ -730,7 +737,7 @@ function buildEdges() {
     }
     if (w > 0) add(a, b, w, 2);
   });
-  if (showWire) for (const [a, b, n] of core.xedges || []) if (inFocus(a, b)) add(a, b, n, 1);
+  if (showWire) for (const [a, b, n] of core.xedges || []) if (shown(a, b)) add(a, b, n, 1);
   const lines = { wire: [], current: [] };
   let maxW = { 1: 1, 2: 1 };
   for (const [key, w] of agg) { const layer = +key.split("|")[2]; maxW[layer] = Math.max(maxW[layer], w); }
@@ -968,8 +975,8 @@ function updateLabels() {
     }
     if (!isOrb && (i === 0 || px > 14)) for (const k of kids[i]) st.push(k);
   }
-  if (sel.i >= 0) {   // the focus and its partners always get a name
-    const extra = [...jAdj[sel.i].slice(0, 8).map((e) => e[0]), ...wOut[sel.i].slice(0, 6).map((e) => e[0]), ...wIn[sel.i].slice(0, 4).map((e) => e[0])];
+  if (sel.i >= 0) {   // the focus and its partners always get a name (the constellation names them itself)
+    const extra = web ? [] : [...jAdj[sel.i].slice(0, 8).map((e) => e[0]), ...wOut[sel.i].slice(0, 6).map((e) => e[0]), ...wIn[sel.i].slice(0, 4).map((e) => e[0])];
     for (const j of [sel.i, ...(hoverLink >= 0 ? [hoverLink] : []), ...extra]) cand.push([j, 1e6 - cand.length]);
   } else if (focusSet && focusSet.size <= 40) {   // a tour stop naming a few acts: they get their names
     for (const j of focusSet) if (K[j] === "act") cand.push([j, 1e6 - cand.length]);
@@ -980,6 +987,7 @@ function updateLabels() {
   const fits = (b) => { for (const o of boxes) if (b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]) return false; boxes.push(b); return true; };
   for (const [i, px] of cand) {
     if (k >= 90 || used.has(i)) continue;
+    if (web && i !== sel.i) continue;                // the constellation names the partners
     const isOrb = mode === "tree" || K[i] === "act" || K[i] === "bucket";
     if (mode === "tree" && !inLayout(i)) continue;
     if (related && !related.has(i) && px < 1e5) continue;
@@ -1005,7 +1013,7 @@ function updateLabels() {
   }
   // tree: the name of each floor beside its rim, at the floor's outline on the screen's left
   // (like the storeys of a building section); on its near rim when that edge is off screen
-  if (mode === "tree") {
+  if (mode === "tree" && !web) {
     const ca = Math.atan2(camera.position.z + origin.z, camera.position.x + origin.x);
     let lastY = -1e9;                              // floors close together on screen: keep their names apart
     for (const [y, r, key] of tree.plates) {
@@ -1043,7 +1051,7 @@ function updateLabels() {
     }
   }
   // tree: each canton's name at the outer rim of its sector (its code where the sector is narrow)
-  if (mode === "tree" && W > 760) {
+  if (mode === "tree" && W > 760 && !web) {
     const rim = tree.plates[tree.plates.length - 1];
     for (const i of orbIndex) {
       if (!TN[i] || TN[i].l !== 4) continue;
@@ -1118,7 +1126,7 @@ function updateLabels() {
     }
   }
   // partners outside the view: a chip on the edge of the free area, pointing to them
-  if (sel.i >= 0 && !sel.art) {
+  if (sel.i >= 0 && !sel.art && !web) {
     const fr = freeRect(), x0 = fr.cx - fr.w / 2 + 24, x1 = fr.cx + fr.w / 2 - 24, y0 = 96, y1 = fr.cy + fr.h / 2 - 70;
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     const list = [...new Set([hoverLink, ...jAdj[sel.i].slice(0, 5).map((e) => e[0]), ...wOut[sel.i].slice(0, 3).map((e) => e[0])])]
@@ -1257,6 +1265,7 @@ function loop(now) {
   }
   if (edgesDirty || (moving && now - lastEdgeBuild > 220 && frontierChanged())) buildEdges();
   if (moving || now - lastLabels > 200) { updateLabels(); lastLabels = now; }
+  renderWeb(now);
   composer.render(dt);
 }
 function updateOpenAct() {
@@ -1335,7 +1344,8 @@ function showTip(px, py, h) {
     const nl = wOut[h.i].length + wIn[h.i].length, nc = jAdj[h.i].length;
     if (o.k === "act" && (nl || nc)) line += ` · ${t.lawWiring} ${nl} · ${t.practice} ${nc}`;
   }
-  tip.innerHTML = `<b>${esc(head.length > 140 ? head.slice(0, 139) + "…" : head)}</b><span>${esc(line)}</span>`;
+  const hint = webOn && !h.art && h.i !== sel.i && (K[h.i] === "act" || K[h.i] === "bvart" || K[h.i] === "kvart") ? t.webClick : "";
+  tip.innerHTML = `<b>${esc(head.length > 140 ? head.slice(0, 139) + "…" : head)}</b><span>${esc(line)}</span>${hint ? `<span class="hint">${esc(hint)}</span>` : ""}`;
   tip.hidden = false;
   tip.style.left = Math.min(px + 14, W - tip.offsetWidth - 8) + "px";
   tip.style.top = Math.min(py + 16, H - tip.offsetHeight - 8) + "px";
@@ -1350,12 +1360,14 @@ function resize() {
   camera.updateProjectionMatrix();
   edgesDirty = true;
   if (!$("story").hidden) storyTop = $("story").getBoundingClientRect().top;
+  relayoutWeb();
 }
 addEventListener("keydown", (e) => {
   if (e.target.matches("input, select, textarea")) return;
   if (e.key === "/") { e.preventDefault(); $("search").focus(); }
   else if (story && story.tr && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { e.preventDefault(); stepTour(e.key === "ArrowRight" ? 1 : -1); }
   else if (e.key === "f" && !e.metaKey && !e.ctrlKey) $("focusbtn").click();
+  else if (e.key === "c" && !e.metaKey && !e.ctrlKey) $("webbtn").click();
   else if (e.key === "Escape") {
     if (story && story.opening) skipOpening();
     else if (story && (story.tr || story.descent)) { story.descent = false; endTour(false); }
@@ -1374,7 +1386,7 @@ function select(i, art = null, animate = true, quiet = false) {
   if (i < 0) {
     const was = !$("panel").hidden;
     sel = { i: -1, art: null }; $("panel").hidden = true; $("tools").classList.remove("raised");
-    hideCourts();
+    hideCourts(); webFor(-1);
     refreshStates(); refreshHover(); writeHash(); crumbs(); renderSpine();
     if (was && animate) recentre();
     return;
@@ -1404,8 +1416,9 @@ function select(i, art = null, animate = true, quiet = false) {
     refreshPanel();
   }
   hideCourts();                                  // a tour or descent shows the courts at their own stop
-  if (mode === "tree" && K[i] === "act" && PK[i] >= 0 && !(story && (story.tr || story.descent))) courtsFor(i);
+  if (mode === "tree" && K[i] === "act" && PK[i] >= 0 && !webOn && !(story && (story.tr || story.descent))) courtsFor(i);
   writeHash(); crumbs(); renderSpine();
+  webFor(i);                                     // its connections, brought next to it
 }
 function goHome() { select(-1, null, false); home(); }
 
@@ -1476,13 +1489,13 @@ function interdependencies(i) {
   let html = "";
   const kindOf = (j) => pairKind.get(i < j ? i + "|" + j : j + "|" + i) || 0;
   if (wOut[i].length || wIn[i].length) {
-    html += `<section><h3><i class="sw wire"></i>${esc(t.lawWiring)}</h3><p class="note">${esc(t.lawWiringNote)}</p>`;
+    html += `<section data-sec="law"><h3><i class="sw wire"></i>${esc(t.lawWiring)}</h3><p class="note">${esc(t.lawWiringNote)}</p>`;
     if (wOut[i].length) html += `<p class="note">${esc(t.refersTo)}</p><ul class="list">${wOut[i].slice(0, 12).map(([j, n]) => linkRow(j, t.refsN(num(n)), title(j), kindOf(j))).join("")}</ul>`;
     if (wIn[i].length) html += `<p class="note">${esc(t.referredBy)}</p><ul class="list">${wIn[i].slice(0, 12).map(([j, n]) => linkRow(j, t.refsN(num(n)), title(j), kindOf(j))).join("")}</ul>`;
     html += "</section>";
   }
   if (jAdj[i].length) {
-    html += `<section><h3><i class="sw current"></i>${esc(t.practice)}</h3><p class="note">${esc(t.practiceNote)}</p><ul class="list">${jAdj[i].slice(0, 12).map(([j, n, l]) =>
+    html += `<section data-sec="court"><h3><i class="sw current"></i>${esc(t.practice)}</h3><p class="note">${esc(t.practiceNote)}</p><ul class="list">${jAdj[i].slice(0, 12).map(([j, n, l]) =>
       linkRow(j, t.together(num(n), l.toFixed(1)), title(j), kindOf(j))).join("")}</ul></section>`;
   }
   if (core.xedges && (wOut[i].length || wIn[i].length || jAdj[i].length)) {
@@ -1618,7 +1631,7 @@ function delegationNorms(i, deps) {
 function dependentsSection(deps, head) {
   const by = new Map();
   for (const d of deps) { const l = LEVEL(d.i); if (!by.has(l)) by.set(l, []); by.get(l).push(d); }
-  let html = `<section><h3><i class="sw tree"></i>${esc(head)} · ${num(deps.length)}</h3>`;
+  let html = `<section data-sec="deps"><h3><i class="sw tree"></i>${esc(head)} · ${num(deps.length)}</h3>`;
   for (const l of [...by.keys()].sort()) {
     const list = by.get(l).sort((a, b) => NC[b.i] - NC[a.i]);
     html += `<p class="note">${esc(t["lv" + l] || "")}</p><ul class="list">${list.slice(0, 40).map((d) => {
@@ -1991,7 +2004,7 @@ $("tilt").onclick = () => {
 $("theme").onclick = () => {
   theme = theme === "light" ? "dark" : "light";
   try { localStorage.setItem("slm-theme", theme); } catch (e) { /* storage unavailable */ }
-  applyTheme(); buildLegend(); refreshPanel(); updateLabels();
+  applyTheme(); buildLegend(); refreshPanel(); updateLabels(); relayoutWeb();
 };
 $("mtree").onclick = () => setMode("tree");
 $("msr").onclick = () => setMode("sr");
@@ -2050,6 +2063,8 @@ function applyLang() {
   $("brandname").textContent = t.name;
   $("search").placeholder = t.search;
   $("home").textContent = t.home; $("periodbtn").textContent = t.time; $("methodbtn").textContent = t.method;
+  $("webbtn").textContent = t.webBtn; $("webbtn").title = t.webHint; $("webbtn").setAttribute("aria-pressed", webOn);
+  if (web) { web.G = webGroups(web.i, !(story && story.tr)); relayoutWeb(); }
   $("tilt").textContent = core ? tiltLabel() : t.view3d; $("play").textContent = playing ? t.pause : t.play;
   $("l-from").textContent = t.from; $("l-to").textContent = t.to; $("periodnote").textContent = t.periodNote;
   $("introtext").textContent = mode === "tree" ? t.introTree : t.intro; $("introok").textContent = t.introOk; $("introtitle").textContent = t.name;
@@ -2137,6 +2152,7 @@ function card(eyebrow, head, body, nav) {
   el.innerHTML = `<p class="eyebrow">${esc(eyebrow)}</p><h3>${esc(head)}</h3><p class="body">${body}</p>${nav || ""}`;
   el.hidden = false;
   storyTop = el.getBoundingClientRect().top;
+  relayoutWeb();
 }
 function navHtml(k, n) {
   const dots = Array.from({ length: n }, (_, j) => `<i class="${j === k ? "on" : ""}"></i>`).join("");
@@ -2202,35 +2218,36 @@ async function showStop() {
   const eyebrow = `${t.tour} · ${t["tour_" + tr.id]} · ${k + 1}/${n}`;
   hideCourts();
   if (s.k === "overview") {
-    select(-1, null, false); setFocus(null); home();
+    select(-1, null, false); setFocus(null);
     card(eyebrow, t.st_overviewH, esc(t.st_overview(num(f.fed), num(f.kant), num(f.dec))), navHtml(k, n));
+    home();
   } else if (s.k === "apex") {
     select(-1, null, false);
     setFocus(floorNodes((l, i) => i === ROOT || ["title", "chapter", "section", "bvart"].includes(K[i])));
     const pl = tree.plates[0];
-    flyTo(0, 0, distanceToFit(pl[1] * 1.15), 0.7, true, pl[0], null, minFlight);   // the article ring, from above
     card(eyebrow, t.st_apexH, esc(t.st_apex(num(f.arts), num(f.artsBasis), num(f.artsRest))), navHtml(k, n));
+    flyTo(0, 0, distanceToFit(pl[1] * 1.15), 0.7, true, pl[0], null, minFlight);   // the article ring, from above
   } else if (s.k === "floor") {
     select(-1, null, false);
     setFocus(floorNodes((l) => l === s.l));
     const pl = tree.plates[s.l];
-    flyTo(0, 0, distanceToFit(pl[1] * 1.08), 0.9, true, pl[0], null, minFlight);
     const p = f["p" + s.l];
     const body = s.l === 1 ? t.st_floor1(num(f.l1), num(p.bv), num(p.none)) : s.l === 2 ? t.st_floor2(num(f.l2), num(p.l1), num(p.bv)) : t.st_floor3(num(f.l3), num(p.l2), num(p.l1));
     card(eyebrow, t["role" + s.l], esc(body), navHtml(k, n));
+    flyTo(0, 0, distanceToFit(pl[1] * 1.08), 0.9, true, pl[0], null, minFlight);
   } else if (s.k === "cantons") {
     select(-1, null, false);
     setFocus(floorNodes((l) => l >= 4));
     const pl = tree.plates[tree.plates.length - 1];
-    flyTo(0, 0, distanceToFit(pl[1] * 1.02), 0.78, true, tree.plates[5][0], null, minFlight);
     card(eyebrow, t.st_cantonsH, esc(t.st_cantons(num(f.kant), (f.kant / f.fed).toFixed(1).replace(".", lang === "en" ? "." : ","))), navHtml(k, n));
+    flyTo(0, 0, distanceToFit(pl[1] * 1.02), 0.78, true, tree.plates[5][0], null, minFlight);
   } else if (s.k === "courts" && s.top) {
     select(-1, null, false);
     const top = s.top.map(gi);
     setFocus(new Set(top));
-    home();
     const list = top.map((j) => `${linkTo(j)} (${num(NC[j])})`).join(", ");
     card(eyebrow, t.role_courts, esc(t.st_courts(num(f.dec))) + " " + list + ".", navHtml(k, n));
+    home();
   } else {                                     // a node of a thread, or the courts under one
     const i = gi(s.i);
     setFocus(null);
@@ -2428,6 +2445,326 @@ function writeCourts() {
   for (const a of ["iCenter", "iRadius", "iColor", "iState"]) g.attributes[a].needsUpdate = true;
   setRibbons(courtLines, lines);
 }
+
+// ---------- the constellation: an act's connections, brought next to it ----------
+// In the cone an act's partners sit far apart (other floors, other cantons, other SR areas): lines
+// to them run off-screen to dots a few pixels wide. So they are brought to it ("bring & go",
+// Moscovich et al., CHI 2009), in groups that keep the directions of the law: above, what it
+// rests on; below, what rests on it; left, the acts its text names or that name it; right, the
+// acts the courts cite with it and its most-cited decisions. Each partner flies in from where it
+// really is; pointing at one shows that place, a click goes there.
+let webOn = (() => { try { return localStorage.getItem("slm-web") !== "0"; } catch (e) { return true; } })();
+let web = null, webReq = 0, bvArts = null;
+const decOf = (j) => (TN[j] && TN[j].dn) || NC[j] || 0;
+const WREL = { up: "basis", down: "basis", law: "wire", court: "current", dec: "court" };
+const isBV = (i) => ids[i] === "SR 101";
+const artList = (names) => (names.length ? `${t.art} ${names.slice(0, 3).join(", ")}${names.length > 3 ? " …" : ""}` : "");
+
+function webGroups(i, withDec) {
+  const g = { up: [], down: [], law: [], court: [], dec: [] }, n = {};
+  const seen = new Set();
+  for (const b of basisOf[i] || []) {                 // the bases its Ingress states; the first is its place
+    if (b.j < 0 || seen.has(b.j)) continue;
+    seen.add(b.j);
+    g.up.push({ j: b.j, w: K[b.j] === "bvart" || K[b.j] === "kvart" ? "" : artList(artNames(b.eids || [])), dash: !b.prim, s: 1 });
+  }
+  n.up = g.up.length; n.upUnk = (basisOf[i] || []).filter((b) => b.j < 0).length;
+  if (isBV(i) || (TN[i] && TN[i].l === 4)) {          // a constitution: the articles most acts rest on
+    if (!bvArts) { bvArts = []; for (let k = NCORE; k < N; k++) if (K[k] === "bvart") bvArts.push(k); }
+    const arts = isBV(i) ? bvArts : LAY.tree.kids[i].filter((k) => K[k] === "kvart");
+    const list = arts.map((k) => [k, (dependents[k] || []).length]).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+    g.down = list.map(([k, c]) => ({ j: k, w: t.webActs(num(c)), s: c }));
+    n.down = list.length; n.apex = true;
+  } else {
+    const dd = new Map();
+    for (const d of dependents[i] || []) if (!dd.has(d.i)) dd.set(d.i, d);
+    const own = K[i] !== "bvart" && K[i] !== "kvart";   // an act: which of its articles they name
+    g.down = [...dd.values()].sort((a, b) => decOf(b.i) - decOf(a.i) || a.i - b.i)
+      .map((d) => ({ j: d.i, w: own ? artList(artNames(d.eids || [])) : "", dash: !d.prim, s: decOf(d.i) }));
+    n.down = dd.size;
+  }
+  const lm = new Map();                               // legislation: provisions naming the other act
+  for (const [j, c] of wOut[i]) lm.set(j, { j, o: c, n: 0 });
+  for (const [j, c] of wIn[i]) { const x = lm.get(j) || { j, o: 0, n: 0 }; x.n = c; lm.set(j, x); }
+  g.law = [...lm.values()].sort((a, b) => b.o + b.n - (a.o + a.n) || decOf(b.j) - decOf(a.j) || a.j - b.j)
+    .map((x) => ({ j: x.j, w: [x.o ? "→ " + num(x.o) : "", x.n ? "← " + num(x.n) : ""].filter(Boolean).join("   "), s: x.o + x.n }));
+  n.law = lm.size;
+  g.court = jAdj[i].map(([j, c]) => ({ j, w: t.decN(num(c)), s: c }));
+  n.court = jAdj[i].length;
+  const rec = actRec(i);
+  if (withDec && rec && rec.top) {
+    g.dec = rec.top.map((did) => [did, decInfo(i, did)]).filter((x) => x[1]).map(([did, d]) => ({ j: -1, did, lab: d[0], w: t.citedBy(num(d[2])), s: d[2] }));
+  }
+  n.dec = g.dec.length;
+  return { g, n, i };
+}
+
+// Where the act will stand (the centre of the free area) and the room around it.
+function webBox() {
+  const fr = freeRect(), phone = W <= 760;
+  const x0 = Math.max(fr.cx - fr.w / 2 + (phone ? 8 : 26), 8), x1 = Math.min(fr.cx + fr.w / 2 - (phone ? 8 : 26), W - 8);
+  const y0 = phone ? 64 : 80, y1 = fr.cy + fr.h / 2 - (phone ? 6 : story ? 10 : 72);
+  return { x0, x1, y0, y1, w: x1 - x0, h: y1 - y0, cx: fr.cx, cy: fr.cy, phone };
+}
+// Slots as offsets from the act, so the constellation stays with it when the view moves.
+function webLayout(G) {
+  const B = webBox(), ph = B.phone, LW = ph ? 84 : 150, SP = ph ? 25 : 30, items = [], heads = [];
+  const { g, n } = G;
+  const cy = B.cy;
+  const capRow = Math.max(2, Math.floor((B.w - 16) / (LW + 16)));
+  const row = (list, y, total, grp) => {
+    const more = total - list.length, k = list.length + (more > 0 ? 1 : 0);
+    const step = Math.min(LW + 22, (B.w - 16) / Math.max(k, 1));
+    const x = (q) => B.cx + (q - (k - 1) / 2) * step - LW * 0.32;
+    list.forEach((it, q) => items.push({ ...it, g: grp, x: x(q), y, side: "r", mw: step - 30 }));
+    if (more > 0) items.push({ j: -1, more, g: grp, x: x(k - 1), y, side: "r", mw: step - 30 });
+  };
+  // above: what it rests on (below the chain to the Constitution, when it is shown)
+  const chainH = mode === "tree" && P[G.i] >= 0 && !ph ? 22 : 0;
+  const yUp = B.y0 + chainH + (ph ? 40 : 58);
+  if (g.up.length) {
+    row(g.up.slice(0, capRow - (g.up.length > capRow ? 1 : 0)), yUp, n.up, "up");
+    heads.push({ g: "up", x: B.cx, y: B.y0 + chainH + (ph ? 14 : 28), text: t.webUp, count: n.up, extra: n.upUnk ? t.webUnk(num(n.upUnk)) : "" });
+  }
+  // below: what rests on it, the most-cited first, in one or two rows
+  const rows = ph || n.down <= capRow ? 1 : 2, capD = rows * capRow;
+  const yD2 = B.y1 - (ph ? 24 : 34), yD1 = rows === 2 ? yD2 - (ph ? 0 : 46) : yD2;
+  if (g.down.length) {
+    const shown = g.down.slice(0, n.down > capD ? capD - 1 : capD);
+    if (rows === 2) { row(shown.slice(0, capRow), yD1, capRow, "down"); row(shown.slice(capRow), yD2, n.down - capRow, "down"); }
+    else row(shown, yD2, n.down, "down");
+    heads.push({ g: "down", x: B.cx, y: yD2 + (ph ? 18 : 30), text: n.apex ? t.webDownApex : t.webDown, count: n.down, shown: shown.length,
+      extra: !n.apex && shown.length < n.down ? t.webDownKey : "" });
+  }
+  // the sides: legislation (left), case law and decisions (right)
+  const top = (g.up.length ? yUp + (ph ? 30 : 40) : B.y0 + 10), bot = (g.down.length ? yD1 - (ph ? 26 : 36) : B.y1 - 10);
+  const capCol = Math.max(0, Math.min(ph ? 6 : 9, Math.floor((bot - top) / SP) - 1));   // a column stays short enough to read
+  const xs = B.w / 2 - LW - (ph ? 6 : 16);
+  const col = (list, total, grp, x, y0, side) => {
+    const more = total - list.length;
+    const mw = ph ? LW - 4 : LW + 18;
+    list.forEach((it, q) => items.push({ ...it, g: grp, x, y: y0 + q * SP, side, mw, w: ph && grp === "court" ? num(it.s) : it.w }));
+    if (more > 0) items.push({ j: -1, more, g: grp, x, y: y0 + list.length * SP, side, mw });
+    return list.length + (more > 0 ? 1 : 0);
+  };
+  if (g.law.length && capCol > 0) {
+    const m = Math.min(g.law.length, n.law > capCol ? capCol - 1 : capCol), k = m + (n.law > m ? 1 : 0);
+    const y0 = Math.max(top + SP * (ph ? 1 : 1.6), cy - ((k - 1) / 2) * SP);
+    heads.push({ g: "law", x: ph ? B.x0 : B.cx - xs, y: y0 - SP * (ph ? 1.1 : 1.6), text: t.webLaw, count: n.law, shown: m, key: t.webLawKey(fullLabel(G.i)), side: ph ? "r" : "l" });
+    col(g.law.slice(0, m), n.law, "law", B.cx - xs, y0, "l");
+  }
+  const capR = ph || !g.dec.length ? capCol : capCol + 4;   // with the decisions the right column holds two groups
+  const md = ph ? 0 : Math.min(g.dec.length, 4, Math.max(0, capR - 3));
+  const mc = Math.min(g.court.length, Math.max(0, capR - (md ? md + 1 : 0) - 1));
+  const k = mc + (mc ? 1 : 0) + md + (md ? 1 : 0);
+  let yr = Math.max(top + SP, cy - ((k - 2) / 2) * SP);
+  if (mc) {
+    heads.push({ g: "court", x: ph ? B.x1 : B.cx + xs, y: yr - SP * (ph ? 1.1 : 1.35), text: t.webCourt, count: n.court, shown: mc, key: t.webCourtKey, side: ph ? "l" : "r" });
+    yr += col(g.court.slice(0, mc), mc, "court", B.cx + xs, yr, "r") * SP + SP * 1.15;
+  }
+  if (md) {
+    heads.push({ g: "dec", x: B.cx + xs, y: yr - SP * 0.95, text: t.webDec, side: "r" });
+    col(g.dec.slice(0, md), md, "dec", B.cx + xs, yr, "r");
+  }
+  // offsets from where the act will stand
+  for (const it of items) { it.dx = it.x - B.cx; it.dy = it.y - cy; }
+  for (const h of heads) {                          // a heading stays inside the free area
+    h.dx = h.x - B.cx; h.dy = h.y - cy;
+    h.maxW = ph && (h.g === "law" || h.g === "court") ? B.w * 0.46 : h.side === "l" ? h.x - B.x0 + 8 : h.side === "r" ? B.x1 - h.x + 8 : B.w;
+  }
+  return { items, heads, B };
+}
+
+function webAllowed(i) {
+  if (!webOn || i < 0 || sel.art || W < 330) return false;
+  if (story && (story.descent || story.opening)) return false;
+  if (story && story.tr && story.tr.stops[story.k] && story.tr.stops[story.k].k === "courts") return false;
+  return K[i] === "act" || K[i] === "bvart" || K[i] === "kvart" || (TN[i] && TN[i].l === 4);
+}
+async function webFor(i) {
+  const req = ++webReq;
+  clearWeb();
+  if (!webAllowed(i)) return;
+  if (PK[i] >= 0 && !actRec(i)) { try { await ensurePack(PK[i]); } catch (e) { /* the decisions stay out */ } }
+  if (req !== webReq || sel.i !== i) return;
+  const G = webGroups(i, !(story && story.tr));
+  if (!G.g.up.length && !G.g.down.length && !G.g.law.length && !G.g.court.length && !G.g.dec.length) return;
+  web = { i, G, t0: performance.now() + 120, hot: -1, done: false, ...webLayout(G) };
+  buildWebDom();
+  document.body.classList.add("webbing");
+  edgesDirty = true; treeDirty = true;
+}
+function clearWeb() {
+  if (!web) return;
+  web = null;
+  $("web").innerHTML = ""; $("wedges").innerHTML = "";
+  document.body.classList.remove("webbing");
+  edgesDirty = true; treeDirty = true;
+}
+function relayoutWeb() { if (web) { Object.assign(web, webLayout(web.G)); buildWebDom(); web.done = false; } }
+
+function buildWebDom() {
+  const el = $("web"), svg = $("wedges"), max = {};
+  el.setAttribute("aria-label", `${t.webBtn}: ${fullLabel(web.i)}`);
+  for (const it of web.items) max[it.g] = Math.max(max[it.g] || 1, it.s || 1);
+  const ns = "http://www.w3.org/2000/svg";
+  el.innerHTML = ""; svg.innerHTML = "";
+  const thread = document.createElementNS(ns, "path");
+  thread.setAttribute("class", "w-thread"); svg.append(thread); web.thread = thread;
+  web.items.forEach((it, k) => {
+    it.k = k;
+    const rel = WREL[it.g];
+    const strength = Math.sqrt((it.s || 1) / max[it.g]);
+    const sz = it.more ? 9 : it.g === "dec" ? 7 : Math.round(7 + 9 * Math.sqrt(Math.min(1, decOf(it.j) / Math.max(1, NC[0] * 0.04))));
+    const b = document.createElement(it.did ? "a" : "button");
+    b.className = `wn ${it.side === "l" ? "l" : ""} ${it.more ? "more" : ""} ${it.did ? "dec" : ""}`;
+    if (it.mw) b.style.setProperty("--mw", Math.max(60, it.mw).toFixed(0) + "px");
+    b.style.setProperty("--r", `var(--${rel})`);
+    b.style.setProperty("--c", it.more ? "var(--bg)" : it.g === "dec" ? "var(--court)" : cssHue(HK[it.j]));
+    const name = it.more ? t.webMore(num(it.more)) : it.did ? it.lab : fullLabel(it.j);
+    b.innerHTML = `<i style="width:${sz}px;height:${sz}px"></i><span><b>${esc(name)}</b>${it.w ? `<em>${esc(it.w)}</em>` : ""}</span>`;
+    if (it.did) { b.href = decUrl(it.did); b.target = "_blank"; b.rel = "noopener"; b.title = t.openDec; }
+    else if (!it.more) b.dataset.j = it.j;
+    else b.dataset.more = it.g;
+    const gname = { up: t.webUp, down: web.G.n.apex ? t.webDownApex : t.webDown, law: t.webLaw, court: t.webCourt, dec: t.webDec }[it.g];
+    b.setAttribute("aria-label", `${gname}: ${name}${it.w ? ", " + it.w : ""}`);    // the relation is read out, not only seen
+    it.r = sz / 2;
+    it.el = b; el.append(b);
+    if (!it.more) {
+      const p = document.createElementNS(ns, "path");
+      p.setAttribute("class", `w-e w-${rel}${it.dash ? " dash" : ""}`);
+      p.setAttribute("stroke-width", (1 + 2.4 * strength).toFixed(2));
+      it.path = p; svg.append(p);
+    }
+  });
+  for (const h of web.heads) {
+    const d = document.createElement("div");
+    d.className = `wh ${h.side === "l" ? "l" : h.side === "r" ? "r" : ""}`;
+    d.style.maxWidth = Math.max(120, h.maxW).toFixed(0) + "px";
+    d.style.setProperty("--r", `var(--${WREL[h.g]})`);
+    const cnt = h.count == null ? "" : h.shown != null && h.shown < h.count && !web.B.phone ? t.webOf(num(h.shown), num(h.count)) : num(h.count);
+    d.innerHTML = `<i></i>${esc(h.text)}${cnt ? ` · ${esc(cnt)}` : ""}${h.extra ? ` <small>${esc(h.extra)}</small>` : ""}${h.key ? `<small>${esc(h.key)}</small>` : ""}`;
+    h.el = d; el.append(d);
+  }
+  if (mode === "tree" && P[web.i] >= 0 && !web.B.phone) {      // the chain up to the Constitution
+    const chain = ancestorsOf(web.i).reverse().filter((j) => !["title", "chapter", "section"].includes(K[j]) && j !== web.i);
+    if (chain.length) {
+      const c = document.createElement("nav");
+      c.className = "wc"; c.setAttribute("aria-label", t.spineHead);
+      c.innerHTML = chain.map((j) => `<button data-j="${j}">${esc(fullLabel(j))}</button>`).join("<span>›</span>") +
+        `<span>›</span><b>${esc(fullLabel(web.i))}</b><button class="chip" data-descend="${web.i}">▼ ${esc(t.descend)}</button>`;
+      web.chain = c; el.append(c);
+    }
+  }
+  web.done = false;
+}
+
+const easeOut = (u) => 1 - Math.pow(1 - u, 3);
+function renderWeb(now) {
+  if (!web) return;
+  const i = web.i;
+  if (!inLayout(i)) { clearWeb(); return; }
+  const [ax, ay, az] = toScreen(X[i], CY[i], Z[i]);
+  const animating = now < web.t0 + 700 + web.items.length * 26;
+  if (!animating && web.done && !moving && !web.dirty) return;
+  web.dirty = false;
+  const off = az > 1 || ax < -W * 0.5 || ax > W * 1.5 || ay < -H * 0.5 || ay > H * 1.5;
+  $("web").style.visibility = $("wedges").style.visibility = off ? "hidden" : "";
+  if (off) return;
+  const ra = Math.min(projectedPx(i), 110) + 3;
+  const hot = web.hot >= 0 ? web.hot : hoverLink;
+  const veil = $("wveil").style;                     // the scene recedes, the act stays lit
+  veil.setProperty("--ax", ax.toFixed(0) + "px"); veil.setProperty("--ay", ay.toFixed(0) + "px"); veil.setProperty("--ar", (ra + 26).toFixed(0) + "px");
+  for (const it of web.items) {
+    const sx = ax + it.dx, sy = ay + it.dy;
+    const u = Math.max(0, Math.min(1, (now - web.t0 - it.k * 26) / 620)), e = easeOut(u);
+    let fx = ax, fy = ay;
+    if (it.j >= 0 && inLayout(it.j)) {
+      const [rx, ry, rz] = toScreen(X[it.j], CY[it.j], Z[it.j]);
+      if (rz <= 1) { fx = rx; fy = ry; }
+      it.real = rz <= 1 ? [rx, ry] : null;
+    } else it.real = null;
+    const px = fx + (sx - fx) * e, py = fy + (sy - fy) * e;
+    it.px = px; it.py = py;
+    const pad = 4 + it.r;
+    it.el.style.transform = it.side === "l" ? `translate(${(px + pad).toFixed(1)}px, ${py.toFixed(1)}px) translate(-100%, -50%)`
+      : `translate(${(px - pad).toFixed(1)}px, ${py.toFixed(1)}px) translate(0, -50%)`;
+    it.el.style.opacity = Math.min(1, u * 2.5).toFixed(2);
+    it.el.style.setProperty("--lab", Math.max(0, (u - 0.45) / 0.55).toFixed(2));
+    it.el.classList.toggle("hot", it.j >= 0 && it.j === hot);
+    if (it.path) {
+      const vert = it.g === "up" || it.g === "down";
+      const c1x = vert ? ax : ax + (px - ax) * 0.55, c1y = vert ? ay + (py - ay) * 0.55 : ay;
+      const c2x = vert ? px : ax + (px - ax) * 0.45, c2y = vert ? ay + (py - ay) * 0.45 : py;
+      const dl = Math.hypot(c1x - ax, c1y - ay) || 1;
+      const x0 = ax + ((c1x - ax) / dl) * ra, y0 = ay + ((c1y - ay) / dl) * ra;
+      it.path.setAttribute("d", `M${x0.toFixed(1)},${y0.toFixed(1)}C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${px.toFixed(1)},${py.toFixed(1)}`);
+      it.path.style.opacity = (Math.min(1, u * 1.6) * (hot >= 0 && it.j !== hot ? 0.35 : 1)).toFixed(2);
+      it.path.classList.toggle("hot", it.j === hot);
+    }
+  }
+  const hi = hot >= 0 ? web.items.find((x) => x.j === hot && x.real) : null;   // where it really is (or towards it)
+  let td = "";
+  if (hi) {
+    let [rx, ry] = hi.real;
+    const m = 10, dx = rx - hi.px, dy = ry - hi.py;
+    let f = 1;                                       // off screen: stop at the edge, pointing at it
+    if (rx < m) f = Math.min(f, (m - hi.px) / dx); if (rx > W - m) f = Math.min(f, (W - m - hi.px) / dx);
+    if (ry < m) f = Math.min(f, (m - hi.py) / dy); if (ry > H - m) f = Math.min(f, (H - m - hi.py) / dy);
+    rx = hi.px + dx * f; ry = hi.py + dy * f;
+    td = `M${hi.px.toFixed(1)},${hi.py.toFixed(1)}L${rx.toFixed(1)},${ry.toFixed(1)}M${(rx + 4.5).toFixed(1)},${ry.toFixed(1)}a4.5,4.5 0 1,0 -9,0a4.5,4.5 0 1,0 9,0`;
+  }
+  web.thread.setAttribute("d", td);
+  const lab = Math.max(0, Math.min(1, (now - web.t0 - 300) / 500)).toFixed(2);
+  for (const h of web.heads) {
+    h.el.style.transform = `translate(${(ax + h.dx).toFixed(1)}px, ${(ay + h.dy).toFixed(1)}px) translate(${h.side === "l" ? "-100%" : h.side === "r" ? "0" : "-50%"}, -50%)`;
+    h.el.style.opacity = lab;
+  }
+  if (web.chain) { web.chain.style.transform = `translate(${(ax).toFixed(1)}px, ${(web.B.y0 + 2).toFixed(1)}px) translate(-50%, 0)`; web.chain.style.opacity = lab; }
+  if (!animating) web.done = true;
+}
+function setWebHot(j) {
+  if (!web || web.hot === j) return;
+  web.hot = j; web.dirty = true; edgesDirty = true;
+  hover = { i: j, art: null }; refreshHover();
+}
+$("web").addEventListener("pointerover", (e) => {
+  const b = e.target.closest("[data-j]");
+  if (!b || b.closest(".wc")) { if (!e.target.closest(".wn")) setWebHot(-1); return; }
+  const j = +b.dataset.j;
+  setWebHot(j);
+  const r = b.getBoundingClientRect();
+  showTip(r.right, r.bottom - 6, { i: j, art: null });
+});
+$("web").addEventListener("pointerout", (e) => {
+  if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".wn")) return;
+  setWebHot(-1); $("tip").hidden = true;
+});
+$("web").addEventListener("click", (e) => {
+  const d = e.target.closest("[data-descend]");
+  if (d) { clearWeb(); descend(+d.dataset.descend); return; }
+  const m = e.target.closest("[data-more]");
+  if (m) {                                   // the full list is in the panel
+    if ($("panel").hidden) { $("panel").hidden = false; recentre(); relayoutWeb(); }
+    const sec = $("pbody").querySelector(m.dataset.more === "down" ? "[data-sec=deps]" : m.dataset.more === "law" ? "[data-sec=law]" : "[data-sec=court]");
+    if (sec) sec.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    return;
+  }
+  const b = e.target.closest("[data-j]");
+  if (!b) return;
+  const j = +b.dataset.j;
+  $("tip").hidden = true;
+  if (story && story.tr) endTour(false);
+  select(j);
+});
+$("webbtn").onclick = () => {
+  webOn = !webOn;
+  try { localStorage.setItem("slm-web", webOn ? "1" : "0"); } catch (e) { /* storage unavailable */ }
+  $("webbtn").setAttribute("aria-pressed", webOn);
+  if (webOn && sel.i >= 0) webFor(sel.i); else clearWeb();
+  if (!webOn && sel.i >= 0 && mode === "tree" && K[sel.i] === "act" && !story) courtsFor(sel.i);
+  else hideCourts();
+};
 
 // --- focus mode, idle orbit
 $("focusbtn").onclick = () => {
