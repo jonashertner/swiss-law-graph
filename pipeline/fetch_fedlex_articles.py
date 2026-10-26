@@ -47,12 +47,12 @@ def sparql(query: str) -> list[dict]:
 
 
 def norm_article(num_html: str) -> str | None:
-    t = TAG_RE.sub("", num_html)
+    t = TAG_RE.sub(" ", num_html)
     t = t.replace("\xa0", " ").strip()
-    m = re.match(r"(?:Art\.?|Artikel|§)?\s*(\d+)\s*([a-z]{0,12})", t, re.I)
+    m = re.match(r"(?:Art\.?|Artikel|§)?\s*(\d+)\s*([a-z]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?|[a-z])(?![a-z])", t, re.I)
     if not m:
         return None
-    return (m.group(1) + m.group(2)).lower()
+    return (m.group(1) + re.sub(r"\s+", "", m.group(2))).lower()
 
 
 def fetch_articles(url: str) -> list[str]:
