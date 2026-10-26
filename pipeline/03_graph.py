@@ -13,7 +13,9 @@ decision = number of distinct decisions citing it.
 Co-citation (decision 9): two acts (or two articles) are linked when they are
 cited together by at least MIN_ACT (MIN_ART) decisions and the pair is
 over-represented: lift = n_xy * N / (n_x * n_y) >= MIN_LIFT. Each node keeps
-its TOP_K strongest links by lift; an edge survives if either end keeps it.
+its TOP_K strongest links, ranked by n_xy * ln(lift) (frequent AND
+over-represented; lift alone favours rare pairs); an edge survives if either
+end keeps it.
 
 Outputs (build/graph/): acts.parquet, act_years.parquet, articles.parquet,
 art_years.parquet, act_edges.parquet, art_edges.parquet, top_decisions.parquet,
@@ -119,8 +121,8 @@ def main() -> None:
                   from px join nx nx1 on nx1.k = px.x join nx nx2 on nx2.k = px.y
                   where px.n * {n_total}::double / (nx1.n * nx2.n) >= {MIN_LIFT}""")
         c.sql(f"""create table {name} as with both_ as (
-                    select x, y, n, lift, row_number() over (partition by x order by lift desc, n desc) rx,
-                           row_number() over (partition by y order by lift desc, n desc) ry from sx)
+                    select x, y, n, lift, row_number() over (partition by x order by n * ln(lift) desc, n desc) rx,
+                           row_number() over (partition by y order by n * ln(lift) desc, n desc) ry from sx)
                   select x, y, n, lift from both_ where rx <= {TOP_K} or ry <= {TOP_K}""")
         print(name, c.sql(f"select count(*) from px").fetchall()[0][0], "pairs >= min;",
               c.sql(f"select count(*) from sx").fetchall()[0][0], "with lift >=", MIN_LIFT, ";",

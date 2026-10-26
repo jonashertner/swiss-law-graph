@@ -1,6 +1,18 @@
 {
  "source": "Fedlex SPARQL + filestore, German text in force on `as_of`",
  "regimes": {
+  "SR 0.742.403.1@1961": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1964/1082_1082_1108",
+   "as_of": "1974-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 0.742.403.1@1970": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1975/267_268_268",
+   "as_of": "1985-04-30",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 101@1874": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1/1_1_1",
    "as_of": "1999-12-31",
@@ -299,6 +311,121 @@
     }
    ]
   },
+  "SR 121.1@2009": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2009/848",
+   "as_of": "2017-08-31",
+   "articles": [
+    "1",
+    "2",
+    "2a",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "14a",
+    "14b",
+    "14c",
+    "14d",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "28a",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "35a",
+    "36",
+    "37"
+   ],
+   "date": "2017-04-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2009/848/20170401/de/pdf-a/fedlex-data-admin-ch-eli-cc-2009-848-20170401-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2017-04-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2009/848/20170401/de/pdf-a/fedlex-data-admin-ch-eli-cc-2009-848-20170401-de-pdf-a.pdf",
+     "articles": 44
+    },
+    {
+     "date": "2010-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2009/848/20100101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2009-848-20100101-de-pdf-a.pdf",
+     "articles": 37
+    }
+   ]
+  },
+  "SR 121@2008": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2009/809",
+   "as_of": "2017-08-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "4a",
+    "4b",
+    "5",
+    "6",
+    "6a",
+    "6b",
+    "6c",
+    "6d",
+    "6e",
+    "6f",
+    "6g",
+    "6h",
+    "6i",
+    "6j",
+    "6k",
+    "6l",
+    "7",
+    "7a",
+    "8",
+    "9",
+    "10"
+   ],
+   "date": "2014-11-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2009/809/20141101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2009-809-20141101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2014-11-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2009/809/20141101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2009-809-20141101-de-pdf-a.pdf",
+     "articles": 25
+    },
+    {
+     "date": "2010-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2009/809/20100101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2009-809-20100101-de-pdf-a.pdf",
+     "articles": 10
+    }
+   ]
+  },
   "SR 141.0@1952": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1952/1087_1115_1119",
    "as_of": "2017-12-31",
@@ -385,6 +512,53 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1952/1087_1115_1119/20000901/de/pdf-a/fedlex-data-admin-ch-eli-cc-1952-1087_1115_1119-20000901-de-pdf-a.pdf",
      "articles": 60
+    }
+   ]
+  },
+  "SR 142.201@1949": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1949/228_232_233",
+   "as_of": "2007-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24"
+   ],
+   "date": "2007-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1949/228_232_233/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1949-228_232_233-20070101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2007-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1949/228_232_233/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1949-228_232_233-20070101-de-pdf-a.pdf",
+     "articles": 24
+    },
+    {
+     "date": "2002-06-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1949/228_232_233/20020601/de/pdf-a/fedlex-data-admin-ch-eli-cc-1949-228_232_233-20020601-de-pdf-a.pdf",
+     "articles": 24
     }
    ]
   },
@@ -1041,6 +1215,12 @@
     }
    ]
   },
+  "SR 172.010@1978": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1979/114_114_114",
+   "as_of": "1997-09-30",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 172.056.11@1995": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1996/518_518_518",
    "as_of": "2020-12-31",
@@ -1663,6 +1843,72 @@
    "articles": null,
    "note": "no German text published"
   },
+  "SR 173.71@2002": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2003/314",
+   "as_of": "2010-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "11a",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "23a",
+    "24",
+    "25",
+    "25a",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34"
+   ],
+   "date": "2009-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2003/314/20090101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2003-314-20090101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2009-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2003/314/20090101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2003-314-20090101-de-pdf-a.pdf",
+     "articles": 37
+    },
+    {
+     "date": "2003-08-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2003/314/20030801/de/pdf-a/fedlex-data-admin-ch-eli-cc-2003-314-20030801-de-pdf-a.pdf",
+     "articles": 34
+    }
+   ]
+  },
+  "SR 196.1@2010": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2011/38",
+   "as_of": "2016-06-30",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 211.223.11@2012": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2012/459",
    "as_of": "2023-12-31",
@@ -2081,6 +2327,18 @@
    "articles": null,
    "note": "no German text published"
   },
+  "SR 232.121@1900": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/18/138_135_140",
+   "as_of": "2002-06-30",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 232.12@1900": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/18/126_124_128",
+   "as_of": "2002-06-30",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 232.141@1977": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1977/2027_2027_2027",
    "as_of": "2026-12-31",
@@ -2333,6 +2591,70 @@
     }
    ]
   },
+  "SR 235.11@1993": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1993/1962_1962_1962",
+   "as_of": "2023-08-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "12a",
+    "12b",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "27a",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38"
+   ],
+   "date": "2012-10-16",
+   "format": "xml",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1993/1962_1962_1962/20121016/de/xml/fedlex-data-admin-ch-eli-cc-1993-1962_1962_1962-20121016-de-xml-2.xml",
+   "texts": [
+    {
+     "date": "2012-10-16",
+     "format": "xml",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1993/1962_1962_1962/20121016/de/xml/fedlex-data-admin-ch-eli-cc-1993-1962_1962_1962-20121016-de-xml-2.xml",
+     "articles": 41
+    },
+    {
+     "date": "2000-04-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1993/1962_1962_1962/20000401/de/pdf-a/fedlex-data-admin-ch-eli-cc-1993-1962_1962_1962-20000401-de-pdf-a.pdf",
+     "articles": 38
+    }
+   ]
+  },
   "SR 235.13@2007": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2007/701",
    "as_of": "2023-08-31",
@@ -2444,6 +2766,71 @@
    "as_of": "1996-01-31",
    "articles": null,
    "note": "no German text published"
+  },
+  "SR 272@2000": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2000/374",
+   "as_of": "2010-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "15a",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "29a",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40"
+   ],
+   "date": "2007-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/374/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-374-20070101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2007-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/374/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-374-20070101-de-pdf-a.pdf",
+     "articles": 42
+    },
+    {
+     "date": "2001-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/374/20010101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-374-20010101-de-pdf-a.pdf",
+     "articles": 40
+    }
+   ]
   },
   "SR 281.35@1971": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1971/1080_1080_1081",
@@ -3777,6 +4164,104 @@
     }
    ]
   },
+  "SR 414.20@1991": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1992/1027_1027_1027",
+   "as_of": "2000-03-31",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 414.20@1999": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2000/146",
+   "as_of": "2014-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "29",
+    "28"
+   ],
+   "date": "2013-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/146/20130101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-146-20130101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2013-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/146/20130101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-146-20130101-de-pdf-a.pdf",
+     "articles": 28
+    },
+    {
+     "date": "2000-04-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/146/20000401/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-146-20000401-de-pdf-a.pdf",
+     "articles": 29
+    }
+   ]
+  },
+  "SR 418.0@1987": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1988/1096_1096_1096",
+   "as_of": "2014-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17"
+   ],
+   "date": "2012-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1988/1096_1096_1096/20120101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1988-1096_1096_1096-20120101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2012-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1988/1096_1096_1096/20120101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1988-1096_1096_1096-20120101-de-pdf-a.pdf",
+     "articles": 17
+    },
+    {
+     "date": "2007-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1988/1096_1096_1096/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1988-1096_1096_1096-20070101-de-pdf-a.pdf",
+     "articles": 17
+    }
+   ]
+  },
   "SR 420.1@1983": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1984/28_28_28",
    "as_of": "2013-12-31",
@@ -3987,6 +4472,49 @@
    "articles": null,
    "note": "no German text published"
   },
+  "SR 446.11@1990": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1990/2012_2012_2012",
+   "as_of": "2012-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20"
+   ],
+   "date": "2012-10-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1990/2012_2012_2012/20121001/de/pdf-a/fedlex-data-admin-ch-eli-cc-1990-2012_2012_2012-20121001-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2012-10-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1990/2012_2012_2012/20121001/de/pdf-a/fedlex-data-admin-ch-eli-cc-1990-2012_2012_2012-20121001-de-pdf-a.pdf",
+     "articles": 0
+    },
+    {
+     "date": "2002-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1990/2012_2012_2012/20020101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1990-2012_2012_2012-20020101-de-pdf-a.pdf",
+     "articles": 20
+    }
+   ]
+  },
   "SR 446.11@2012": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2012/699",
    "as_of": "2021-12-31",
@@ -4033,6 +4561,37 @@
      "format": "xml",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2012/699/20130101/de/xml/fedlex-data-admin-ch-eli-cc-2012-699-20130101-de-xml-1.xml",
      "articles": 32
+    }
+   ]
+  },
+  "SR 446.1@1989": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1990/2007_2007_2007",
+   "as_of": "2012-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "date": "2007-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1990/2007_2007_2007/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1990-2007_2007_2007-20070101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2007-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1990/2007_2007_2007/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1990-2007_2007_2007-20070101-de-pdf-a.pdf",
+     "articles": 14
     }
    ]
   },
@@ -4083,6 +4642,125 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1981/1680_1680_1680/20000601/de/pdf-a/fedlex-data-admin-ch-eli-cc-1981-1680_1680_1680-20000601-de-pdf-a.pdf",
      "articles": 5
+    }
+   ]
+  },
+  "SR 453@1981": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1981/1248_1248_1248",
+   "as_of": "2007-06-30",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "7a",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "20a",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26"
+   ],
+   "date": "2007-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1981/1248_1248_1248/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1981-1248_1248_1248-20070101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2007-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1981/1248_1248_1248/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1981-1248_1248_1248-20070101-de-pdf-a.pdf",
+     "articles": 28
+    },
+    {
+     "date": "2000-04-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1981/1248_1248_1248/20000401/de/pdf-a/fedlex-data-admin-ch-eli-cc-1981-1248_1248_1248-20000401-de-pdf-a.pdf",
+     "articles": 28
+    }
+   ]
+  },
+  "SR 453@2007": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2007/351",
+   "as_of": "2013-09-30",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "22a",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44"
+   ],
+   "date": "2013-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2007/351/20130101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2007-351-20130101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2013-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2007/351/20130101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2007-351-20130101-de-pdf-a.pdf",
+     "articles": 45
+    },
+    {
+     "date": "2008-12-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2007/351/20081201/de/pdf-a/fedlex-data-admin-ch-eli-cc-2007-351-20081201-de-pdf-a.pdf",
+     "articles": 45
     }
    ]
   },
@@ -4547,6 +5225,12 @@
    "articles": null,
    "note": "no German text published"
   },
+  "SR 510.51@1995": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1995/4784_4784_4784",
+   "as_of": "1999-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 510.710@1983": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1983/627_627_627",
    "as_of": "1994-12-31",
@@ -4558,6 +5242,175 @@
    "as_of": "2004-02-29",
    "articles": null,
    "note": "no German text published"
+  },
+  "SR 511.12@1998": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1998/2656_2656_2656",
+   "as_of": "2004-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 512.21@1989": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1989/2179_2179_2179",
+   "as_of": "1994-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 512.21@1994": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1994/2907_2907_2907",
+   "as_of": "1999-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 512.21@1999": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1999/458",
+   "as_of": "2003-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "60",
+    "61",
+    "62",
+    "63",
+    "64",
+    "65",
+    "66",
+    "67",
+    "68",
+    "69",
+    "70",
+    "71",
+    "72",
+    "73",
+    "74",
+    "75",
+    "76",
+    "77",
+    "78",
+    "79",
+    "80",
+    "81",
+    "82",
+    "83",
+    "84",
+    "85",
+    "86",
+    "87",
+    "88",
+    "89",
+    "90",
+    "91",
+    "92",
+    "93",
+    "94",
+    "95",
+    "96",
+    "97",
+    "98",
+    "99",
+    "100",
+    "100a",
+    "100b",
+    "100c",
+    "101",
+    "102",
+    "103",
+    "104",
+    "105",
+    "106",
+    "107",
+    "108",
+    "112",
+    "113",
+    "114",
+    "115",
+    "116",
+    "117",
+    "118",
+    "119",
+    "120",
+    "121",
+    "122",
+    "123",
+    "124",
+    "127",
+    "129",
+    "130",
+    "131",
+    "11"
+   ],
+   "date": "2002-05-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/458/20020501/de/pdf-a/fedlex-data-admin-ch-eli-cc-1999-458-20020501-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2002-05-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/458/20020501/de/pdf-a/fedlex-data-admin-ch-eli-cc-1999-458-20020501-de-pdf-a.pdf",
+     "articles": 127
+    },
+    {
+     "date": "2000-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/458/20000101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1999-458-20000101-de-pdf-a.pdf",
+     "articles": 125
+    }
+   ]
   },
   "SR 512.21@2003": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2003/680",
@@ -4735,6 +5588,38 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2003/682/20040101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2003-682-20040101-de-pdf-a.pdf",
      "articles": 22
+    }
+   ]
+  },
+  "SR 513.11@2003": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2003/685",
+   "as_of": "2017-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
+   ],
+   "date": "2015-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2003/685/20150101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2003-685-20150101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2015-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2003/685/20150101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2003-685-20150101-de-pdf-a.pdf",
+     "articles": 9
+    },
+    {
+     "date": "2004-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2003/685/20040101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2003-685-20040101-de-pdf-a.pdf",
+     "articles": 9
     }
    ]
   },
@@ -5168,6 +6053,18 @@
     }
    ]
   },
+  "SR 520.17@1994": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1994/2739_2739_2739",
+   "as_of": "2003-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 520.1@1994": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1994/2626_2626_2626",
+   "as_of": "2003-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 520.1@2002": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2003/620",
    "as_of": "2020-12-31",
@@ -5279,6 +6176,12 @@
      "articles": 77
     }
    ]
+  },
+  "SR 531.32@1991": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1991/2517_2517_2517",
+   "as_of": "2020-09-30",
+   "articles": null,
+   "note": "no German text published"
   },
   "SR 531@1982": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1983/931_931_931",
@@ -6486,6 +7389,12 @@
    "articles": null,
    "note": "no German text published"
   },
+  "SR 680.11@1962": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1962/319_325_331",
+   "as_of": "1999-06-30",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 680.11@1999": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1999/276",
    "as_of": "2017-12-31",
@@ -6783,6 +7692,38 @@
     }
    ]
   },
+  "SR 730.010.1@2006": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2006/816",
+   "as_of": "2017-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "3a",
+    "4",
+    "4a",
+    "5",
+    "6",
+    "7"
+   ],
+   "date": "2014-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2006/816/20140101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2006-816-20140101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2014-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2006/816/20140101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2006-816-20140101-de-pdf-a.pdf",
+     "articles": 9
+    },
+    {
+     "date": "2008-04-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2006/816/20080401/de/pdf-a/fedlex-data-admin-ch-eli-cc-2006-816-20080401-de-pdf-a.pdf",
+     "articles": 8
+    }
+   ]
+  },
   "SR 730.01@1992": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1992/397_397_397",
    "as_of": "1998-12-31",
@@ -6898,6 +7839,12 @@
     }
    ]
   },
+  "SR 730.0@1990": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1991/1018_1018_1018",
+   "as_of": "1998-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 730.0@1998": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1999/27",
    "as_of": "2017-12-31",
@@ -6961,6 +7908,53 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/27/20050101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1999-27-20050101-de-pdf-a.pdf",
      "articles": 31
+    }
+   ]
+  },
+  "SR 732.11@1984": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1984/209_209_209",
+   "as_of": "2005-01-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20a",
+    "21",
+    "21a",
+    "22",
+    "23"
+   ],
+   "date": "2002-03-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1984/209_209_209/20020301/de/pdf-a/fedlex-data-admin-ch-eli-cc-1984-209_209_209-20020301-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2002-03-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1984/209_209_209/20020301/de/pdf-a/fedlex-data-admin-ch-eli-cc-1984-209_209_209-20020301-de-pdf-a.pdf",
+     "articles": 24
+    },
+    {
+     "date": "2001-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1984/209_209_209/20010101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1984-209_209_209-20010101-de-pdf-a.pdf",
+     "articles": 24
     }
    ]
   },
@@ -7105,6 +8099,18 @@
      "articles": 38
     }
    ]
+  },
+  "SR 734.25@1991": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1991/1476_1476_1476",
+   "as_of": "2000-02-29",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 734.26@1992": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1992/2504_2504_2504",
+   "as_of": "1997-04-30",
+   "articles": null,
+   "note": "no German text published"
   },
   "SR 734.26@1997": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1997/1016_1016_1016",
@@ -7251,6 +8257,12 @@
     }
    ]
   },
+  "SR 741.41@1969": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1969/821_841_839",
+   "as_of": "1995-09-30",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 741.621@1985": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1985/620_620_620",
    "as_of": "2002-12-31",
@@ -7342,6 +8354,112 @@
     }
    ]
   },
+  "SR 741.71@1994": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1994/2509_2509_2509",
+   "as_of": "2000-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31"
+   ],
+   "date": "1998-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1994/2509_2509_2509/19980101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1994-2509_2509_2509-19980101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "1998-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1994/2509_2509_2509/19980101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1994-2509_2509_2509-19980101-de-pdf-a.pdf",
+     "articles": 31
+    }
+   ]
+  },
+  "SR 742.120@1998": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1999/100",
+   "as_of": "2009-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 742.120@2009": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2009/732",
+   "as_of": "2015-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "19a",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28"
+   ],
+   "date": "2013-07-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2009/732/20130701/de/pdf-a/fedlex-data-admin-ch-eli-cc-2009-732-20130701-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2013-07-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2009/732/20130701/de/pdf-a/fedlex-data-admin-ch-eli-cc-2009-732-20130701-de-pdf-a.pdf",
+     "articles": 29
+    },
+    {
+     "date": "2010-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2009/732/20100101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2009-732-20100101-de-pdf-a.pdf",
+     "articles": 28
+    }
+   ]
+  },
   "SR 742.144.1@2001": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2001/441",
    "as_of": "2015-12-31",
@@ -7394,6 +8512,113 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2001/441/20011215/de/pdf-a/fedlex-data-admin-ch-eli-cc-2001-441-20011215-de-pdf-a.pdf",
      "articles": 38
+    }
+   ]
+  },
+  "SR 742.161@2000": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2000/320",
+   "as_of": "2015-01-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41"
+   ],
+   "date": "2007-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/320/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-320-20070101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2007-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/320/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-320-20070101-de-pdf-a.pdf",
+     "articles": 41
+    },
+    {
+     "date": "2000-10-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/320/20001001/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-320-20001001-de-pdf-a.pdf",
+     "articles": 41
+    }
+   ]
+  },
+  "SR 742.221@1995": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1996/458_458_458",
+   "as_of": "2010-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26"
+   ],
+   "date": "1999-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1996/458_458_458/19990101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1996-458_458_458-19990101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "1999-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1996/458_458_458/19990101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1996-458_458_458-19990101-de-pdf-a.pdf",
+     "articles": 26
     }
    ]
   },
@@ -7993,6 +9218,51 @@
      "articles": 34
     }
    ]
+  },
+  "SR 748.215.3@1996": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1996/653_653_653",
+   "as_of": "2009-07-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "5a",
+    "5b",
+    "6",
+    "7",
+    "8"
+   ],
+   "date": "2005-07-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1996/653_653_653/20050701/de/pdf-a/fedlex-data-admin-ch-eli-cc-1996-653_653_653-20050701-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2005-07-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1996/653_653_653/20050701/de/pdf-a/fedlex-data-admin-ch-eli-cc-1996-653_653_653-20050701-de-pdf-a.pdf",
+     "articles": 10
+    },
+    {
+     "date": "2000-07-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1996/653_653_653/20000701/de/pdf-a/fedlex-data-admin-ch-eli-cc-1996-653_653_653-20000701-de-pdf-a.pdf",
+     "articles": 8
+    }
+   ]
+  },
+  "SR 748.411@1952": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1952/1060_1087_1090",
+   "as_of": "2005-09-04",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 748.941@1988": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1988/549_549_549",
+   "as_of": "1994-12-31",
+   "articles": null,
+   "note": "no German text published"
   },
   "SR 748.941@1994": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1994/3076_3076_3076",
@@ -8595,6 +9865,169 @@
     }
    ]
   },
+  "SR 784.102.1@1992": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1992/873_873_873",
+   "as_of": "1997-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 784.102.1@1997": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1997/2868_2868_2868",
+   "as_of": "2007-03-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "19a",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43"
+   ],
+   "date": "2005-02-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1997/2868_2868_2868/20050201/de/pdf-a/fedlex-data-admin-ch-eli-cc-1997-2868_2868_2868-20050201-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2005-02-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1997/2868_2868_2868/20050201/de/pdf-a/fedlex-data-admin-ch-eli-cc-1997-2868_2868_2868-20050201-de-pdf-a.pdf",
+     "articles": 44
+    },
+    {
+     "date": "2000-05-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1997/2868_2868_2868/20000501/de/pdf-a/fedlex-data-admin-ch-eli-cc-1997-2868_2868_2868-20000501-de-pdf-a.pdf",
+     "articles": 44
+    }
+   ]
+  },
+  "SR 784.102.1@2007": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2007/172",
+   "as_of": "2020-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "10a",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "28a",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "43",
+    "44",
+    "45",
+    "46",
+    "46a",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "60",
+    "61",
+    "62",
+    "62a",
+    "63",
+    "40",
+    "41",
+    "42"
+   ],
+   "date": "2017-12-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2007/172/20171201/de/pdf-a/fedlex-data-admin-ch-eli-cc-2007-172-20171201-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2017-12-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2007/172/20171201/de/pdf-a/fedlex-data-admin-ch-eli-cc-2007-172-20171201-de-pdf-a.pdf",
+     "articles": 64
+    },
+    {
+     "date": "2007-04-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2007/172/20070401/de/pdf-a/fedlex-data-admin-ch-eli-cc-2007-172-20070401-de-pdf-a.pdf",
+     "articles": 63
+    }
+   ]
+  },
   "SR 784.106@1997": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1997/2895_2895_2895",
    "as_of": "2007-12-31",
@@ -8700,6 +10133,12 @@
   "SR 784.10@1991": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1992/581_581_581",
    "as_of": "1997-10-19",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 784.401@1982": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1982/1149_1149_1149",
+   "as_of": "1992-03-31",
    "articles": null,
    "note": "no German text published"
   },
@@ -9030,6 +10469,117 @@
     }
    ]
   },
+  "SR 812.121.1@1952": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1952/252_252_256",
+   "as_of": "1996-06-30",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 812.121.1@1996": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1996/1679_1679_1679",
+   "as_of": "2011-06-30",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "22a",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "36a",
+    "37",
+    "38",
+    "39",
+    "40",
+    "40a",
+    "40b",
+    "40c",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "60",
+    "61",
+    "62",
+    "63",
+    "64",
+    "65",
+    "66",
+    "67",
+    "68",
+    "68a",
+    "69",
+    "70",
+    "71",
+    "72",
+    "73",
+    "74",
+    "75",
+    "76"
+   ],
+   "date": "2008-12-12",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1996/1679_1679_1679/20081212/de/pdf-a/fedlex-data-admin-ch-eli-cc-1996-1679_1679_1679-20081212-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2008-12-12",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1996/1679_1679_1679/20081212/de/pdf-a/fedlex-data-admin-ch-eli-cc-1996-1679_1679_1679-20081212-de-pdf-a.pdf",
+     "articles": 82
+    },
+    {
+     "date": "2002-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1996/1679_1679_1679/20020101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1996-1679_1679_1679-20020101-de-pdf-a.pdf",
+     "articles": 80
+    }
+   ]
+  },
   "SR 812.212.1@2001": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2001/515",
    "as_of": "2018-12-31",
@@ -9348,6 +10898,12 @@
     }
    ]
   },
+  "SR 812.21@1989": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1990/570_570_570",
+   "as_of": "2001-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 813.11@2005": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2005/466",
    "as_of": "2015-06-30",
@@ -9503,6 +11059,18 @@
      "articles": 111
     }
    ]
+  },
+  "SR 814.12@1986": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1986/1147_1147_1147",
+   "as_of": "1998-09-30",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 814.201@1972": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1972/967_976_1138",
+   "as_of": "1998-12-31",
+   "articles": null,
+   "note": "no German text published"
   },
   "SR 814.501.513@2004": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2005/42",
@@ -9679,6 +11247,149 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1994/1947_1947_1947/20000101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1994-1947_1947_1947-20000101-de-pdf-a.pdf",
      "articles": 144
+    }
+   ]
+  },
+  "SR 814.600@1990": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1991/169_169_169",
+   "as_of": "2015-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "46a",
+    "47",
+    "51",
+    "52",
+    "53",
+    "53a",
+    "58",
+    "48",
+    "49",
+    "50",
+    "54",
+    "55",
+    "56",
+    "57"
+   ],
+   "date": "2011-07-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1991/169_169_169/20110701/de/pdf-a/fedlex-data-admin-ch-eli-cc-1991-169_169_169-20110701-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2011-07-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1991/169_169_169/20110701/de/pdf-a/fedlex-data-admin-ch-eli-cc-1991-169_169_169-20110701-de-pdf-a.pdf",
+     "articles": 53
+    },
+    {
+     "date": "2000-03-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1991/169_169_169/20000301/de/pdf-a/fedlex-data-admin-ch-eli-cc-1991-169_169_169-20000301-de-pdf-a.pdf",
+     "articles": 59
+    }
+   ]
+  },
+  "SR 814.610@1986": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1987/55_55_55",
+   "as_of": "2005-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43"
+   ],
+   "date": "2005-08-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1987/55_55_55/20050801/de/pdf-a/fedlex-data-admin-ch-eli-cc-1987-55_55_55-20050801-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2005-08-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1987/55_55_55/20050801/de/pdf-a/fedlex-data-admin-ch-eli-cc-1987-55_55_55-20050801-de-pdf-a.pdf",
+     "articles": 43
     }
    ]
   },
@@ -10894,6 +12605,91 @@
     }
    ]
   },
+  "SR 817.190@1995": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1995/1666_1666_1666",
+   "as_of": "2005-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "18a",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "60",
+    "61"
+   ],
+   "date": "2004-09-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1995/1666_1666_1666/20040901/de/pdf-a/fedlex-data-admin-ch-eli-cc-1995-1666_1666_1666-20040901-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2004-09-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1995/1666_1666_1666/20040901/de/pdf-a/fedlex-data-admin-ch-eli-cc-1995-1666_1666_1666-20040901-de-pdf-a.pdf",
+     "articles": 62
+    },
+    {
+     "date": "2001-04-15",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1995/1666_1666_1666/20010415/de/pdf-a/fedlex-data-admin-ch-eli-cc-1995-1666_1666_1666-20010415-de-pdf-a.pdf",
+     "articles": 62
+    }
+   ]
+  },
   "SR 817.190@2005": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2005/747",
    "as_of": "2017-04-30",
@@ -11687,6 +13483,36 @@
     }
    ]
   },
+  "SR 910.15@2007": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2007/820",
+   "as_of": "2011-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7"
+   ],
+   "date": "2011-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2007/820/20110101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2007-820-20110101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2011-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2007/820/20110101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2007-820-20110101-de-pdf-a.pdf",
+     "articles": 7
+    },
+    {
+     "date": "2008-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2007/820/20080101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2007-820-20080101-de-pdf-a.pdf",
+     "articles": 7
+    }
+   ]
+  },
   "SR 910.15@2013": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2013/712",
    "as_of": "2019-12-31",
@@ -11717,6 +13543,49 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2013/712/20140101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2013-712-20140101-de-pdf-a.pdf",
      "articles": 10
+    }
+   ]
+  },
+  "SR 910.17@1998": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1999/44",
+   "as_of": "2013-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "11a",
+    "12",
+    "12a",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18"
+   ],
+   "date": "2013-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/44/20130101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1999-44-20130101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2013-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/44/20130101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1999-44-20130101-de-pdf-a.pdf",
+     "articles": 20
+    },
+    {
+     "date": "2000-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/44/20000101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1999-44-20000101-de-pdf-a.pdf",
+     "articles": 18
     }
    ]
   },
@@ -11758,6 +13627,12 @@
      "articles": 16
     }
    ]
+  },
+  "SR 913.1@1971": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1971/996_997_996",
+   "as_of": "1998-12-31",
+   "articles": null,
+   "note": "no German text published"
   },
   "SR 913.1@1998": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1998/3092_3092_3092",
@@ -11868,6 +13743,33 @@
     }
    ]
   },
+  "SR 913.211@1998": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1998/3114_3114_3114",
+   "as_of": "2003-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4"
+   ],
+   "date": "2002-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1998/3114_3114_3114/20020101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1998-3114_3114_3114-20020101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2002-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1998/3114_3114_3114/20020101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1998-3114_3114_3114-20020101-de-pdf-a.pdf",
+     "articles": 4
+    },
+    {
+     "date": "2000-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1998/3114_3114_3114/20000101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1998-3114_3114_3114-20000101-de-pdf-a.pdf",
+     "articles": 4
+    }
+   ]
+  },
   "SR 915.7@2006": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2006/386",
    "as_of": "2010-12-31",
@@ -11912,6 +13814,12 @@
      "articles": 15
     }
    ]
+  },
+  "SR 916.01@1953": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1953/1129_1153_1194",
+   "as_of": "1998-12-31",
+   "articles": null,
+   "note": "no German text published"
   },
   "SR 916.01@1998": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1998/3125_3125_3125",
@@ -11995,6 +13903,12 @@
      "articles": 36
     }
    ]
+  },
+  "SR 916.121.10@1995": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1995/2017_2017_2017",
+   "as_of": "1998-12-31",
+   "articles": null,
+   "note": "no German text published"
   },
   "SR 916.161@2005": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2005/481",
@@ -12235,6 +14149,12 @@
     }
    ]
   },
+  "SR 916.171.1@1995": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1995/2809_2809_2809",
+   "as_of": "2001-03-14",
+   "articles": null,
+   "note": "no German text published"
+  },
   "SR 916.171.1@2001": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2001/109",
    "as_of": "2007-12-31",
@@ -12307,6 +14227,174 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2001/105/20010301/de/pdf-a/fedlex-data-admin-ch-eli-cc-2001-105-20010301-de-pdf-a.pdf",
      "articles": 36
+    }
+   ]
+  },
+  "SR 916.20@2001": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2001/174",
+   "as_of": "2010-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "14a",
+    "15",
+    "15a",
+    "15b",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "24a",
+    "24b",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "30a",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53"
+   ],
+   "date": "2010-04-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2001/174/20100401/de/pdf-a/fedlex-data-admin-ch-eli-cc-2001-174-20100401-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2010-04-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2001/174/20100401/de/pdf-a/fedlex-data-admin-ch-eli-cc-2001-174-20100401-de-pdf-a.pdf",
+     "articles": 59
+    },
+    {
+     "date": "2001-07-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2001/174/20010701/de/pdf-a/fedlex-data-admin-ch-eli-cc-2001-174-20010701-de-pdf-a.pdf",
+     "articles": 53
+    }
+   ]
+  },
+  "SR 916.20@2010": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2010/882",
+   "as_of": "2019-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "46a",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "60",
+    "61",
+    "62"
+   ],
+   "date": "2019-09-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2010/882/20190901/de/pdf-a/fedlex-data-admin-ch-eli-cc-2010-882-20190901-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2019-09-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2010/882/20190901/de/pdf-a/fedlex-data-admin-ch-eli-cc-2010-882-20190901-de-pdf-a.pdf",
+     "articles": 63
+    },
+    {
+     "date": "2011-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2010/882/20110101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2010-882-20110101-de-pdf-a.pdf",
+     "articles": 61
     }
    ]
   },
@@ -12694,6 +14782,48 @@
     }
    ]
   },
+  "SR 916.351.0@2005": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/2005/757",
+   "as_of": "2010-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "6a",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18"
+   ],
+   "date": "2009-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2005/757/20090101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2005-757-20090101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2009-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2005/757/20090101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2005-757-20090101-de-pdf-a.pdf",
+     "articles": 19
+    },
+    {
+     "date": "2007-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2005/757/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2005-757-20070101-de-pdf-a.pdf",
+     "articles": 19
+    }
+   ]
+  },
   "SR 916.371@1990": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1990/1549_1549_1549",
    "as_of": "1996-08-31",
@@ -12746,6 +14876,62 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/20/20000301/de/pdf-a/fedlex-data-admin-ch-eli-cc-1999-20-20000301-de-pdf-a.pdf",
      "articles": 19
+    }
+   ]
+  },
+  "SR 916.441.22@1993": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1993/920_920_920",
+   "as_of": "2004-06-30",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "4a",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "22a",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31"
+   ],
+   "date": "2003-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1993/920_920_920/20030101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1993-920_920_920-20030101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2003-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1993/920_920_920/20030101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1993-920_920_920-20030101-de-pdf-a.pdf",
+     "articles": 33
+    },
+    {
+     "date": "2001-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1993/920_920_920/20010101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1993-920_920_920-20010101-de-pdf-a.pdf",
+     "articles": 33
     }
    ]
   },
@@ -12901,6 +15087,152 @@
      "format": "pdf-a",
      "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/2000/565/20010101/de/pdf-a/fedlex-data-admin-ch-eli-cc-2000-565-20010101-de-pdf-a.pdf",
      "articles": 18
+    }
+   ]
+  },
+  "SR 935.511@1924": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/40/259_249_253",
+   "as_of": "2018-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "13",
+    "32",
+    "36",
+    "37",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "49",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "48"
+   ],
+   "date": "2012-04-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/40/259_249_253/20120401/de/pdf-a/fedlex-data-admin-ch-eli-cc-40-259_249_253-20120401-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2012-04-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/40/259_249_253/20120401/de/pdf-a/fedlex-data-admin-ch-eli-cc-40-259_249_253-20120401-de-pdf-a.pdf",
+     "articles": 15
+    },
+    {
+     "date": "2007-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/40/259_249_253/20070101/de/pdf-a/fedlex-data-admin-ch-eli-cc-40-259_249_253-20070101-de-pdf-a.pdf",
+     "articles": 44
+    }
+   ]
+  },
+  "SR 935.51@1923": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/39/353_361_363",
+   "as_of": "2018-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "27",
+    "28",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "29",
+    "30",
+    "31",
+    "32",
+    "51"
+   ],
+   "date": "2008-08-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/39/353_361_363/20080801/de/pdf-a/fedlex-data-admin-ch-eli-cc-39-353_361_363-20080801-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2008-08-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/39/353_361_363/20080801/de/pdf-a/fedlex-data-admin-ch-eli-cc-39-353_361_363-20080801-de-pdf-a.pdf",
+     "articles": 42
+    },
+    {
+     "date": "2004-04-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/39/353_361_363/20040401/de/pdf-a/fedlex-data-admin-ch-eli-cc-39-353_361_363-20040401-de-pdf-a.pdf",
+     "articles": 56
     }
    ]
   },
@@ -13251,6 +15583,230 @@
     }
    ]
   },
+  "SR 951.311@1967": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1967/135_145_139",
+   "as_of": "1994-12-31",
+   "articles": null,
+   "note": "no German text published"
+  },
+  "SR 951.311@1994": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1994/2547_2547_2547",
+   "as_of": "2006-12-31",
+   "articles": [
+    "1",
+    "1a",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "7a",
+    "7b",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "36a",
+    "37",
+    "37a",
+    "38",
+    "39",
+    "40",
+    "41",
+    "41a",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "60",
+    "61",
+    "62",
+    "63",
+    "64",
+    "65",
+    "66",
+    "67",
+    "68",
+    "69",
+    "70",
+    "71",
+    "72",
+    "73",
+    "74",
+    "75",
+    "76",
+    "77",
+    "77a",
+    "78",
+    "79",
+    "80",
+    "81",
+    "82",
+    "83",
+    "84",
+    "85",
+    "86",
+    "87",
+    "87a",
+    "88"
+   ],
+   "date": "2004-08-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1994/2547_2547_2547/20040801/de/pdf-a/fedlex-data-admin-ch-eli-cc-1994-2547_2547_2547-20040801-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2004-08-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1994/2547_2547_2547/20040801/de/pdf-a/fedlex-data-admin-ch-eli-cc-1994-2547_2547_2547-20040801-de-pdf-a.pdf",
+     "articles": 96
+    },
+    {
+     "date": "2001-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1994/2547_2547_2547/20010101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1994-2547_2547_2547-20010101-de-pdf-a.pdf",
+     "articles": 92
+    }
+   ]
+  },
+  "SR 951.31@1994": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1994/2523_2523_2523",
+   "as_of": "2006-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "60",
+    "61",
+    "62",
+    "63",
+    "64",
+    "65",
+    "66",
+    "67",
+    "68",
+    "69",
+    "70",
+    "71",
+    "72",
+    "73",
+    "74",
+    "75",
+    "76"
+   ],
+   "date": "2004-05-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1994/2523_2523_2523/20040501/de/pdf-a/fedlex-data-admin-ch-eli-cc-1994-2523_2523_2523-20040501-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2004-05-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1994/2523_2523_2523/20040501/de/pdf-a/fedlex-data-admin-ch-eli-cc-1994-2523_2523_2523-20040501-de-pdf-a.pdf",
+     "articles": 76
+    },
+    {
+     "date": "2001-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1994/2523_2523_2523/20010101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1994-2523_2523_2523-20010101-de-pdf-a.pdf",
+     "articles": 76
+    }
+   ]
+  },
   "SR 952.02@1972": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1972/821_832_752",
    "as_of": "2014-12-31",
@@ -13398,11 +15954,218 @@
     }
    ]
   },
+  "SR 954.11@1996": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1997/85_85_85",
+   "as_of": "2019-12-31",
+   "articles": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "60",
+    "61",
+    "62",
+    "63",
+    "64",
+    "65",
+    "66",
+    "67",
+    "68",
+    "69",
+    "70",
+    "71",
+    "72",
+    "73",
+    "74",
+    "75",
+    "76",
+    "77",
+    "78",
+    "79",
+    "80",
+    "81",
+    "82",
+    "83",
+    "84",
+    "85",
+    "86",
+    "87",
+    "88",
+    "89",
+    "90",
+    "91",
+    "92",
+    "93",
+    "94"
+   ],
+   "date": "2017-08-15",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1997/85_85_85/20170815/de/pdf-a/fedlex-data-admin-ch-eli-cc-1997-85_85_85-20170815-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2017-08-15",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1997/85_85_85/20170815/de/pdf-a/fedlex-data-admin-ch-eli-cc-1997-85_85_85-20170815-de-pdf-a.pdf",
+     "articles": 94
+    },
+    {
+     "date": "2004-07-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1997/85_85_85/20040701/de/pdf-a/fedlex-data-admin-ch-eli-cc-1997-85_85_85-20040701-de-pdf-a.pdf",
+     "articles": 59
+    }
+   ]
+  },
   "SR 954.195.1@1997": {
    "act": "https://fedlex.data.admin.ch/eli/cc/1997/2061_2061_2061",
    "as_of": "2008-12-31",
    "articles": null,
    "note": "no German text published"
+  },
+  "SR 954.1@1995": {
+   "act": "https://fedlex.data.admin.ch/eli/cc/1997/68_68_68",
+   "as_of": "2019-12-31",
+   "articles": [
+    "1",
+    "2",
+    "2a",
+    "10",
+    "10bis",
+    "11",
+    "11a",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "20",
+    "33",
+    "33e",
+    "34",
+    "34a",
+    "34b",
+    "35",
+    "35a",
+    "36",
+    "36a",
+    "37",
+    "38a",
+    "39",
+    "40",
+    "40a",
+    "41",
+    "41a",
+    "42",
+    "42a",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "50",
+    "51",
+    "52",
+    "54",
+    "55",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "19",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "38",
+    "49",
+    "53"
+   ],
+   "date": "2016-01-01",
+   "format": "pdf-a",
+   "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1997/68_68_68/20160101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1997-68_68_68-20160101-de-pdf-a.pdf",
+   "texts": [
+    {
+     "date": "2016-01-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1997/68_68_68/20160101/de/pdf-a/fedlex-data-admin-ch-eli-cc-1997-68_68_68-20160101-de-pdf-a.pdf",
+     "articles": 44
+    },
+    {
+     "date": "2004-05-01",
+     "format": "pdf-a",
+     "url": "https://fedlex.data.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1997/68_68_68/20040501/de/pdf-a/fedlex-data-admin-ch-eli-cc-1997-68_68_68-20040501-de-pdf-a.pdf",
+     "articles": 57
+    }
+   ]
   },
   "SR 955.033.0@2010": {
    "act": "https://fedlex.data.admin.ch/eli/cc/2010/885",

@@ -27,7 +27,7 @@ Same label, same date, same canton, two ids: `be_weitere` ↔ `be_direktionen` 1
 (`tg_obergericht_RBOG_2004_Nr._19` = `tg_gerichte_BR.2004.66`), `sg_publikationen` ↔
 `sg_gerichte` 1, `zg_obergericht` ↔ `zg_kantonsgericht` 1.
 
-### A3. Impossible decision dates — 14,533 decisions dated more than a year before their own docket year
+### A3. Impossible decision dates — 14,645 decisions dated more than a year before their own docket year
 | court | decisions |
 |---|---|
 | ge_gerichte | 3,832 |
@@ -38,7 +38,7 @@ Same label, same date, same canton, two ids: `be_weitere` ↔ `be_direktionen` 1
 | so_gerichte | 603 |
 | zh_sozialversicherungsgericht | 595 |
 | ar_gerichte | 556 |
-| bs_appellationsgericht | 517 |
+| bs_appellationsgericht | 540 |
 | bl_gerichte | 390 |
 | sg_versicherungsgericht | 388 |
 | vd_findinfo | 345 |
@@ -139,6 +139,11 @@ The extractor upper-cases codes, so `aZG` (Zollgesetz 1925) becomes `AZG` = Arbe
 *Suggested fix:* keep the original case of the code or emit an `edition` flag.
 *Map:* excluded as ambiguous.
 
+### B7b. Article numbers glued onto the code — 2,113 distinct codes
+`BV8`, `ZGB8`, `LPGA1`, `RPG1`, `ZPO1`, `KV9`: a known code followed directly by an article number,
+emitted as the law code (the article column then holds something else). In cantonal decisions such
+a code looks like an unknown cantonal act. *Map:* excluded as extraction artifacts.
+
 ### B8. Codes cantonal courts use that are not cantonal acts
 A consumer that reads "unknown code in a cantonal decision" as a cantonal act creates fake
 acts in up to 24 cantons: `GEBV` (20 cantons), `BVV` (21), `VO` (21), `EG` (22), `SIA` (24),
@@ -146,6 +151,26 @@ acts in up to 24 cantons: `GEBV` (20 cantons), `BVV` (21), `VO` (21), `EG` (22),
 `TIT` (from "tit. fin. CC"), `CLAH` (Hague conventions), `CCT` (collective labour agreements),
 `CGA` (insurance terms), `VOSTRA`, `SIS`, `DNA` (federal ordinances/acts).
 *Map:* excluded as "not a cantonal act" (66,780 references).
+
+---
+
+## D. MCP tools (checked live on 2026-10-26)
+
+### D1. `analyze_legal_trend` does not pair language variants of a law code
+`analyze_legal_trend(law_code="OR", article="41")` returns **3,734** decisions; the snapshot has
+3,737 decisions citing "OR 41" — and another **6,837** citing "CO 41" (French and Italian: VD 2,087,
+BGer 1,994, GE 1,721, TI 338, …). `law_code="CO"` counts those separately (728 since 2025, matching the
+snapshot's 724). Asked for Art. 41 OR, a German-speaking user gets about a third of the answer;
+the union is 10,503 decisions (10,424 after merging BGE/BGer duplicates and adding the other
+alias spellings). This is the pairing problem `law_codes.json` itself warns about ("_why").
+Worth checking `find_leading_cases(law_code=…)` and every other tool that filters by `law_code`.
+
+### D2. The future-dated decision shows in `get_statistics`
+`by_year` contains `"2027": 1` — the `fr_gerichte_605 2025 140` record of A3.
+
+### D3. Citation counts agree
+`find_citations("bge_143 IV 241", incoming, min_confidence 0.5)`: 9,086 live; the snapshot gives
+8,925 direct + 48 via the BGer twin (A1) → 8,949 after merging. The difference is the live graph's growth.
 
 ---
 

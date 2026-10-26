@@ -240,7 +240,12 @@ def main() -> None:
     c.register("al", al)
     c.register("hom", pd.DataFrame({"code": sorted(CANTONAL_HOMONYMS)}))
     c.register("unv", pd.DataFrame({"code": sorted(UNVERIFIED_HOMONYMS)}))
-    c.register("notk", pd.DataFrame({"code": sorted(NOT_CANTONAL)}))
+    # Extraction artifacts: a federal code with the article number glued on ("BV8", "ZGB8",
+    # "LPGA1"). Unknown to the alias tables, they would become cantonal acts.
+    codes = [x for (x,) in c.sql(f"select distinct upper(law_code) from '{ROOT}/data/statute_references.parquet'").fetchall()]
+    glued = {k for k in codes if k not in alias and (m := re.fullmatch(r"([A-Z]+?)(\d+[A-Z]?)", k or ""))
+             and len(m.group(1)) >= 2 and m.group(1) in alias}
+    c.register("notk", pd.DataFrame({"code": sorted(NOT_CANTONAL | glued)}))
     c.register("dated", pd.DataFrame([(k, d) for k, (_, d) in DATED_ALIASES.items()], columns=["code", "until"]))
     c.register("sec", pd.DataFrame(list(sections.items()), columns=["code", "section"]))
     c.register("edi", pd.DataFrame({"code": sorted(editions)}))
@@ -263,8 +268,8 @@ def main() -> None:
     c.sql("""create table alias_map as select alias_id, canonical_id, rule from dup
              where alias_id not in (select canonical_id from dup)""")
     c.sql(f"""create table meta0 as
-        select decision_id, any_value(court) court, any_value(canton) canton, min(dt) dt_src,
-               arg_min(label, length(label)) label
+        select decision_id, min(court) court, min(canton) canton, min(dt) dt_src,
+               arg_min(label, lpad(length(label)::varchar, 4, '0') || label) label
         from ci where decision_id not in (select alias_id from alias_map) group by 1""")
     # Docket year: the last run of exactly four digits between 1850 and 2029.
     year_of = lambda col: (f"try_cast(list_last(list_filter(regexp_extract_all({col}, '[0-9]+'), "
@@ -325,7 +330,7 @@ def main() -> None:
                then canton || ' ' || code
         end act_id, section, code, article, resolution
       from res2""")
-    c.sql(f"""copy (select decision_id, act_id, section, article, any_value(code) code, any_value(resolution) resolution
+    c.sql(f"""copy (select decision_id, act_id, section, article, min(code) code, min(resolution) resolution
                     from out where act_id is not null group by 1,2,3,4)
               to '{BUILD}/refs.parquet' (compression zstd)""")
     c.sql(f"copy meta to '{BUILD}/meta.parquet' (compression zstd)")
@@ -375,6 +380,7 @@ def main() -> None:
                "alias_overrides": ALIAS_OVERRIDES,
                "aliases_added_from_fedlex": added_from_fedlex,
                "not_cantonal": sorted(NOT_CANTONAL),
+               "glued_codes": len(glued),
                "cantonal_homonyms": sorted(CANTONAL_HOMONYMS),
                "unverified_homonyms": sorted(UNVERIFIED_HOMONYMS)},
               open(BUILD / "resolution_report.json", "w"), indent=1, default=str)

@@ -9,73 +9,125 @@ contradictions and lacunae. Owner: Jonas Hertner (also owner of opencaselaw.ch).
 ## Sources (public only — the page will be public)
 - `data/citations.parquet` — OpenCaseLaw CC0, 9,474,505 decision→decision edges
   (`match_type`, `confidence_score`). HF `voilaj/swiss-caselaw`, snapshot 2026-10-26.
-- `data/statute_references.parquet` — CC0, 12,707,001 decision→(law_code, article, paragraph).
+- `data/statute_references.parquet` — CC0, 12,707,001 rows decision × code × article × paragraph
+  (`mention_count` is 1 on every row: carries no information).
 - `data/structure.parquet` — CC0, per-decision court/language/structure flags.
-- `data/cite-index-*.tsv.gz` — CC0, decision → court, canton, date (col5 = decision_id).
+- `data/cite-index-*.tsv.gz` — CC0: col0 label, col1 court, col2 canton, col3 date, col5 decision_id.
 - `data/sr_taxonomy.csv` — Fedlex SPARQL legal taxonomy: SR tree + titles DE/FR/IT (+ some EN/RM).
-- `data/sr_eli.csv` — Fedlex SR number → ELI (for links to official text).
-- `data/fedlex_articles.json` — article list of each cited federal act from the current
-  consolidated XML (written by `pipeline/fetch_fedlex_articles.py`).
+- `data/sr_eli.csv` — Fedlex SR number → ELI + enforcement status (`…/0` = in force).
+- `data/fedlex_acts.json` — every act that ever carried a cited SR number, with dateDocument,
+  entry into force, repeal, titles and short titles per language (`fetch_fedlex_acts.py`).
+- `data/fedlex_articles.json` — flat article list per cited act (`fetch_fedlex_articles.py`; fallback only).
+- `data/fedlex_structure.json.gz` — structure of each cited act from the consolidated XML, DE/FR/IT:
+  levels (book/part/title/…/marginal titles) and articles in order with eId, repealed flag, headings
+  (`fetch_fedlex_structure.py`, ~35 min). 826/830 acts (4 have no XML).
+- `data/fedlex_regime_articles.json` — article numbers of each earlier act from its earliest and last
+  published text (mostly PDF/A, parsed by bold "Art." headings) (`fetch_fedlex_regimes.py`, needs
+  `build/act_nodes.json` from step 1). 171/230 earlier acts have a text.
 - Alias tables live in the opencaselaw repo: `docs/data/law_codes.json`,
-  `docs/api/law_aliases.json` (clone `jonashertner/opencaselaw`, pass its path to step 1).
+  `docs/api/law_aliases.json` (public repo: clone `jonashertner/opencaselaw` next to this one).
 - Do NOT use `jonashertner/opencaselaw-data` (private telemetry; its cards forbid release).
 
-Network: HuggingFace and Fedlex were blocked from the claude.ai cloud sandbox and were
-fetched from Jonas' Mac. The Mac disk is ~99 % full (12 GB free): keep large work off it.
+Network: the claude.ai cloud sandbox reached HuggingFace, Fedlex and the npm registry on
+2026-10-26 (it did not earlier). Jonas' Mac disk is ~99 % full: keep large work off it.
 
-## Decisions taken (each must be disclosed on the page's method panel)
+## Run
+```
+pip install duckdb pandas pyarrow pdfplumber        # + pandoc for docx (not used today)
+python3 pipeline/01_resolve.py ../jonashertner/opencaselaw   # 25 s
+python3 pipeline/02_validate.py                     # 20 s
+python3 pipeline/03_graph.py                        # 40 s
+python3 pipeline/04_hierarchy.py && (cd layout && npm ci && node pack.mjs)
+python3 pipeline/05_site.py                         # 40 s -> site/data (44 MB, not in git)
+python3 pipeline/06_artifact.py                     # site/artifact.html for claude.ai preview
+python3 -m http.server -d site 8765                 # local view: http://localhost:8765
+```
+Fedlex fetchers (only when refreshing data): `fetch_fedlex_acts.py`, `fetch_fedlex_articles.py`,
+`fetch_fedlex_structure.py`, then step 1, then `fetch_fedlex_regimes.py`.
+Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republish from
+`site/artifact.html` with root `site` and the files under `site/data`.
+
+## Decisions taken (each disclosed on the page's method panel)
 1. Language variants collapse onto one SR number (OR = CO, BGG = LTF, EMRK = CEDH).
-   The extractor emits language-specific codes; without pairing, French references vanish.
-2. Regimes: one SR number can carry different acts over time; earlier acts get their own
-   node `SR <n>@<regime>` because article numbering differs:
-   101@1874 (aBV, cut-over 2000-01-01), 173.110@1943 (OG), 312.0@1934 (BStP),
-   142.20@1931 (ANAG), 832.10@1911 (KUVG, cut 1996), 235.1@1992 (aDSG, cut 2023-09-01),
-   311.0@a (StGB before the 2007 general-part revision, cut 2007-01-01), 210@a, 220@a.
-   AuG/LEtr → AIG is a pure rename and is merged.
+2. Regimes, now generic (`01_resolve.py::act_intervals`): 412 of the 830 cited SR numbers carried
+   more than one act (Fedlex). Earlier acts get `SR <n>@<year of the act>` (232 receive references).
+   A code borne only by the earlier act (OG, ANAG, BStP, SGG, BEHG, GestG) means it; a code shared
+   by old and new act (ELG, AsylG, MWSTG, BüG, BV) means the act in force on the decision date; a
+   code only the current act bears (BGG, AIG) means the current act whatever the date. Short titles
+   of repealed acts from Fedlex are added as aliases (223 added; 9 rejected because they collide with other usage
+   — `REJECTED_FEDLEX`: LAG, LAJ, OASI, TVA, ALV, OOA, OGF, OAJ, BCO). 305 act nodes carry a regime
+   suffix; 303 earlier acts were looked up on Fedlex, 211 have a text. Editions of acts still in force
+   (aStGB, aZGB, aOR) get `@a`; StGB in decisions before 2007-01-01 → 311.0@a.
 3. ZPO/CPC/StPO/CPP before 2011-01-01: cantonal procedure codes (cantonal decision →
-   `<canton> <code>`; federal decision → excluded as ambiguous).
-4. Cantonal homonyms (`CANTONAL_HOMONYMS` in step 1, e.g. LPA = GE procedure act, not the
-   federal Animal Welfare Act): cantonal decision → cantonal act; federal → excluded.
-   Unverified homonyms are excluded everywhere they are ambiguous — never guessed.
-5. Unknown codes in cantonal decisions → cantonal act node `<canton> <code>` (no title yet:
-   the cantonal tables carry no abbreviations).
-6. Citation edges: `confidence_score` is NOT a probability — it rewards same court/canton
-   and recency (see opencaselaw `search_stack/build_reference_graph.py::_citation_confidence`).
-   Filtering on it would delete old and cross-jurisdiction citations. Rule: keep all match
-   types, drop score < 0.5 (0.35 %, resolver-detected conflicts), dedupe (source,target)
-   pairs (370,207 duplicates), flag `bge_pincite` edges as inferred.
-7. Article validation: an article node exists only if the article exists in the act's
-   current Fedlex text; others go to a per-act "not found in current text" bucket
-   (catches extraction noise like "Art. 429 CP", and VD's transitional old CPC 2011–2013:
-   cantonal decision + article absent from federal ZPO → cantonal code).
+   `<canton> <code>`; federal decision → excluded). Cantonal decisions 2011–2013 citing an article
+   absent from the federal ZPO/StPO → the canton's former code (6,616 refs, VD above all).
+4. Cantonal homonyms (`CANTONAL_HOMONYMS`): cantonal decision → cantonal act; federal → excluded.
+   Added 2026-10-26 on evidence of article-not-found rates per canton: StG, PBG, LAF, LC, LPers, PG,
+   LAS. Unverified / a-prefix collisions (`UNVERIFIED_HOMONYMS`, incl. AZG = aZG Customs Act 1925,
+   AWG, ASTG, ASTV) are excluded everywhere — never guessed.
+5. Unknown codes in cantonal decisions → cantonal act `<canton> <code>`, except `NOT_CANTONAL`
+   (federal acts missing from the alias tables, typos, generic words, SIA/CCT/CGA) and 2,113 codes
+   with an article number glued on (BV8, ZGB8): 71,453 refs excluded.
+   Cantonal act nodes with < 5 citing decisions are pooled per canton. Cantonal titles only where an
+   official title in law_codes.json contains the code and names exactly one law (639 acts, mostly GE/TI).
+6. Citation edges: `confidence_score` is NOT a probability. Keep all match types, drop < 0.5
+   (33,369), merge duplicate decisions, dedupe pairs (543,190), drop self-citations (6,210) and
+   targets outside the corpus (15,012) → 8,876,525 edges; 712,251 rest on a `bge_pincite` only.
+7. Article validation (`02_validate.py`): an article node exists only if the article exists in the
+   applicable Fedlex text — current act: main body of today's XML (transitional blocks restart
+   numbering and are separate; SchlT ZGB is its own section); repealed blocks ("Art. 274–274g") are
+   expanded; earlier acts: union of their earliest and last published text; aZGB/aOR: today's
+   numbering. Results: 9,054,590 valid / 30,590 not in text (bucket per act) / 12,038 no text;
+   63,559 article nodes.
 8. Every number shown is computed, not estimated; every node links to its source
-   (decisions: `https://mcp.opencaselaw.ch/entscheid/<urlencoded id>`; acts: Fedlex ELI).
-9. Co-citation edges between acts/articles must be significance-filtered (lift, minimum
-   count, top-k per node) — raw counts make BGG/ZPO connect to everything.
-10. Labels must say exactly what is measured: "most-cited decisions referring to this
-    article", never "leading case on this article".
+   (decisions: `https://mcp.opencaselaw.ch/entscheid/<urlencoded id>`; acts: Fedlex ELI page,
+   articles with `#<eId>` anchor).
+9. Co-citation: min 20 (acts) / 10 (articles) shared decisions, lift ≥ 2, top-8 per node ranked by
+   n·ln(lift) (lift alone surfaces obscure pairs). 7,376 act edges, 102,195 article edges.
+10. Labels say exactly what is measured: "Decisions referring to this article", "Most-cited decisions
+    referring to this article" (ranked by citing decisions), never "leading case".
+11. One judgment, one node: 5,812 BGE/BGer docket twins and 185 same label/date/canton duplicates
+    are merged onto one id (BGE preferred).
+12. Impossible source dates (14,645 decisions dated > 1 year before their own docket year; 1 future
+    date) are treated as unknown: no year shown; act assignment uses 1 January of the docket year.
+13. Alias fixes: OPC → 831.301 (not 281.41; not-found 69 % → 0.4 %); KLV → 832.112.31 for decisions
+    before 2025-01-01 (KlV climate ordinance from then on: ambiguous, excluded).
+14. Counting unit on the map: a decision counts once per act / article; areas count distinct
+    decisions citing any act inside (not the sum of their acts).
 
 ## Pipeline status
-- [x] `pipeline/01_resolve.py <opencaselaw path>` → build/refs.parquet, build/meta.parquet,
-      build/resolution_report.json. 97.9 % of references resolve to an act; rest counted.
-- [x] `pipeline/fetch_fedlex_articles.py` (stdlib only, ~12 min, needs Fedlex access):
-      826/830 acts have article lists. NOTE: the committed data/fedlex_articles.json was made
-      before a parser fix and has glued suffixes ("4aufgehoben", "197angenommen"). Rerun the
-      fetcher (fixed), or normalise with `^(\d+)([a-z]?(bis|ter|quater|…)?)` before use.
-      Acts carry transitional/final-provision articles that restart numbering (OR, ZGB):
-      treat the list as a set of valid numbers, not as order.
-- [ ] Apply article validation (decision 7).
-- [ ] Step 2: graph layers — areas (SR tree), acts, articles, decisions; per-year counts
-      for a time slider; co-citation edges; decision citation edges.
-- [ ] Step 3: layout — circle packing following the official SR tree (position = place in
-      the SR, not a force layout); articles ordered by number inside each act; curved arcs
-      for connections. Authority = incoming citations (PageRank optional).
-- [ ] Step 4: WebGL page (sigma.js/graphology or deck.gl), semantic zoom, instant search,
-      DE/FR/IT/EN, method panel with every exclusion count, works at phone width.
-      Decision layer loaded on demand in shards.
-- [ ] Step 5: verify counts against the opencaselaw MCP, view on desktop and phone.
+- [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
+      Deterministic (ties broken explicitly); two runs give identical reports.
+- [x] Step 2a `02_validate.py`: article validation (decision 7).
+- [x] Step 2b `03_graph.py`: per-act/article counts and years, authority (in-degree), co-citation.
+- [x] Step 3 `04_hierarchy.py` + `layout/pack.mjs`: d3-hierarchy circle packing of the SR tree
+      (siblings in SR order, padding ∝ parent size), cantonal region by canton; article grid in
+      reading order inside each act, a blank heading row before each top-level unit (`05_site.py`).
+- [x] Step 4 `site/` (index.html + app.js, no dependencies): Canvas 2D in double precision instead
+      of WebGL (exact multilingual text, zoom to 10^5× without float32 jitter, no CDN dependency;
+      2–26 ms per frame in headless software rendering). Semantic zoom, instant search (acts by any
+      language's code, "Art. 41 OR", SR numbers, titles, and topics from the acts' own headings —
+      "Mietrecht" → OR Achter Titel: Die Miete; lazily loaded `topics.<lang>.json`), DE/FR/IT/EN, method panel, period filter,
+      dark mode, phone layout (bottom sheet), deep links `#SR_220--art_41`. Articles loaded per
+      shard (168 shards, ≤ 1.8 MB raw).
+- [x] Step 5 partly: counts cross-checked with the opencaselaw MCP (BGE 143 IV 241 in-degree;
+      Art. 41 OR — the MCP undercounts, see report D1); desktop + phone screenshots via Playwright.
+
+## Reports
+- `reports/opencaselaw-anomalies.md` — anomalies in OpenCaseLaw for Jonas to fix there (duplicates,
+  impossible dates, alias errors, unflagged homonyms, SR reuse, extractor issues, MCP pairing). Keep
+  adding to it rather than silently working around new ones.
+
+## Next
+- Jonas to review the preview on desktop and phone; decide public vs private.
+- Decision search (by docket / BGE citation) and a decision panel with its own cites/cited-by.
+- PageRank as an optional authority measure (in-degree today).
+- Time slider polish (animation over years); EN titles exist for 471 SR entries only (fallback DE).
+- Canvas content is not screen-reader accessible; the panel, search and method dialog are.
+- Phase 2 (simplification, contradictions, lacunae) builds on `fedlex_structure.json.gz` and the
+  article co-citation graph.
 
 ## Open questions for Jonas
-- Public at launch, or private preview first?
-- Cantonal acts: titles need a cantonal abbreviation table (does not exist yet; opencaselaw
-  issue #74 notes cantonal abbreviations collide across cantons → key as `ZH_PBG`).
+- Public at launch, or private preview first? (Preview above is private.)
+- Cantonal acts: 639 now carry an official title; the rest need a cantonal abbreviation table
+  (opencaselaw issue #74: abbreviations collide across cantons → key as `ZH_PBG`).

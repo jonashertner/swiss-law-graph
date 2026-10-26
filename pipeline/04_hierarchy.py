@@ -51,6 +51,18 @@ def main() -> None:
         status[r["notation"]] = min(status.get(r["notation"], "9"), s or "9")
     is_act = set(status)
 
+    def up(n: str) -> str | None:
+        """Parent notation; for a parent Fedlex lists but does not describe (852.1, a
+        repealed act named as broader of 852.11), the nearest described SR prefix."""
+        if n in parent:
+            return parent[n]
+        d = n
+        while len(d) > 1:
+            d = d[:-1].rstrip(".")
+            if d in parent:
+                return d
+        return None
+
     c = duckdb.connect()
     dec = dict(c.sql(f"select act_id, decisions from '{BUILD}/graph/acts.parquet'").fetchall())
     nodes = json.load(open(BUILD / "act_nodes.json"))
@@ -69,10 +81,10 @@ def main() -> None:
         n = sr
         while n:
             keep.add(n)
-            n = parent.get(n)
+            n = up(n)
     kids: dict[str | None, list] = defaultdict(list)
     for n in keep:
-        kids[parent.get(n)].append(n)
+        kids[up(n)].append(n)
 
     def act_leaf(act_id: str) -> dict:
         return {"id": act_id, "kind": "act", "value": dec.get(act_id, 0) + 1, "decisions": dec.get(act_id, 0)}
