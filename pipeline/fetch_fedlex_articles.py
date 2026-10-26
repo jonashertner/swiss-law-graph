@@ -17,6 +17,8 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import artnum
+
 ROOT = Path(__file__).resolve().parents[1]
 RUN_DATE = "2026-10-26"
 SPARQL = "https://fedlex.data.admin.ch/sparqlendpoint"
@@ -46,13 +48,15 @@ def sparql(query: str) -> list[dict]:
         return json.load(r)["results"]["bindings"]
 
 
-def norm_article(num_html: str) -> str | None:
-    t = TAG_RE.sub(" ", num_html)
-    t = t.replace("\xa0", " ").strip()
-    m = re.match(r"(?:Art\.?|Artikel|§)?\s*(\d+)\s*([a-z]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?|[a-z])(?![a-z])", t, re.I)
-    if not m:
-        return None
-    return (m.group(1) + re.sub(r"\s+", "", m.group(2))).lower()
+NOTE_RE = re.compile(r"<authorialNote\b.*?</authorialNote>", re.S)
+
+
+def norm_article(num_html: str) -> list[str]:
+    """Numbers named by an article's <num>. Footnotes are dropped first ("Art. 4" +
+    note "Aufgehoben ..." must not read "4aufgehoben"); tags are then removed
+    without a space, because Fedlex splits digits ("<b>Art. 25</b><b>7</b>" = 257)
+    as well as suffixes ("6<sup>bis</sup>"). Blocks ("Art. 274–274g") are expanded."""
+    return artnum.parse_num(TAG_RE.sub("", NOTE_RE.sub("", num_html)))
 
 
 def fetch_articles(url: str) -> list[str]:
@@ -68,10 +72,10 @@ def fetch_articles(url: str) -> list[str]:
             time.sleep(3)
     out, seen = [], set()
     for m in ART_RE.finditer(xml):
-        a = norm_article(m.group(1))
-        if a and a not in seen:
-            seen.add(a)
-            out.append(a)
+        for a in norm_article(m.group(1)):
+            if a not in seen:
+                seen.add(a)
+                out.append(a)
     return out
 
 
