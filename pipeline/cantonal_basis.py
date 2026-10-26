@@ -136,8 +136,19 @@ GOV = re.compile(r"Regierungsrat|Regierung\b|Standeskommission|Landammann|Consei
                  r"Justizleitung|Justizkommission|Gerichtsrat|Kantonsgerichtsausschuss|Plenum", re.I)
 TITLE_FLOOR = [
     (re.compile(r"^(?:Verfassung|Constitution|Costituzione)\b", re.I), 4),
+    # agreements: between governments → 6; otherwise intercantonal or with another state → 5 (ratified above)
+    (re.compile(r"^(?:Nachtrag\s+zu[mr]\s+)?(?:Interkantonale[rs]?\s+|Intercantonale?\s+)?(?:\w*[Vv]ereinbarung|Übereinkunft|Übereinkommen|"
+                r"Vertrag|Verträge|Konvention|Konkordat|Gegenrechts\w+|Traité|Convention|Concordat|Accord|Convenzione|Accordo|"
+                r"Concordato|Trattato).*?(?:Regierung|Standeskommission|Bundesrat|gouvernement|Conseil\s+d['’]\s*[ÉE]tat|Conseil\s+fédéral|"
+                r"governo|governi|Consiglio\s+(?:di\s+Stato|federale))", re.I), 6),
+    (re.compile(r"^(?!.*\b(?:Einwohnergemeinde|Bürgergemeinde|Gemeinde|commune|comune)\b)"      # a commune's contract: not here
+                r"(?:Nachtrag\s+zu[mr]\s+)?(?:Interkantonale[rs]?\s+|Intercantonale?\s+)?(?:\w*[Vv]ereinbarung|Übereinkunft|Übereinkommen|"
+                r"Vertrag|Verträge|Staatsvertrag|Konvention|Konkordat|Abkommen|Traité|Convention|Concordat|Accord|Protocole|"
+                r"Convenzione|Accordo|Concordato|Trattato|Protocollo)\b", re.I), 5),
+    (re.compile(r"^Geschäftsordnung\s+(?:des|für\s+den)\s+(?:Grossen\s+Rat|Kantonsrat|Landrat)|^Règlement\s+du\s+Grand\s+Conseil|"
+                r"^Kantonale[rs]?\s+\w*[Gg]esetz\b|^[\w-]+\s+und\s+\w*gesetz\b", re.I), 5),
     (re.compile(r"\b(?:des\s+Regierungsrates|der\s+Regierung|der\s+Standeskommission|du\s+Conseil\s+d['’]\s*[ÉE]tat|"
-                r"del\s+Consiglio\s+di\s+Stato|Regierungsratsbeschluss|des\s+Obergerichts|des\s+Kantonsgerichts|"
+                r"del\s+Consiglio\s+di\s+Stato|Regierungsratsbeschluss|Regierungsbeschlus\w*|Standeskommissionsbeschluss|des\s+Obergerichts|des\s+Kantonsgerichts|"
                 r"du\s+Tribunal\s+cantonal)\b", re.I), 6),
     (re.compile(r"\b(?:der\s+\w*[Dd]irektion|des\s+\w*[Dd]epartement\w*|du\s+Département|de\s+la\s+Direction|"
                 r"del\s+Dipartimento|Weisung|Richtlinie|Directive|Direttiva)\b", re.I), 7),

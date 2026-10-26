@@ -28,6 +28,7 @@ const HUE = {
   1: [0.42, 0.56, 1.0], 2: [0.2, 0.86, 0.74], 3: [1.0, 0.45, 0.33], 4: [0.72, 0.53, 1.0], 5: [0.68, 0.76, 0.32],
   6: [1.0, 0.72, 0.22], 7: [0.32, 0.72, 0.98], 8: [1.0, 0.45, 0.66], 9: [0.4, 0.82, 0.5], k: [0.82, 0.62, 0.42], n: [0.6, 0.66, 0.72],
   bv: [1.0, 0.86, 0.58],
+  court: [0.98, 0.42, 0.36],         // decisions: the courts under an act
 };
 const PLATE = [0.5, 0.58, 0.72];     // the floors of the Stufenbau
 const GRAPHITE = [0.56, 0.6, 0.66];  // tree branches on paper: one calm ink; the nodes carry the SR colours
@@ -139,6 +140,7 @@ async function boot() {
   XN = [];
   // tree nodes that are acts are the map's own nodes; the Constitution's structure is added
   const tmap = tree ? tree.nodes.map((o) => (o.c >= 0 ? o.c : NCORE + XN.push(o) - 1)) : [];
+  TMAP = tmap;
   N = NCORE + XN.length;
   NC = new Float64Array(N); PK = new Int32Array(N).fill(-1);
   K = new Array(N); HK = new Array(N); ids = new Array(N);
@@ -185,7 +187,8 @@ async function boot() {
   $("loading").hidden = true;
   const h = decodeHash();
   if (h) select(h.i, h.art, true);
-  else if (!seenIntro()) $("intro").hidden = false;
+  else if (mode === "tree" && tree && !seenOpening()) opening();
+  else if (mode !== "tree" && !seenIntro()) $("intro").hidden = false;
   requestAnimationFrame(loop);
 }
 
@@ -304,6 +307,7 @@ function writeInstances() {
     ocol.set(node(i).reg ? h.map((c) => 0.35 * c + 0.3) : h, j * 3);  // earlier act or edition: paler
   });
   treeDirty = true;
+  if (courtFor >= 0) writeCourts();
   for (const m of [rings, orbs]) {
     m.geometry.attributes.iCenter.needsUpdate = true;
     m.geometry.attributes.iRadius.needsUpdate = true;
@@ -315,7 +319,8 @@ function writeInstances() {
 let related = null;
 function refreshStates() {
   related = null;
-  if (sel.i >= 0) {
+  if (focusSet && sel.i < 0) related = new Set(focusSet);
+  else if (sel.i >= 0) {
     related = new Set([sel.i]);
     let p = P[sel.i];
     while (p >= 0) { related.add(p); p = P[p]; }
@@ -379,11 +384,16 @@ function rebase(nx, nz) {
 const worldTarget = () => ({ x: controls.target.x + origin.x, z: controls.target.z + origin.z });
 
 // ---------- camera ----------
-let anim = null;
+let anim = null, minFlight = 600;           // tours slow flights down so the eye can follow
 const viewDist = () => camera.position.distanceTo(controls.target);
 function pxPerUnitAt(dist) { return (H / 2) / Math.tan((camera.fov * Math.PI) / 360) / Math.max(dist, 1e-9); }
+let storyTop = 0;                        // top edge of the tour card (px), measured when it is written
 function freeRect() {
   const open = !$("panel").hidden;
+  if (!open && story && (story.tr || story.descent)) {   // a tour: the card holds the bottom, the subject sits above it
+    const y0 = W <= 760 ? 64 : 72, y1 = Math.max(y0 + 160, (storyTop || H - (W <= 760 ? 300 : 280)) - 12);
+    return { cx: W / 2, cy: (y0 + y1) / 2, w: W, h: y1 - y0 };
+  }
   if (!open) return { cx: W / 2, cy: H / 2, w: W, h: H };
   if (W <= 760) { const sh = Math.min(H * 0.52, 460) + 20; return { cx: W / 2, cy: (H - sh) / 2 + 30, w: W, h: H - sh - 60 }; }
   return { cx: (W - 424) / 2, cy: H / 2, w: W - 424, h: H };
@@ -394,24 +404,28 @@ function distanceToFit(r) {
   return (r * 2.2) * ((H / 2) / Math.tan((camera.fov * Math.PI) / 360)) / span;
 }
 // ty: height of the point looked at (an article dot rises above the floor)
-function flyTo(wx, wz, dist, polar, animate = true, ty = 0) {
+const wrapPi = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
+// Returns the flight's duration (ms), so tours and descents can chain flights.
+function flyTo(wx, wz, dist, polar, animate = true, ty = 0, theta = null, minDur = 600) {
   const sph = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
   const toPolar = polar ?? sph.phi;
+  const toTheta = theta == null ? sph.theta : sph.theta + wrapPi(theta - sph.theta);
   const from = [controls.target.x + origin.x, controls.target.z + origin.z, viewDist()];
   const to = [wx, wz, dist];
-  if (!animate || reduceMotion) { setView(to, toPolar, sph.theta, ty); return; }
+  if (!animate || reduceMotion) { setView(to, toPolar, toTheta, ty); return 0; }
   const interp = interpolateZoom(from, to);
-  const dur = Math.max(600, Math.min(2400, interp.duration * 1.1));
+  const dur = Math.max(minDur, Math.min(2600, interp.duration * 1.1));
   const t0 = performance.now(), phi0 = sph.phi, th = sph.theta, y0 = controls.target.y;
   anim = {
     step(now) {
       const u = Math.min(1, (now - t0) / dur);
       const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
-      setView(interp(e), phi0 + (toPolar - phi0) * e, th, y0 + (ty - y0) * e);
+      setView(interp(e), phi0 + (toPolar - phi0) * e, th + (toTheta - th) * e, y0 + (ty - y0) * e);
       if (u >= 1) anim = null;
     },
     shift() { /* positions are absolute, setView applies the origin */ },
   };
+  return dur;
 }
 function recentre() {   // re-apply the panel offset after the panel opened or closed
   const sph = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
@@ -446,12 +460,12 @@ function interpolateZoom(p0, p1) {   // van Wijk & Nuij smooth zoom (d3-interpol
 }
 // Tree: the camera distance and target height at which every floor, apex to the lowest
 // cantonal floor, fits between the search bar and the tools (found numerically).
-function fitTree(phi) {
+function fitTree(phi, topPx = null) {
   const pts = [[0, CY[ROOT] + R[ROOT] * 2, 0]];
   for (const [y, r] of tree.plates) for (let a = 0; a < 32; a++) pts.push([r * Math.cos(a * Math.PI / 16), y, r * Math.sin(a * Math.PI / 16)]);
   const theta = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)).theta;
   const cam = camera.clone(), q = new THREE.Vector3(), tgt = new THREE.Vector3();
-  const phone = W <= 760, top = 1 - 2 * (phone ? 120 : 92) / H, bot = -1 + 2 * (phone ? 150 : 70) / H;
+  const phone = W <= 760, top = 1 - 2 * (topPx ?? (phone ? 120 : 92)) / H, bot = -1 + 2 * (phone ? 150 : 70) / H;
   const left = phone ? -0.94 : -1 + 2 * 390 / W, right = phone ? 0.94 : 1 - 2 * 250 / W;   // legend left, floor names right
   const bounds = (d, ty) => {
     tgt.set(0, ty, 0);
@@ -488,10 +502,10 @@ function home(animate = true) {
   flyTo((x0 + x1) / 2, (z0 + z1) / 2 + r * 0.12, distanceToFit(r) * (W <= 760 ? 0.92 : 0.8), polar, animate);
 }
 function focusOn(i, animate = true) {
-  if (mode === "tree") {               // the node with the span of what rests on it
+  if (mode === "tree") {               // the node with the span of what rests on it, turned to face the viewer
     const span = Math.max(R[i] * 5, (SPAN[i] || 0) * 0.55, tree.method.C * 0.015);
-    flyTo(X[i], Z[i], distanceToFit(span), W <= 760 ? 0.5 : 0.92, animate, CY[i]);
-    return;
+    const a = Math.atan2(Z[i], X[i]), off = Math.hypot(X[i], Z[i]) > tree.method.C * 0.03;
+    return flyTo(X[i], Z[i], distanceToFit(span), W <= 760 ? 0.5 : 0.92, animate, CY[i], off ? Math.atan2(Math.cos(a), Math.sin(a)) : null, minFlight);
   }
   // an act is framed with room around it, so its links and partners stay in view;
   // zooming further dissolves it into its articles
@@ -585,7 +599,11 @@ function writeTreeLines() {
   treeDirty = false;
   if (mode !== "tree") return;
   const lines = [], chain = new Set();
-  if (sel.i >= 0) { let j = sel.i; while (j >= 0) { chain.add(j); j = P[j]; } for (const d of subtree(sel.i)) chain.add(d); }
+  if (sel.i >= 0) {                    // what rests on the selection; for the apex (all of it) only the first step
+    let j = sel.i; while (j >= 0) { chain.add(j); j = P[j]; }
+    const sub = subtree(sel.i);
+    for (const d of sub.length <= 800 ? sub : kids[sel.i]) chain.add(d);
+  }
   const size = LAY.tree.size, top = Math.log10(size[ROOT] + 1), light = theme === "light";
   const groups = new Map();             // parent -> height -> children
   for (const i of orbIndex) {
@@ -953,6 +971,8 @@ function updateLabels() {
   if (sel.i >= 0) {   // the focus and its partners always get a name
     const extra = [...jAdj[sel.i].slice(0, 8).map((e) => e[0]), ...wOut[sel.i].slice(0, 6).map((e) => e[0]), ...wIn[sel.i].slice(0, 4).map((e) => e[0])];
     for (const j of [sel.i, ...(hoverLink >= 0 ? [hoverLink] : []), ...extra]) cand.push([j, 1e6 - cand.length]);
+  } else if (focusSet && focusSet.size <= 40) {   // a tour stop naming a few acts: they get their names
+    for (const j of focusSet) if (K[j] === "act") cand.push([j, 1e6 - cand.length]);
   }
   cand.sort((a, b) => b[1] - a[1]);
   const boxes = [], used = new Set();
@@ -1013,9 +1033,11 @@ function updateLabels() {
         continue;
       }
       el.style.textAlign = "center";
-      if (W <= 760) { el.hidden = true; continue; }   // a phone: names over the tree would hide it
+      // a phone, or a selection (its panel or card names the floor): names over the tree would hide it
+      if (W <= 760 || sel.i >= 0) { el.hidden = true; continue; }
       const [sx, sy, sz] = toScreen(r * Math.cos(ca), y, r * Math.sin(ca));
-      if (sz > 1 || sx < 60 || sx > W - 60 || sy < 70 || sy > H - 30) { el.hidden = true; continue; }
+      const wc = Math.max((sub || head).length * 7.6, 120);
+      if (sz > 1 || sx < 60 || sx > W - 60 || sy < 70 || sy > H - 30 || !fits([sx - wc / 2, sy + 6, sx + wc / 2, sy + 40])) { el.hidden = true; continue; }
       el.style.transform = `translate(${sx.toFixed(1)}px, ${(sy + 6).toFixed(1)}px) translate(-50%, 0)`;
       el.hidden = false;
     }
@@ -1038,6 +1060,34 @@ function updateLabels() {
       el.classList.remove("on", "edge");
       el.hidden = false;
     }
+  }
+  // tree: the decisions hanging under the selected act
+  for (const [did, d, pos] of courtList) {
+    if (!pos || k >= 200) continue;
+    const [sx, sy, sz] = toScreen(pos[0], pos[1], pos[2]);
+    if (sz > 1 || sx < 10 || sx > W - 10 || sy < 60 || sy > H - 10) continue;
+    const rp = pos[3] * pxPerUnitAt(camera.position.distanceTo(pv.set(pos[0] - origin.x, pos[1] - origin.y, pos[2] - origin.z)));
+    const w = d[0].length * 6.6 + 8, box = [sx - w / 2, sy + rp + 1, sx + w / 2, sy + rp + 17];   // below its sphere
+    if (!fits(box)) continue;
+    const el = labelEl(k++);
+    el.textContent = d[0];
+    el.style.transform = `translate(${sx.toFixed(1)}px, ${(sy + rp + 2).toFixed(1)}px) translate(-50%, 0)`;
+    el.style.fontSize = "";
+    el.dataset.kind = "dec";
+    el.classList.remove("on", "edge");
+    el.hidden = false;
+  }
+  // scale: acts in view, federal and cantonal
+  {
+    let vf = 0, vk = 0;
+    for (const i of orbIndex) {
+      if (K[i] !== "act") continue;
+      if ((related && !related.has(i)) || (TN[i] && TN[i].cited)) continue;   // acts in force only
+      const [sx, sy, sz] = toScreen(X[i], CY[i], Z[i]);
+      if (sz > 1 || sx < 0 || sx > W || sy < 0 || sy > H) continue;
+      if (isCant(i) || node(i).c) vk++; else vf++;
+    }
+    updateHud(vf, vk);
   }
   // article numbers when the floor plan is close enough to read
   if (dots) {
@@ -1084,7 +1134,11 @@ function updateLabels() {
       let ex = cx + dx * f, ey = cy + dy * f;
       const tb = $("tools").getBoundingClientRect();     // keep clear of the legend and tools
       if (ex < tb.right + 60 && ey > tb.top - 16) ey = tb.top - 16;
-      while (placed.some(([px, py]) => Math.abs(px - ex) < 120 && Math.abs(py - ey) < 22)) ey += ey > cy ? -24 : 24;
+      const step = ey > cy ? -24 : 24;        // one direction: stepping toward the centre would oscillate around it
+      const hw = label(j).length * 3.6 + 22;  // half width of the chip; it keeps clear of names already placed
+      const hit = (y) => placed.some(([px, py]) => Math.abs(px - ex) < 120 && Math.abs(py - y) < 22) ||
+        boxes.some((o) => ex + hw > o[0] && ex - hw < o[2] && y + 11 > o[1] && y - 11 < o[3]);
+      for (let g = 0; g < 40 && hit(ey); g++) ey += step;
       placed.push([ex, ey]);
       const el = labelEl(k++);
       const kind = pairKind.get(sel.i < j ? sel.i + "|" + j : j + "|" + sel.i) || 2;
@@ -1157,6 +1211,8 @@ function loop(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
   if (anim) anim.step(now);
+  const idle = mode === "tree" && sel.i < 0 && !anim && !story && now - lastInput > 25000 && !reduceMotion;
+  if (idle !== controls.autoRotate) { controls.autoRotate = idle; controls.autoRotateSpeed = 0.35; }
   controls.update();
   const dist = viewDist();
   camera.near = Math.max(dist * 0.002, 1e-7);
@@ -1167,14 +1223,16 @@ function loop(now) {
     const w = worldTarget(); rebase(w.x, w.z);
   }
   const pxScale = (H / 2) / Math.tan((camera.fov * Math.PI) / 360);
-  for (const m of [rings, orbs]) { m.material.uniforms.uPixelScale.value = pxScale; }
+  for (const m of [rings, orbs, courtOrbs]) if (m) m.material.uniforms.uPixelScale.value = pxScale;
   orbs.material.uniforms.uMinPx.value = mode === "tree" ? 2.4 : 1.1;     // every act stays a visible dot
+  if (courtOrbs) courtOrbs.material.uniforms.uMinPx.value = 2.4;
   {                                    // depth fade around the point looked at: the far side recedes
     const d = camera.position.distanceTo(controls.target);
     if (mode === "tree") setFog(d * 0.92, d * 1.75, 0.8); else setFog(d * 1.2, d * 3.5, 0.45);
   }
   if (treeDirty) writeTreeLines();
-  for (const m of [wires, current, focusRibbons, treeLines]) {
+  for (const m of [wires, current, focusRibbons, treeLines, courtLines]) {
+    if (!m) continue;
     m.material.uniforms.uTime.value = now / 1000;
     m.material.uniforms.uViewport.value.set(W / 2, H / 2);
   }
@@ -1291,19 +1349,24 @@ function resize() {
   camera.aspect = W / H;
   camera.updateProjectionMatrix();
   edgesDirty = true;
+  if (!$("story").hidden) storyTop = $("story").getBoundingClientRect().top;
 }
 addEventListener("keydown", (e) => {
   if (e.target.matches("input, select, textarea")) return;
   if (e.key === "/") { e.preventDefault(); $("search").focus(); }
+  else if (story && story.tr && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { e.preventDefault(); stepTour(e.key === "ArrowRight" ? 1 : -1); }
+  else if (e.key === "f" && !e.metaKey && !e.ctrlKey) $("focusbtn").click();
   else if (e.key === "Escape") {
-    if (!$("method").hidden) closeMethod();
+    if (story && story.opening) skipOpening();
+    else if (story && (story.tr || story.descent)) { story.descent = false; endTour(false); }
+    else if (!$("method").hidden) closeMethod();
     else if (!$("intro").hidden) closeIntro();
     else if (sel.i >= 0) { const p = P[sel.i]; sel.art ? select(sel.i) : (p > 0 ? select(p) : goHome()); }
   }
 });
 
 // ---------- selection ----------
-function select(i, art = null, animate = true) {
+function select(i, art = null, animate = true, quiet = false) {
   if (i >= 0 && (art || !inLayout(i))) {      // an article, or an act outside the tree: the SR map shows it
     if (mode === "tree" && LAY.sr && i < NCORE) setMode("sr", false);
   }
@@ -1311,13 +1374,14 @@ function select(i, art = null, animate = true) {
   if (i < 0) {
     const was = !$("panel").hidden;
     sel = { i: -1, art: null }; $("panel").hidden = true; $("tools").classList.remove("raised");
-    refreshStates(); refreshHover(); writeHash(); crumbs();
+    hideCourts();
+    refreshStates(); refreshHover(); writeHash(); crumbs(); renderSpine();
     if (was && animate) recentre();
     return;
   }
   sel = { i, art };
   hoverLink = -1;
-  $("panel").hidden = false;
+  $("panel").hidden = quiet;
   $("tools").classList.toggle("raised", W <= 760);
   closeIntro();
   if (PK[i] >= 0) ensurePack(PK[i]);
@@ -1336,10 +1400,12 @@ function select(i, art = null, animate = true) {
     };
     if (actRec(i)) go(); else { refreshPanel(); ensurePack(PK[i])?.then(go); }
   } else {
-    focusOn(i, animate);
+    if (!(story && story.descent)) focusOn(i, animate);
     refreshPanel();
   }
-  writeHash(); crumbs();
+  hideCourts();                                  // a tour or descent shows the courts at their own stop
+  if (mode === "tree" && K[i] === "act" && PK[i] >= 0 && !(story && (story.tr || story.descent))) courtsFor(i);
+  writeHash(); crumbs(); renderSpine();
 }
 function goHome() { select(-1, null, false); home(); }
 
@@ -1493,7 +1559,15 @@ function kActSections(i) {
   if (u) html += `<section><a class="link" href="${esc(u)}" target="_blank" rel="noopener">${esc(t.cantonalColl(cantonName(o.ct)))} ↗</a></section>`;
   return html;
 }
-function artNames(eids) { return eids.map((e) => (e.startsWith("disp_") ? t.finalProv + " " : "") + e.replace(/^.*art_/, "").replace(/_/g, "")); }
+function artNames(eids) { return [...new Set(eids.map((e) => (e.startsWith("disp_") ? t.finalProv + " " : "") + e.replace(/^.*art_/, "").replace(/_/g, "")))]; }
+// a label that stands on its own in running text: "Art. 82 BV", "SG BE"
+function fullLabel(j) {
+  const o = node(j), l = label(j);
+  if (o.k === "bvart") return `${l} ${ROOT >= 0 ? label(ROOT) : "BV"}`;
+  const ct = TN[j] && TN[j].ct;
+  if (ct && TN[j].l >= 5 && !l.includes(ct)) return `${l} ${ct}`;
+  return l;
+}
 function basisSections(i) {
   if (!tree || !TN[i]) return "";
   if (TN[i].l === 4) return kvSections(i);        // a cantonal constitution
@@ -1928,10 +2002,14 @@ $("periodbtn").onclick = () => {
   const box = $("period"), on = box.hidden;
   box.hidden = !on;
   $("periodbtn").setAttribute("aria-pressed", on);
-  if (on) setPeriod(); else { period = null; refreshStates(); refreshPanel(); }
+  $("y1").min = mode === "tree" ? 1800 : 1875;
+  setGrowthUI();
+  if (on && mode === "tree") { select(-1, null, false); home(); }   // the growth reads from the whole tree
+  if (on) setPeriod(); else { period = null; growthYear = null; if (mode === "tree") setFocus(null); refreshStates(); refreshPanel(); }
 };
 for (const id of ["y0", "y1"]) $(id).addEventListener("input", setPeriod);
 function setPeriod() {
+  if (mode === "tree") { const y = +$("y1").value; $("o1").value = y; setGrowth(y); return; }
   if (!edgeYears) getJSON("data/ey.json").then((d) => { edgeYears = d; edgesDirty = true; }).catch(() => {});
   let a = +$("y0").value, b = +$("y1").value;
   if (a > b) [a, b] = [b, a];
@@ -1944,11 +2022,12 @@ $("play").onclick = () => {
   if (playing) { cancelAnimationFrame(playing); playing = null; $("play").textContent = t.play; return; }
   if ($("period").hidden) $("periodbtn").click();
   $("play").textContent = t.pause;
-  let y = 1880, last = 0;
+  let y = mode === "tree" ? 1848 : 1880, last = 0;
   const step = (now) => {
-    if (now - last > 140) {
+    if (now - last > (mode === "tree" ? 110 : 140)) {
       last = now;
-      $("y0").value = Math.max(1875, y - 9); $("y1").value = y;
+      if (mode !== "tree") $("y0").value = Math.max(1875, y - 9);
+      $("y1").value = y;
       setPeriod();
       y++;
       if (y > 2026) { playing = null; $("play").textContent = t.play; return; }
@@ -1975,6 +2054,10 @@ function applyLang() {
   $("l-from").textContent = t.from; $("l-to").textContent = t.to; $("periodnote").textContent = t.periodNote;
   $("introtext").textContent = mode === "tree" ? t.introTree : t.intro; $("introok").textContent = t.introOk; $("introtitle").textContent = t.name;
   $("mtree").textContent = t.viewTree; $("msr").textContent = t.viewSR;
+  $("tourbtn").textContent = t.tours; $("tourbtn").hidden = !LAY.tree;
+  $("focusbtn").title = t.focusMode; $("focusbtn").setAttribute("aria-label", t.focusMode);
+  $("opening").querySelector(".op-skip").textContent = t.opSkip;
+  if (core) { setGrowthUI(); renderSpine(); }
   $("mtree").setAttribute("aria-pressed", mode === "tree"); $("msr").setAttribute("aria-pressed", mode === "sr");
   $("mtree").hidden = $("msr").hidden = !LAY.tree;
   $("ltree").hidden = mode !== "tree";
@@ -1995,8 +2078,13 @@ function buildLegend() {               // colour = SR area in both views; in the
   const items = srk[ch].map((j) => [j, HK[j], label(j)]);
   items.push([idIndex.get("KT"), "k", t.KT]);
   if (mode === "tree") items.unshift([-1, "bv", t.bvFull]);
-  el.innerHTML = items.map(([j, h, l]) => `<button data-sel="${j}" title="${esc(l)}"${mode === "tree" ? " disabled" : ""}><i style="background: ${cssHue(h)}"></i><span>${esc(j >= 0 && core.nodes[j].sr ? core.nodes[j].sr + " " : "")}${esc(l)}</span></button>`).join("");
-  el.onclick = (e) => { const b = e.target.closest("[data-sel]"); if (b && mode === "sr") select(+b.dataset.sel); };
+  el.innerHTML = items.map(([j, h, l]) => `<button data-sel="${j}" data-hue="${h}" title="${esc(mode === "tree" ? t.lensHint : l)}" aria-pressed="${lens === h}"${mode === "tree" && h === "bv" ? " disabled" : ""}><i style="background: ${cssHue(h)}"></i><span>${esc(j >= 0 && core.nodes[j].sr ? core.nodes[j].sr + " " : "")}${esc(l)}</span></button>`).join("");
+  el.onclick = (e) => {
+    const b = e.target.closest("[data-sel]");
+    if (!b) return;
+    if (mode === "sr") select(+b.dataset.sel);
+    else if (b.dataset.hue !== "bv") { select(-1, null, false); setLens(b.dataset.hue); }   // a lens: that area across all floors
+  };
 }
 
 // ---------- intro ----------
@@ -2016,6 +2104,339 @@ function closeMethod() { $("method").hidden = true; $("methodbtn").focus(); }
 $("methodbtn").onclick = openMethod;
 $("method").addEventListener("click", (e) => { if (e.target.id === "method") closeMethod(); });
 
-window.__slm = { select, pick, home, setMode, get mode() { return mode; }, updateLabels, rebuild: () => { buildEdges(); return buildMs; }, idx: (id) => idIndex.get(id), get dbg() { return { buildMs, lines: lastEntries.length, dotsAct, p: dots ? actRec(dotsAct).p : null, pxu: pxPerUnitAt(viewDist()), R: R[sel.i], pool: pool.length, fade: artFade, W, H }; }, get state() { return { sel, origin: origin.toArray(), dist: viewDist() }; }, get entries() { return lastEntries.map(([k, w]) => { const [a, b, l] = k.split("|").map(Number); return [ids[a], ids[b], l, w, Math.round(projectedPx(a)), Math.round(projectedPx(b))]; }); }, get meshes() { return { wires, current, focusRibbons, orbs, rings, camera, controls }; } };
+window.__slm = { select, pick, home, setMode, get mode() { return mode; }, updateLabels, rebuild: () => { buildEdges(); return buildMs; }, idx: (id) => idIndex.get(id), get dbg() { return { buildMs, lines: lastEntries.length, dotsAct, p: dots ? actRec(dotsAct).p : null, pxu: pxPerUnitAt(viewDist()), R: R[sel.i], pool: pool.length, fade: artFade, W, H }; }, get state() { return { sel, origin: origin.toArray(), dist: viewDist() }; }, get entries() { return lastEntries.map(([k, w]) => { const [a, b, l] = k.split("|").map(Number); return [ids[a], ids[b], l, w, Math.round(projectedPx(a)), Math.round(projectedPx(b))]; }); }, get meshes() { return { wires, current, focusRibbons, orbs, rings, camera, controls, scene, treeLines, courtOrbs, courtLines }; } };
+// ---------- immersion: opening, tours, descent, spine, scale, lenses, growth, courts ----------
+// Martini glass (Segel & Heer 2010): a short authored opening and guided tours, then free
+// exploration. Every number a tour or the opening shows is computed here from the data.
+let TMAP = [], focusSet = null, story = null, lens = null, growthYear = null, lastInput = performance.now();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const gi = (k) => TMAP[k];                                  // tree index -> global index
+const setFocus = (s) => { focusSet = s; refreshStates(); treeDirty = true; };
+const floorNodes = (pred) => { const s = new Set(); for (const i of orbIndex) if (pred(LV(i), i)) s.add(i); return s; };
+const isCant = (i) => !!(TN[i] && TN[i].ct);
+function facts() {                                          // the numbers the opening and tours show
+  if (facts.v) return facts.v;
+  const L = LAY.tree, by = tree.method.by_level, arts = orbIndex.filter((i) => K[i] === "bvart");
+  const par = (l) => { const c = { bv: 0, l1: 0, l2: 0, none: 0, other: 0 };   // where the acts of a floor hang
+    for (const i of orbIndex) if (LV(i) === l && !/^SR 0\./.test(ids[i] || "")) {   // treaties stand on floor 1 only as bases
+      const p = L.P[i];
+      if (K[p] === "bvart" || p === L.root) c.bv++; else if (/^SR 0\./.test(ids[p] || "")) c.other++;
+      else if (LV(p) === 1) c.l1++; else if (LV(p) === 2) c.l2++;
+      else if (ids[p] === "TREE:none") c.none++; else c.other++;            // treaties, BV 1874, same floor
+    }
+    return c; };
+  facts.v = { fed: tree.method.acts, kant: tree.method.cantonal_acts, dec: core.nodes[0].n, arts: arts.length,
+    artsBasis: arts.filter((i) => (dependents[i] || []).length).length, artsRest: arts.reduce((s, i) => s + (dependents[i] || []).length, 0),
+    l1: by["1"], l2: by["2"], l3: by["3"], p1: par(1), p2: par(2), p3: par(3) };
+  return facts.v;
+}
+
+// --- the narration card
+function card(eyebrow, head, body, nav) {
+  const el = $("story");
+  el.innerHTML = `<p class="eyebrow">${esc(eyebrow)}</p><h3>${esc(head)}</h3><p class="body">${body}</p>${nav || ""}`;
+  el.hidden = false;
+  storyTop = el.getBoundingClientRect().top;
+}
+function navHtml(k, n) {
+  const dots = Array.from({ length: n }, (_, j) => `<i class="${j === k ? "on" : ""}"></i>`).join("");
+  return `<div class="nav"><span class="dots" aria-hidden="true">${dots}</span>
+    <button class="chip" data-story="prev"${k ? "" : " disabled"}>← ${esc(t.back)}</button>
+    <button class="chip strong" data-story="${k < n - 1 ? "next" : "end"}">${esc(k < n - 1 ? t.next : t.end)} ${k < n - 1 ? "→" : ""}</button>
+    <button class="chip" data-story="close" aria-label="${esc(t.closeTour)}">×</button></div>`;
+}
+$("story").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-story]");
+  if (b) { const a = b.dataset.story; if (a === "next") stepTour(1); else if (a === "prev") stepTour(-1); else endTour(a === "end"); return; }
+  const s = e.target.closest("[data-sel]");
+  if (s) { const j = +s.dataset.sel; endTour(false); select(j); }
+});
+const linkTo = (j, text) => `<button class="link" data-sel="${j}">${esc(text ?? label(j))}</button>`;
+
+// --- tours
+function startTour(id) {
+  closeIntro(); $("opening").hidden = true; $("tourmenu").hidden = true;
+  if (mode !== "tree") setMode("tree", false);
+  lens = null; growthYear = null; setGrowthUI();
+  story = { tr: tree.tours.find((x) => x.id === id), k: 0 };
+  document.body.classList.add("touring");
+  minFlight = 1700;
+  showStop();
+}
+function stepTour(d) { if (!story || !story.tr) return; story.k = Math.max(0, Math.min(story.tr.stops.length - 1, story.k + d)); showStop(); }
+function endTour(toExplore) {
+  story = null; minFlight = 600; $("story").hidden = true; setFocus(null); hideCourts();
+  document.body.classList.remove("touring"); storyTop = 0;
+  if (toExplore && sel.i >= 0) select(sel.i);
+}
+function roleOf(i) {
+  if (K[i] === "bvart") return t.role_bvart;
+  const l = LV(i);
+  return t["role" + (l === 4.5 ? 4 : l)] || "";
+}
+function nodeFacts(i) {
+  const bits = [];
+  const o = TN[i];
+  if (K[i] === "bvart") {
+    const h = pickL(node(i).h);
+    bits.push(`<b>${esc(fullLabel(i))}${h ? " · " + esc(h) : ""}</b>`);
+  } else {
+    bits.push(`<b>${esc(fullLabel(i))}</b>${title(i) && title(i) !== label(i) ? " · " + esc(title(i)) : ""}`);
+    const who = (t["lv" + o.l] || "").split(" · ")[1] || "";           // the floor = the enacting authority
+    // federal: the Ingress names the issuer (o.by); cantonal: only the floor is in the tree (issuer or title)
+    if (who) bits.push(o.ct ? `${esc(t.fFloor(who))} (${esc(cantonName(o.ct))})` : esc(o.by ? t.fBy(who) : t.fFloor(who)));
+    const b = (basisOf[i] || []).find((x) => x.prim) || (basisOf[i] || []).find((x) => x.j >= 0);
+    if (b && b.j >= 0) {
+      const names = artNames(b.eids);
+      bits.push(esc(t.fBasisPre) + " " + linkTo(b.j, (names.length && K[b.j] !== "bvart" && K[b.j] !== "kvart" ? `${t.art} ${names.slice(0, 4).join(", ")}${names.length > 4 ? " …" : ""} ` : "") + fullLabel(b.j)));
+    }
+    const nd = (o && o.dn) || NC[i];
+    if (nd) bits.push(esc(t.fDec(num(nd))));
+  }
+  const nr = (dependents[i] || []).length;      // the apex: everything rests on it, the count would mislead
+  if (nr && i !== ROOT) bits.push(esc(t.fRest(num(nr))));
+  return bits.join(" · ");
+}
+async function showStop() {
+  const { tr, k } = story, s = tr.stops[k], n = tr.stops.length, f = facts(), C = tree.method.C;
+  const eyebrow = `${t.tour} · ${t["tour_" + tr.id]} · ${k + 1}/${n}`;
+  hideCourts();
+  if (s.k === "overview") {
+    select(-1, null, false); setFocus(null); home();
+    card(eyebrow, t.st_overviewH, esc(t.st_overview(num(f.fed), num(f.kant), num(f.dec))), navHtml(k, n));
+  } else if (s.k === "apex") {
+    select(-1, null, false);
+    setFocus(floorNodes((l, i) => i === ROOT || ["title", "chapter", "section", "bvart"].includes(K[i])));
+    const pl = tree.plates[0];
+    flyTo(0, 0, distanceToFit(pl[1] * 1.15), 0.7, true, pl[0], null, minFlight);   // the article ring, from above
+    card(eyebrow, t.st_apexH, esc(t.st_apex(num(f.arts), num(f.artsBasis), num(f.artsRest))), navHtml(k, n));
+  } else if (s.k === "floor") {
+    select(-1, null, false);
+    setFocus(floorNodes((l) => l === s.l));
+    const pl = tree.plates[s.l];
+    flyTo(0, 0, distanceToFit(pl[1] * 1.08), 0.9, true, pl[0], null, minFlight);
+    const p = f["p" + s.l];
+    const body = s.l === 1 ? t.st_floor1(num(f.l1), num(p.bv), num(p.none)) : s.l === 2 ? t.st_floor2(num(f.l2), num(p.l1), num(p.bv)) : t.st_floor3(num(f.l3), num(p.l2), num(p.l1));
+    card(eyebrow, t["role" + s.l], esc(body), navHtml(k, n));
+  } else if (s.k === "cantons") {
+    select(-1, null, false);
+    setFocus(floorNodes((l) => l >= 4));
+    const pl = tree.plates[tree.plates.length - 1];
+    flyTo(0, 0, distanceToFit(pl[1] * 1.02), 0.78, true, tree.plates[5][0], null, minFlight);
+    card(eyebrow, t.st_cantonsH, esc(t.st_cantons(num(f.kant), (f.kant / f.fed).toFixed(1).replace(".", lang === "en" ? "." : ","))), navHtml(k, n));
+  } else if (s.k === "courts" && s.top) {
+    select(-1, null, false);
+    const top = s.top.map(gi);
+    setFocus(new Set(top));
+    home();
+    const list = top.map((j) => `${linkTo(j)} (${num(NC[j])})`).join(", ");
+    card(eyebrow, t.role_courts, esc(t.st_courts(num(f.dec))) + " " + list + ".", navHtml(k, n));
+  } else {                                     // a node of a thread, or the courts under one
+    const i = gi(s.i);
+    setFocus(null);
+    select(i, null, true, true);
+    if (s.k === "courts") {
+      card(eyebrow, t.role_courts, esc(t.st_courtsAct(label(i), num((TN[i] && TN[i].dn) || NC[i]))) + ` <span class="muted">${esc(t.loading)}</span>`, navHtml(k, n));
+      const rec = await courtsFor(i);
+      if (!story || story.tr !== tr || story.k !== k) return;
+      const top = rec && rec.top ? rec.top.slice(0, 3).map((did) => decInfo(i, did)).filter(Boolean) : [];
+      card(eyebrow, t.role_courts, esc(t.st_courtsAct(label(i), num((TN[i] && TN[i].dn) || NC[i]))) +
+        (top.length ? " " + esc(t.st_courtsTop) + " " + top.map((d) => `<b>${esc(d[0])}</b>`).join(", ") + "." : ""), navHtml(k, n));
+    } else card(eyebrow, roleOf(i), nodeFacts(i), navHtml(k, n));
+  }
+}
+
+// --- the opening: the floors light up one after the other while the numbers build up
+async function opening() {
+  if (!tree || mode !== "tree") return;
+  const f = facts(), ov = $("opening"), C = tree.method.C;
+  story = { opening: true };
+  ov.hidden = false;
+  const beats = [
+    [t.op0, "", "", new Set()],
+    [t.op1(num(f.arts)), t.op1s, "", floorNodes((l, i) => i === ROOT || ["title", "chapter", "section", "bvart"].includes(K[i]))],
+    [t.op2(num(f.fed)), t.op2s, "", floorNodes((l, i) => (l >= 1 && l <= 3) || i === ROOT || K[i] === "bvart")],
+    [t.op3, t.op3s, "", floorNodes((l, i) => l === 4 || l <= 3)],
+    [t.op4(num(f.kant)), t.op4s, "", null],
+    [t.op5(num(f.dec)), t.op5s, "", null],
+  ];
+  const [d0, ty0] = fitTree(W <= 760 ? 0.42 : 0.62, H * (W <= 760 ? 0.36 : 0.33));   // the top third holds the words
+  flyTo(0, 0, d0 * 2.4, 0.25, false, ty0, 0.4);
+  for (let b = 0; b < beats.length && story && story.opening; b++) {
+    const [h, sub, , set] = beats[b];
+    $("opening").querySelector(".op-num").textContent = h;
+    $("opening").querySelector(".op-text").textContent = sub;
+    $("opening").classList.remove("beat"); void ov.offsetWidth; $("opening").classList.add("beat");
+    setFocus(set);
+    if (b === 0) flyTo(0, 0, d0 * 1.45, 0.42, true, ty0, 0.9, 5200);
+    if (b === 3) flyTo(0, 0, d0 * 1.1, 0.55, true, ty0, 1.6, 5200);
+    await sleep(b === 0 ? 1800 : 3000);
+  }
+  if (!story || !story.opening) return;
+  setFocus(null);
+  flyTo(0, 0, d0, W <= 760 ? 0.42 : 0.62, true, ty0, null, 1800);
+  $("opening").querySelector(".op-num").textContent = t.opAsk;
+  $("opening").querySelector(".op-text").textContent = "";
+  $("opening").querySelector(".op-actions").innerHTML = tree.tours.map((tr) => `<button class="chip strong" data-tour="${tr.id}">${esc(t["tour_" + tr.id])}</button>`).join("") +
+    `<button class="chip" data-op="explore">${esc(t.opExplore)}</button>`;
+  story = null;
+}
+function skipOpening() {
+  if (story && story.opening) story = null;
+  $("opening").hidden = true;
+  $("opening").querySelector(".op-actions").innerHTML = "";
+  setFocus(null);
+  try { localStorage.setItem("slm-opening", "1"); } catch (e) { /* storage unavailable */ }
+}
+$("opening").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tour]");
+  if (b) { skipOpening(); startTour(b.dataset.tour); return; }
+  if (e.target.closest("[data-op='explore'], .op-skip")) { skipOpening(); home(); }
+});
+function seenOpening() { try { return localStorage.getItem("slm-opening") === "1"; } catch (e) { return false; } }
+
+// --- tour menu
+$("tourbtn").onclick = () => {
+  const m = $("tourmenu");
+  m.innerHTML = `<p class="eyebrow">${esc(t.tours)}</p>` + tree.tours.map((tr) => `<button data-tour="${tr.id}"><b>${esc(t["tour_" + tr.id])}</b><span>${esc(t["tourSub_" + tr.id])}</span></button>`).join("") +
+    `<button data-op="replay"><b>${esc(t.replay)}</b><span>${esc(t.replaySub)}</span></button>`;
+  m.hidden = !m.hidden;
+};
+$("tourmenu").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tour], [data-op]");
+  if (!b) return;
+  $("tourmenu").hidden = true;
+  if (b.dataset.tour) startTour(b.dataset.tour);
+  else { endTour(false); select(-1, null, false); if (mode !== "tree") setMode("tree", false); opening(); }
+});
+
+// --- descent: from the Constitution down the chain of delegation to the act
+async function descend(i) {
+  const chain = ancestorsOf(i).reverse().filter((j) => !["title", "chapter", "section"].includes(K[j]));
+  story = { descent: true };
+  minFlight = 1500;
+  document.body.classList.add("touring");
+  for (const j of chain) {
+    if (!story || !story.descent) break;
+    select(j, null, true, true);
+    card(t.descend, roleOf(j) || t.lvBV, nodeFacts(j),
+      `<div class="nav"><span class="dots"></span><button class="chip" data-story="close" aria-label="${esc(t.closeTour)}">×</button></div>`);
+    await sleep(focusOn(j, true) + 1100);
+  }
+  const was = story && story.descent;
+  story = null; minFlight = 600; $("story").hidden = true;
+  document.body.classList.remove("touring"); storyTop = 0;
+  if (was) select(i);
+}
+
+// --- spine: the chain of delegation of the selection, floor by floor (left, tree view)
+function renderSpine() {
+  const el = $("spine");
+  if (mode !== "tree" || sel.i < 0 || W <= 760 || story) { el.hidden = true; return; }
+  const chain = ancestorsOf(sel.i).reverse();
+  const rows = [];
+  let crown = [];
+  for (const j of chain) {
+    if (["title", "chapter", "section"].includes(K[j])) { crown.push(pickL(node(j).num).replace(/:$/, "")); continue; }
+    const hue = K[j] === "act" || K[j] === "bvart" ? cssHue(HK[j]) : "var(--muted)";
+    const sub = K[j] === "bvart" ? (crown.join(" › ") + (pickL(node(j).h) ? " · " + pickL(node(j).h) : "")) : roleOf(j);
+    rows.push(`<button data-sel="${j}" class="${j === sel.i ? "on" : ""}"><i style="background:${hue}"></i><b>${esc(label(j))}</b><span>${esc(sub)}</span></button>`);
+    crown = [];
+  }
+  el.innerHTML = `<p class="eyebrow">${esc(t.spineHead)}</p>${rows.join("")}<button class="chip" data-descend="${sel.i}">▼ ${esc(t.descend)}</button>`;
+  el.hidden = false;
+}
+$("spine").addEventListener("click", (e) => {
+  const d = e.target.closest("[data-descend]");
+  if (d) { descend(+d.dataset.descend); return; }
+  const b = e.target.closest("[data-sel]");
+  if (b) select(+b.dataset.sel);
+});
+
+// --- scale: what is in view right now
+function updateHud(visFed, visKant) {
+  const el = $("hud");
+  if (!core || (story && story.opening)) { el.hidden = true; return; }
+  const f = tree ? facts() : null;
+  let s = `<b>${esc(t.hudView)}</b> ${esc(t.hudFed(num(visFed)))} · ${esc(t.hudKant(num(visKant)))}`;
+  if (growthYear) s += ` · <b>${esc(t.hudYear(growthYear))}</b>`;
+  else if (f && visFed >= f.fed * 0.9 && visKant >= f.kant * 0.9) s += ` · ${esc(t.hudDec(num(f.dec)))}`;
+  el.innerHTML = s;
+  el.hidden = false;
+}
+
+// --- lenses: an SR area (legend) across the whole tree
+function setLens(key) {
+  lens = lens === key ? null : key;
+  if (!lens) { setFocus(null); buildLegend(); return; }
+  setFocus(floorNodes((l, i) => (lens === "k" ? isCant(i) : !isCant(i) && HK[i] === lens && K[i] === "act")));
+  buildLegend();
+  home();                                      // an area across all floors: seen from the overview
+}
+
+// --- growth: today's law by year of adoption (repealed acts are not in the data)
+function setGrowthUI() {
+  const on = mode === "tree" && !$("period").hidden;
+  $("y0").closest("label").hidden = mode === "tree";
+  $("periodnote").textContent = mode === "tree" ? t.growthNote : t.periodNote;
+  if (!on) growthYear = null;
+}
+function setGrowth(y) {
+  growthYear = y;
+  const yy = String(y);
+  setFocus(floorNodes((l, i) => {
+    if (K[i] !== "act") return i === ROOT || ["title", "chapter", "section", "bvart", "kvart", "tgroup"].includes(K[i]);
+    const ad = TN[i] && TN[i].ad;               // undated acts (133) appear with today's law only
+    return ad ? ad.slice(0, 4) <= yy : y >= +$("y1").max;
+  }));
+}
+
+// --- courts: the most-cited decisions referring to the selected act hang below it
+let courtOrbs = null, courtLines = null, courtFor = -1, courtList = [];
+async function courtsFor(i) {
+  if (PK[i] < 0) return null;
+  if (!actRec(i)) await ensurePack(PK[i]);
+  const rec = actRec(i);
+  if (!rec || !rec.top || sel.i !== i || mode !== "tree") return rec;
+  courtFor = i; courtList = rec.top.slice(0, 10).map((did) => [did, decInfo(i, did)]).filter((x) => x[1]);
+  writeCourts();
+  return rec;
+}
+function hideCourts() { courtFor = -1; courtList = []; if (courtOrbs) { courtOrbs.geometry.instanceCount = 0; setRibbons(courtLines, []); } }
+function writeCourts() {
+  if (!courtOrbs) {
+    courtOrbs = makeOrbs(12); courtLines = makeRibbons();
+    scene.add(courtOrbs, courtLines);
+  }
+  const i = courtFor, n = courtList.length;
+  if (i < 0 || !n) { hideCourts(); return; }
+  // they hang within the act's own framing (focusOn), so act and decisions fit in one view
+  const span = Math.max(R[i] * 5, (SPAN[i] || 0) * 0.55, tree.method.C * 0.015), drop = R[i] + span * 0.3, ring = Math.max(R[i] * 1.8, span * 0.2);
+  const g = courtOrbs.geometry, cc = g.attributes.iCenter.array, rr = g.attributes.iRadius.array, col = g.attributes.iColor.array, st = g.attributes.iState.array;
+  const maxC = Math.max(1, ...courtList.map((x) => x[1][2] || 0)), lines = [];
+  courtList.forEach(([did, d], k) => {
+    const a = (k / n) * Math.PI * 2;
+    const x = X[i] + ring * Math.cos(a), z = Z[i] + ring * Math.sin(a), y = CY[i] - drop - (k % 2) * ring * 0.25;
+    cc.set([x - origin.x, y - origin.y, z - origin.z], k * 3);
+    rr[k] = Math.max(R[i] * 0.22, span * 0.012) * (0.7 + 1.1 * Math.sqrt((d[2] || 0) / maxC));
+    col.set(HUE.court, k * 3);
+    st.set([1, 0.35 + 0.65 * Math.sqrt((d[2] || 0) / maxC), 0, 0], k * 4);
+    courtList[k][2] = [x, y, z, rr[k]];
+    lines.push({ pts: flat([[X[i] - origin.x, CY[i] - origin.y, Z[i] - origin.z], [x - origin.x, y - origin.y, z - origin.z]]), width: 1.1, color: HUE.court, alpha: 0.55, flow: 0.5 });
+  });
+  g.instanceCount = n;
+  for (const a of ["iCenter", "iRadius", "iColor", "iState"]) g.attributes[a].needsUpdate = true;
+  setRibbons(courtLines, lines);
+}
+
+// --- focus mode, idle orbit
+$("focusbtn").onclick = () => {
+  const on = !document.body.classList.contains("immersive");
+  document.body.classList.toggle("immersive", on);
+  $("focusbtn").setAttribute("aria-pressed", on);
+  try { if (on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); else if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) { /* not allowed here */ }
+};
+for (const ev of ["pointerdown", "wheel", "keydown", "touchstart"]) addEventListener(ev, () => { lastInput = performance.now(); }, { passive: true });
+
 applyTheme();
 boot().catch((e) => { $("loading").textContent = "Error: " + e.message; console.error(e); });

@@ -138,9 +138,10 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     constitutions (SR 131.2, `pipeline/cantons.py`) hang from Art. 51 BV (a constitutional link, not
     an Ingress; drawn down the central axis). Below, every act in force of the 26 official collections
     (16,358 + 26 constitutions) on floors by the issuer its Ingress names: 5 parliament/people/
-    Landsgemeinde/intercantonal (5,946), 6 government + cantonal courts (7,801), 7 directorates,
-    offices, other bodies incl. communal bodies some cantons publish and church constitutions (2,611);
-    no issuer → from the title (marked). Parent = the nearest higher cantonal basis the Ingress names
+    Landsgemeinde/intercantonal (6,244), 6 government + cantonal courts (7,894), 7 directorates,
+    offices, other bodies incl. communal bodies some cantons publish and church constitutions (2,220);
+    no issuer → from the title (1,395, marked; agreements between governments → 6, other agreements,
+    incl. with foreign states → 5; 284 with no telling title → 7, marked "unknown"). Parent = the nearest higher cantonal basis the Ingress names
     (a KV article node `KV:<ct>:art_N`, or a cantonal act), then text order; only federal bases →
     group "only federal law named"; nothing → "no basis named" (incl. 1,200 acts whose collection
     publishes no Ingress: TG above all). A basis is identified by its footnote/inline collection
@@ -169,6 +170,17 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     via `ink(c) = c^1.6·0.8`); the night-sky look stays one click away (☾). Tree overview: the
     delegation tree alone; case-law/legislation arcs for the selected act, or all via a toggle.
     Depth fade (atmospheric perspective) behind the point looked at.
+20. Narrative layer ("martini glass": author-driven opening, then free exploration). Every sentence
+    of the opening and the tours carries computed numbers only (`facts()` in main.js, from tree.json),
+    with the BV article it paraphrases (Art. 3/42, 49, 51 BV). Wording rules found by checking:
+    decisions "refer to at least one federal act (treaties included) or cantonal act, in force or
+    earlier" (979,726 counts every act on the map, not only law in force); federal counts exclude
+    treaties (2,011); floor 1 = enactments of the Federal Assembly (incl. its 19 ordinances), floors
+    2–3 "nearly all / mostly ordinances"; parents that are treaties are not counted as "an act of the
+    Assembly". Cantonal nodes carry the floor, not the issuer → the card says "floor: …", federal acts
+    with a stated issuer "enacted by: …". FR/IT use gender-neutral forms ("autorité :", "base :").
+    Time-lapse = today's law by adoption year (survivorship: repealed acts absent; 133 undated acts
+    appear only in the current year).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -208,6 +220,17 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
       Art. 51 BV, acts by floor, KV articles other acts rest on (§/Art. as the canton writes it), the
       groups; search "PBG ZH" / "ZH PBG" / title words; deep links `#K.ZH_c700.1` (escape `_u _s _l _c`).
       Canton codes ring the outer rim; floor names right of the cone (left when the panel is open).
+- [x] Step 8 immersive layer (`main.js` story block, `07_tree.py::tours`): opening sequence (once per
+      browser, `slm-opening`; replay in the tour menu), three tours (Stufenbau in 7 stops; traffic:
+      Art. 82 BV → SVG → VRV → SG BE → courts; building: Art. 75 BV → RPG → RPV → LaLAT GE → courts),
+      descent from the Constitution along the chain of delegation, spine (left: what the selection
+      rests on), scale HUD (acts in view), lenses (legend: an SR area across all floors), growth
+      time-lapse ("Zeit" in the tree), the courts below the selected act (its 10 most-cited decisions,
+      from the pack's `top`), focus mode (f), idle orbit, vignette. While a tour or descent runs, the
+      card's free area frames the subject (`freeRect`), legend and HUD step aside (phone: toolbar too),
+      and the courts appear only at their own stop. Bugs found by screenshot runs: an edge-chip
+      collision loop that oscillated forever (page hang), court layers without viewport uniforms
+      (screen-filling ribbons), the apex selection highlighting all 18,000 acts.
 - [x] Step 5 partly: counts cross-checked with the opencaselaw MCP (BGE 143 IV 241 in-degree;
       Art. 41 OR — the MCP undercounts, see report D1); desktop + phone screenshots via Playwright.
 

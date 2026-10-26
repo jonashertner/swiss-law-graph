@@ -47,6 +47,7 @@
   --glow: 0px;               /* swatch glow: none on paper */
   --lab-base: #1c2229; --lab-mix: 52%; --lab-dom: #1c2229; --lab-area: #56616c; --lab-act: #0e1318;
   --lab-art: #3b4652; --lab-on: #000; --lab-title: #6b4706; --lab-chap: #7b5a20; --lab-plate: #44525f;
+  --court: #c8432f; --vig: rgb(110 96 70 / 0.16); --vig2: rgb(110 96 70 / 0.3);
   --font-display: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -81,6 +82,7 @@
   --glow: 8px;
   --lab-base: #e6edf3; --lab-mix: 55%; --lab-dom: #dfe7ee; --lab-area: #9aa8b6; --lab-act: #f4f8fb;
   --lab-art: #b9c6d3; --lab-on: #fff; --lab-title: #f3e3c2; --lab-chap: #d9c9a8; --lab-plate: #9fb0c6;
+  --court: #ff8a70; --vig: rgb(0 0 0 / 0.45); --vig2: rgb(0 0 0 / 0.7);
 }
 html, body { height: 100%; }
 [hidden] { display: none !important; }
@@ -241,6 +243,67 @@ button.link { border: 0; background: none; padding: 0; font: inherit; cursor: po
 .mono { font-family: var(--font-data); }
 .pill { display: inline-block; font: 500 11px/1.6 var(--font-data); padding: 0 6px; border-radius: 4px; background: var(--track); color: var(--muted); }
 
+/* Immersion: opening, tours, spine, scale */
+.chip.strong { background: var(--press-bg); color: var(--press-fg); border-color: var(--press-bg); }
+.chip[disabled] { opacity: 0.4; cursor: default; }
+#vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(ellipse 75% 70% at 50% 46%, transparent 55%, var(--vig) 100%); }
+#opening { position: fixed; z-index: 8; left: 50%; top: calc(14vh + env(safe-area-inset-top, 0px)); transform: translateX(-50%);
+  width: min(760px, calc(100% - 32px)); text-align: center; display: grid; gap: 10px; justify-items: center; pointer-events: none; }
+#opening .op-num { margin: 0; font: 700 clamp(28px, 4.6vw, 54px)/1.05 var(--font-display); letter-spacing: -0.025em; color: var(--fg);
+  text-shadow: 0 0 18px var(--bg), 0 0 6px var(--bg); text-wrap: balance; }
+#opening .op-text { margin: 0; max-width: 54ch; font: 400 clamp(14px, 1.6vw, 17px)/1.5 var(--font-body); color: var(--fg-soft);
+  text-shadow: 0 0 12px var(--bg), 0 0 4px var(--bg); text-wrap: pretty; min-height: 1.5em; }
+#opening.beat .op-num, #opening.beat .op-text { animation: beat 3s ease both; }
+@keyframes beat { 0% { opacity: 0; transform: translateY(10px); } 14% { opacity: 1; transform: none; } 86% { opacity: 1; } 100% { opacity: 0.92; } }
+#opening .op-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; pointer-events: auto; margin-top: 6px; }
+#opening .op-actions .chip { height: 38px; padding: 0 16px; font-size: 14px; }
+#opening .op-skip { pointer-events: auto; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  color: var(--muted); font-size: 13px; }
+#opening .op-actions:not(:empty) ~ .op-skip { display: none; }
+#tourmenu { position: fixed; z-index: 7; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+  width: min(380px, calc(100% - 32px)); padding: 8px; display: grid; gap: 2px; box-sizing: border-box; }
+#tourmenu .eyebrow { margin: 4px 8px 4px; font: 600 10.5px/1.3 var(--font-data); color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+#tourmenu button { display: grid; gap: 2px; text-align: left; border: 0; background: none; color: var(--fg); padding: 8px 10px; border-radius: 8px; cursor: pointer; font: inherit; }
+#tourmenu button:hover { background: var(--hoverbg); }
+#tourmenu button b { font: 600 14px/1.3 var(--font-display); }
+#tourmenu button span { color: var(--muted); font-size: 12.5px; }
+#story { position: fixed; z-index: 7; left: 50%; transform: translateX(-50%); bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  width: min(560px, calc(100% - 32px)); box-sizing: border-box; padding: 16px 18px 12px; display: grid; gap: 6px; }
+#story .eyebrow { margin: 0; font: 500 11px/1.3 var(--font-data); color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+#story h3 { margin: 0; font: 700 21px/1.2 var(--font-display); letter-spacing: -0.012em; text-wrap: balance; }
+#story .body { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--fg-soft); text-wrap: pretty; }
+#story .body b { color: var(--fg); font-weight: 600; }
+#story .body .muted { color: var(--muted); }
+#story .nav { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+#story .nav .dots { flex: 1; display: flex; gap: 5px; }
+#story .nav .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
+#story .nav .dots i.on { background: var(--fg); }
+#spine { position: fixed; z-index: 4; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(78px + env(safe-area-inset-top, 0px));
+  width: 300px; max-height: calc(100vh - 470px); overflow-y: auto; padding: 8px 8px 10px; display: grid; gap: 0; box-sizing: border-box; }
+#spine .eyebrow { margin: 2px 6px 6px; font: 600 10.5px/1.3 var(--font-data); color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+#spine button[data-sel] { position: relative; display: grid; grid-template-columns: 14px 1fr; gap: 0 8px; text-align: left; border: 0; background: none;
+  color: var(--fg); padding: 5px 6px 7px; border-radius: 8px; cursor: pointer; font: inherit; }
+#spine button[data-sel]:hover { background: var(--hoverbg); }
+#spine button[data-sel] i { grid-row: 1 / span 2; width: 9px; height: 9px; border-radius: 50%; margin: 5px 0 0 2px; z-index: 1; }
+#spine button[data-sel]:not(:last-of-type)::after { content: ""; position: absolute; left: 12px; top: 18px; bottom: -6px; border-left: 1.5px solid var(--line-strong); }
+#spine button[data-sel] b { font: 600 13.5px/1.3 var(--font-display); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#spine button[data-sel] span { grid-column: 2; color: var(--muted); font-size: 12px; line-height: 1.35; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#spine button[data-sel].on b { color: var(--focus); }
+#spine .chip { justify-self: start; margin: 6px 0 0 6px; height: 28px; }
+#hud { position: fixed; z-index: 3; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); pointer-events: none;
+  font: 500 11.5px/1.3 var(--font-data); color: var(--muted); letter-spacing: 0.02em; white-space: nowrap; text-shadow: 0 0 6px var(--bg), 0 0 2px var(--bg); }
+#hud b { color: var(--fg); font-weight: 600; }
+body:has(#story:not([hidden])) #hud { display: none; }
+body:has(#panel:not([hidden])) #hud, body:has(#opening:not([hidden])) #hud { display: none; }
+.lab[data-kind="dec"] { font: 500 11px/1.1 var(--font-data); color: color-mix(in srgb, var(--court) 70%, var(--lab-base)); }
+body[data-mode="tree"] #crumbs { display: none; }
+body.immersive #legend, body.immersive #layers, body.immersive #crumbs, body.immersive #spine, body.immersive #brand small { display: none !important; }
+body.touring #legend, body.touring #layers, body.touring #hud { display: none !important; }
+@media (max-width: 760px) { body.touring #tools, body.touring #spine { display: none !important; } }
+body.immersive #vignette { background: radial-gradient(ellipse 70% 65% at 50% 46%, transparent 50%, var(--vig2) 100%); }
+#legend button[aria-pressed="true"] span { color: var(--fg); font-weight: 600; }
+
 /* Tooltip */
 #tip { position: fixed; z-index: 7; pointer-events: none; padding: 7px 10px; font-size: 12.5px; max-width: 320px; }
 #tip b { font-weight: 600; }
@@ -291,6 +354,10 @@ button.link { border: 0; background: none; padding: 0; font: inherit; cursor: po
   #crumbs { display: none; }
   #intro { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); padding: 16px 18px; }
   #intro h1 { font-size: 21px; }
+  #story { bottom: calc(108px + env(safe-area-inset-bottom, 0px)); padding: 12px 14px 10px; }
+  #story h3 { font-size: 17px; }
+  #story .body { font-size: 13.5px; }
+  #hud { display: none; }
   #intro p { font-size: 13.5px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
@@ -329,6 +396,7 @@ button.link { border: 0; background: none; padding: 0; font: inherit; cursor: po
   </div>
   <div id="legend" class="float"></div>
   <div id="toolrow">
+    <button class="chip strong" id="tourbtn"></button>
     <div class="seg" role="group" aria-label="View"><button id="mtree" aria-pressed="true"></button><button id="msr" aria-pressed="false"></button></div>
     <button class="chip" id="zin" aria-label="Zoom in">+</button>
     <button class="chip" id="zout" aria-label="Zoom out">−</button>
@@ -337,6 +405,7 @@ button.link { border: 0; background: none; padding: 0; font: inherit; cursor: po
     <button class="chip" id="periodbtn" aria-pressed="false"></button>
     <button class="chip" id="methodbtn"></button>
     <button class="chip" id="theme" aria-label="Theme"></button>
+    <button class="chip" id="focusbtn" aria-pressed="false" aria-label="Focus">⤢</button>
   </div>
 </div>
 
@@ -346,6 +415,12 @@ button.link { border: 0; background: none; padding: 0; font: inherit; cursor: po
 </aside>
 
 <div id="tip" class="float" hidden></div>
+<div id="vignette" aria-hidden="true"></div>
+<div id="opening" hidden aria-live="polite"><p class="op-num"></p><p class="op-text"></p><div class="op-actions"></div><button class="op-skip link"></button></div>
+<div id="tourmenu" class="float" hidden></div>
+<div id="story" class="float" hidden aria-live="polite"></div>
+<nav id="spine" class="float" hidden aria-label="Chain of delegation"></nav>
+<div id="hud" hidden aria-live="off"></div>
 <div id="intro" class="float" hidden role="dialog" aria-labelledby="introtitle">
   <h1 id="introtitle"></h1>
   <p id="introtext"></p>

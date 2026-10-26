@@ -203,6 +203,8 @@ def main() -> None:
             kinfo[kact[(ct, ksr)]] = rec
     stats["cantons_read"] = sum(1 for ct in ct_order if cb["cantons"].get(ct))
     stats["cantonal_acts"] = len(kact)
+    stats["k_floor_from_title"] = sum(1 for i in kact.values() if kinfo[i].get("floor_by") == "Titel")
+    stats["k_floor_unknown"] = sum(1 for i in kact.values() if kinfo[i].get("floor_by") == "unbekannt")
 
     def abbr_keys(ab, ct):
         out = set()
@@ -626,6 +628,43 @@ def main() -> None:
         e = eli.get(CANTON_CONSTITUTION[ct])
         if e:
             info[t]["e"] = e.replace("http://", "https://").replace("fedlex.data.admin.ch", "www.fedlex.admin.ch")
+    # adoption date of each federal act (dated title in the SR taxonomy): today's law by year of adoption
+    from cantonal_basis import LABEL, MONTHS
+    for r in csv.DictReader(open(ROOT / "data/sr_taxonomy.csv", encoding="utf-8")):
+        t = act_node.get(r["notation"]) if r["lang"] == "de" else None
+        m = LABEL.match(r["label"]) if t is not None else None
+        if m:
+            info[t]["ad"] = f"{int(m['y']):04d}-{MONTHS[m['m'].lower()]:02d}-{int(m['d']):02d}"
+    info[root]["ad"] = "1999-04-18"
+    stats["federal_acts_with_date"] = sum(1 for t in act_node.values() if info[t].get("ad"))
+
+    # guided tours: stops chosen by rule from the data, so every number they show is computed
+    rests_on = defaultdict(list)                 # target -> acts naming it as a basis
+    for sr, cands in resolved.items():
+        for c in cands:
+            rests_on[c[0]].append(act_node[sr])
+    for me, cands in kresolved.items():
+        for c in cands:
+            if c[0] >= 0:
+                rests_on[c[0]].append(me)
+
+    def thread(eid, sr):
+        """Art. <eid> BV -> the act -> its most-cited ordinance resting on it -> the most-cited cantonal act
+        resting on either: one real delegation chain, from the Constitution to the canton."""
+        law = act_node[sr]
+        ords = [x for x in set(rests_on[law]) if lv[x] == 2 and parent[x] == law]
+        o = max(ords, key=lambda x: (nof(x), -x)) if ords else None
+        cant = [x for x in set(rests_on[law] + (rests_on[o] if o is not None else [])) if lv[x] in (5, 6, 7)]
+        k = max(cant, key=lambda x: (nof(x), -x)) if cant else None
+        return [x for x in (bvart[eid], law, o, k) if x is not None]
+    top_acts = sorted((t for t in act_node.values()), key=lambda t: -nof(t))[:3]
+    tours = [
+        {"id": "stufenbau", "stops": [{"k": "overview"}, {"k": "apex", "i": root}, {"k": "floor", "l": 1},
+                                      {"k": "floor", "l": 2}, {"k": "floor", "l": 3}, {"k": "cantons"},
+                                      {"k": "courts", "top": top_acts}]},
+        {"id": "verkehr", "stops": [{"k": "node", "i": x} for x in thread("art_82", "741.01")] + [{"k": "courts", "i": act_node["741.01"]}]},
+        {"id": "bauen", "stops": [{"k": "node", "i": x} for x in thread("art_75", "700")] + [{"k": "courts", "i": act_node["700"]}]},
+    ]
     out_nodes = []
     for t in range(len(ids)):
         o = {"i": ids[t], "k": kind[t], "p": parent[t] if parent[t] is not None else -1, "c": core_i[t],
@@ -673,7 +712,7 @@ def main() -> None:
               [round(KY[5] * C, 3), round(ring_abs[5] + 0.02 * Rk, 3), "lv5"],
               [round(KY[6] * C, 3), round(ring_abs[6] + 0.02 * Rk, 3), "lv6"],
               [round(KY[7] * C, 3), round(ring_abs[7] + 0.02 * Rk, 3), "lv7"]]
-    json.dump({"nodes": out_nodes, "bases": bases_out, "root": root, "method": method, "plates": plates},
+    json.dump({"nodes": out_nodes, "bases": bases_out, "root": root, "method": method, "plates": plates, "tours": tours},
               open(SITE / "tree.json", "w"), ensure_ascii=False, separators=(",", ":"))
     json.dump({act_node[sr]: [issuer_of(r), r.get("ingress", "")] for sr, r in members.items()},
               open(SITE / "ingress.json", "w"), ensure_ascii=False, separators=(",", ":"))
