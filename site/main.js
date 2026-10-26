@@ -186,7 +186,9 @@ async function boot() {
   home(false);
   $("loading").hidden = true;
   const h = decodeHash();
-  if (location.hash === "#aufbau") showAgg(true);
+  // the first view: the overview ("Aufbau"), unless a link names an act or the visitor last chose the 3D views
+  const last = store("slm-view");
+  if (location.hash === "#aufbau" || (!h && tree && (!last || last === "agg"))) showAgg(true);
   else if (h) select(h.i, h.art, true);
   else if (mode === "tree" && tree && !seenOpening()) opening();
   else if (mode !== "tree" && !seenIntro()) $("intro").hidden = false;
@@ -650,7 +652,7 @@ function writeTreeLines() {
       alpha: lv >= 5 ? 0.5 : 0.95, flow: 0.6 });   // pulses run downwards: delegation
   }
   if (sel.i >= 0 && !web) {            // further bases of the selection, and acts naming it as a further basis (the constellation shows them)
-    for (const b of basisOf[sel.i] || []) if (!b.prim) lines.push({ pts: radialLink(b.j, sel.i), width: 1.5, color: BASIS2, alpha: 0.8, flow: 0.5 });
+    for (const b of basisOf[sel.i] || []) if (!b.prim && b.j >= 0) lines.push({ pts: radialLink(b.j, sel.i), width: 1.5, color: BASIS2, alpha: 0.8, flow: 0.5 });
     for (const d of dependents[sel.i] || []) if (!d.prim) lines.push({ pts: radialLink(sel.i, d.i), width: 1.2, color: BASIS2, alpha: 0.6, flow: 0.5 });
   }
   setRibbons(treeLines, lines);
@@ -1556,7 +1558,7 @@ function kActSections(i) {
       const clause = rec && rec[2] ? rec[2][b.k] || "" : "";
       const tags = [b.prim ? t.basisPlace : "", b.via === "old" ? t.basisOld : "", b.via === "earlier" ? t.basisEarlier : "",
         b.via === "absent" ? t.basisAbsent : "", b.j >= 0 && !b.found ? t.basisNotFound : ""].filter(Boolean).join(" · ");
-      if (b.j < 0) return `<li><span class="k"><i class="sw tree2"></i>${esc(b.via === "unresolved" ? t.basisUnresolved : b.via === "earlier" ? t.basisEarlierShort : t.basisAbsentShort)}</span><span class="v">${esc(tags)}</span>${clause ? `<span class="d">«${esc(clause)}»</span>` : ""}</li>`;
+      if (b.j < 0) return `<li><span class="k"><i class="sw tree2"></i>${esc(b.via === "unresolved" ? t.basisUnresolved : b.via === "earlier" ? t.basisEarlierShort : b.via === "fedany" ? t.basisFedAnyShort : t.basisAbsentShort)}</span><span class="v">${esc(tags)}</span>${clause ? `<span class="d">«${esc(clause)}»</span>` : ""}</li>`;
       const isBV = K[b.j] === "bvart" || b.j === LAY.tree.root;
       const names = artNames(b.eids);
       const head = K[b.j] === "kvart" ? label(b.j) + (names.length > 1 ? ` (${names.join(", ")})` : "")
@@ -1565,7 +1567,7 @@ function kActSections(i) {
       const target = isBV && names.length ? idIndex.get("BV:" + b.eids[0]) ?? b.j : b.j;
       return `<li><button class="k link" data-sel="${target}"><i class="sw ${b.prim ? "tree" : "tree2"}"></i>${esc(head)}</button><span class="v">${esc(tags)}</span>${clause ? `<span class="d">«${esc(clause)}»</span>` : ""}</li>`;
     }).join("")}</ul>`;
-    if (P[i] >= 0 && K[P[i]] === "tgroup") html += `<p class="note">${esc(t.kgFedPlace)}</p>`;
+    if (P[i] >= 0 && K[P[i]] === "tgroup") html += `<p class="note">${esc(t.kgPlace(t["kg_" + ids[P[i]].split(":")[2]] || ""))}</p>`;
   } else html += `<p class="note">${esc(!rec && ingressKWait ? t.loading : rec && rec[1] ? t.kNoBasis : t.kNoIngress)}</p>`;
   if (rec && rec[1]) html += `<details class="ingress"><summary>${esc(t.ingressK)}</summary><blockquote lang="${ctLang(o.ct)}">${esc(rec[1])}</blockquote></details>`;
   html += "</section>";
@@ -2009,8 +2011,9 @@ $("theme").onclick = () => {
   try { localStorage.setItem("slm-theme", theme); } catch (e) { /* storage unavailable */ }
   applyTheme(); buildLegend(); refreshPanel(); updateLabels(); relayoutWeb(); refreshAgg();
 };
-$("mtree").onclick = () => { if (aggOn) showAgg(false); setMode("tree"); applyLang(); };
-$("msr").onclick = () => { if (aggOn) showAgg(false); setMode("sr"); applyLang(); };
+// leaving the overview for the cone the first time: the opening introduces it (once per browser)
+$("mtree").onclick = () => { if (aggOn) showAgg(false); setMode("tree"); applyLang(); store("slm-view", "tree"); if (tree && !seenOpening()) opening(); };
+$("msr").onclick = () => { if (aggOn) showAgg(false); setMode("sr"); applyLang(); store("slm-view", "sr"); };
 $("lwire").onclick = () => { showWire = !showWire; $("lwire").setAttribute("aria-pressed", showWire); edgesDirty = true; };
 $("lall").onclick = () => { treeAll = !treeAll; $("lall").setAttribute("aria-pressed", treeAll); edgesDirty = true; };
 $("lcurrent").onclick = () => { showCurrent = !showCurrent; $("lcurrent").setAttribute("aria-pressed", showCurrent); edgesDirty = true; };
@@ -2319,6 +2322,11 @@ $("opening").addEventListener("click", (e) => {
   if (e.target.closest("[data-op='explore'], .op-skip")) { skipOpening(); home(); }
 });
 function seenOpening() { try { return localStorage.getItem("slm-opening") === "1"; } catch (e) { return false; } }
+// per-viewer conveniences only; the page works without storage
+function store(k, v) {
+  try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { /* storage unavailable */ }
+  return null;
+}
 
 // --- tour menu
 $("tourbtn").onclick = () => {
@@ -2818,9 +2826,10 @@ const aggHue = (b) => { const { r, k } = agg.blocks[b]; return r === "bv" ? "bv"
 
 function aggLayout() {
   const phone = W <= 760, panel = !$("panel").hidden && !phone;
-  const VW = phone ? Math.max(920, W) : W - (panel ? 424 : 0), VH = phone ? Math.max(780, H + 150) : H;   // phone: it scrolls
+  // phone: it scrolls, with room below for the key and the toolbar that floats over the page's foot
+  const VW = phone ? Math.max(920, W) : W - (panel ? 424 : 0), VH = phone ? Math.max(910, H + 280) : H;
   const x0 = (phone ? 16 : 26) + 22, x1 = VW - (phone ? 16 : 26);     // 22 px on the left: the constitutional trunk
-  const y0 = phone ? 250 : 196, y1 = VH - (phone ? 170 : 96);
+  const y0 = phone ? 250 : 196, y1 = VH - (phone ? 300 : 96);
   const rowH = phone ? 15 : 18;
   const unit = (y1 - y0 - AGG_ROWS.length * rowH) / 7.6;
   const Y = []; let y = y0;
@@ -2890,7 +2899,7 @@ function aggLayout() {
   }
   for (const [b, list] of Object.entries(ins)) {
     const g = geo.blocks[b], k = geo.k[part(+b)];
-    const key = (f) => (f.g ? -2e9 + (f.g === "fed" ? 0 : 1) : f.lane ? 1e9 + f.lane[0] : B[f.s].r === "bv" && B[+b].r === 4 ? -1.5e9 : cx(f.s));
+    const key = (f) => (f.g ? -2e9 + STUBS.indexOf(f.g) : f.lane ? 1e9 + f.lane[0] : B[f.s].r === "bv" && B[+b].r === 4 ? -1.5e9 : cx(f.s));
     list.sort((p, q) => key(p) - key(q) || (p.q ?? 0) - (q.q ?? 0));
     let x = g.x;
     for (const f of list) { const w = f.n * k; f.ta = x; f.tb = x + w; x += w; }
@@ -2938,8 +2947,9 @@ function renderAgg() {
   svg.setAttribute("viewBox", `0 0 ${G.VW} ${G.VH}`);
   svg.setAttribute("width", G.VW); svg.setAttribute("height", G.VH);
   const f2 = (v) => v.toFixed(1), out = [];
-  out.push(`<defs><linearGradient id="gNone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--faint)" stop-opacity="0"/><stop offset="1" stop-color="var(--faint)" stop-opacity="0.75"/></linearGradient>` +
-    `<linearGradient id="gFed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--current)" stop-opacity="0"/><stop offset="1" stop-color="var(--current)" stop-opacity="0.6"/></linearGradient></defs>`);
+  const grad = (id, c, o) => `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity="0"/><stop offset="1" stop-color="${c}" stop-opacity="${o}"/></linearGradient>`;
+  out.push(`<defs>${grad("gNone", "var(--faint)", 0.75)}${grad("gFed", "var(--current)", 0.6)}${grad("gBasis", "var(--basis)", 0.6)}` +
+    `<pattern id="gNoIng" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="url(#gNone)" opacity="0.35"/><line x1="0" y1="0" x2="0" y2="5" stroke="var(--faint)" stroke-width="1.6"/></pattern></defs>`);
   // floors: the row names, the part divider with Art. 49 BV, the scale bars
   const rowTot = {};
   for (let b = 0; b < B.length; b++) rowTot[B[b].r] = (rowTot[B[b].r] || 0) + (B[b].r === "bv" ? 0 : B[b].n);
@@ -2967,7 +2977,7 @@ function renderAgg() {
   for (const s of G.stubs) {
     const g = G.blocks[s.d]; if (!g) continue;
     const h = Math.min(G.unit * 0.55, 30);
-    out.push(`<rect class="as ${s.g}" data-s="${s.q}" x="${f2(s.ta)}" y="${f2(g.y - h)}" width="${f2(Math.max(0.6, s.tb - s.ta))}" height="${f2(h)}" fill="url(#${s.g === "fed" ? "gFed" : "gNone"})"/>`);
+    out.push(`<rect class="as ${s.g}" data-s="${s.q}" x="${f2(s.ta)}" y="${f2(g.y - h)}" width="${f2(Math.max(0.6, s.tb - s.ta))}" height="${f2(h)}" fill="url(#${STUB_FILL[s.g]})"/>`);
   }
   if (G.trunk.length) {                               // Art. 51 BV: one trunk down the left, a comb into the 26 constitutions
     const src = G.blocks[G.trunk[0].s], sa = Math.min(...G.trunk.map((f) => f.sa)), sb = Math.max(...G.trunk.map((f) => f.sb));
@@ -3003,6 +3013,12 @@ function renderAgg() {
   $("aggscale").style.right = (G.phone ? 16 : 26 + W - G.VW) + "px";
   $("aggscale").innerHTML = [[t.lvBV, G.k.BV], [t.aggFed, G.k.F], [t.aggKant, G.k.C]].map(([l, k]) => { const [n, w] = sc(k);
     return `<span><i style="width:${w.toFixed(1)}px"></i>${esc(l)}: ${esc(t.aggActs(num(n)))}</span>`; }).join("");
+  // the key to the stubs, below the cantons' codes: acts that hang from no basis in the tree, and why
+  const key = $("aggkey");
+  key.hidden = aggLayer !== "basis";
+  key.style.top = `${(G.Y[7] + G.rowH + 30).toFixed(0)}px`;
+  if (!G.phone) { key.style.right = `${Math.max(16, W - G.x1).toFixed(0)}px`; key.style.maxWidth = `${Math.max(320, G.x1 - 470).toFixed(0)}px`; }
+  key.innerHTML = `<span>${esc(t.aggNoParent)}:</span>` + STUBS.map((g) => `<button data-agg-stubkind="${g}"><i class="sws ${g}"></i>${esc(stubName(g))} <b>${esc(num(agg.stubs.reduce((a, [, k, m]) => a + (k === g ? m.length : 0), 0)))}</b></button>`).join("");
   if (aggLayer !== "basis") drawAggLinks(null);
   if (aggSel && aggSel[0] === "b") aggHot("b", aggSel[1]);          // the block the panel shows stays lit
   else if (aggSel) aggHot(aggSel[0], aggSel[1]);
@@ -3086,6 +3102,36 @@ function aggTarget(e) {
   if (el.dataset.l != null) return ["l", +el.dataset.l];
   return ["trunk", 0];
 }
+// acts that arrive from no basis drawn in the tree, and why (order at a block's top edge)
+const STUBS = ["fed", "unres", "lower", "none", "noing"];
+const STUB_FILL = { fed: "gFed", unres: "gBasis", lower: "gBasis", none: "gNone", noing: "gNoIng" };
+const stubName = (g) => ({ fed: t.aggOnlyFed, unres: t.aggUnres, lower: t.aggLower, none: t.aggNone, noing: t.aggNoIng })[g];
+// a stub of a canton, against the same kind on the same floor in all cantons (computed from agg.json)
+function stubCompare(f) {
+  const B = agg.blocks, me = B[f.d];
+  let html = `<section><p class="note">${esc(t["kg_" + f.g + "Note"] || "")}</p>`;
+  if (typeof me.r === "number" && me.r >= 5) {
+    const per = {};
+    for (let b = 0; b < B.length; b++) if (B[b].r === me.r) per[b] = { n: B[b].n, s: 0 };
+    for (const [d, g, m] of agg.stubs) if (g === f.g && per[d]) per[d].s += m.length;
+    const rows = Object.entries(per).filter(([, v]) => v.n >= 20).map(([b, v]) => [+b, v.s / v.n]).sort((a, b) => a[1] - b[1]);
+    const all = Object.values(per).reduce((a, v) => [a[0] + v.s, a[1] + v.n], [0, 0]);
+    const pc = (x) => `${Math.round(x * 100)} %`.replace(" %", lang === "en" ? "%" : " %");
+    if (rows.length > 2) html += `<p class="note">${esc(t.aggStubShare(num(f.n), num(me.n), pc(f.n / me.n), aggRowName(me.r), pc(all[0] / all[1]),
+      aggName(rows[0][0]), pc(rows[0][1]), aggName(rows[rows.length - 1][0]), pc(rows[rows.length - 1][1])))}</p>`;
+  }
+  return html + `</section>`;
+}
+function aggKindPanel(g) {
+  const B = agg.blocks, rows = agg.stubs.map(([d, k, m], q) => [d, k, m.length, q]).filter((x) => x[1] === g).sort((a, b) => b[2] - a[2]);
+  const tot = rows.reduce((a, x) => a + x[2], 0);
+  const html = `<section><div class="big"><b>${num(tot)}</b><span>${esc(t.acts)}</span></div><p class="note">${esc(t["kg_" + g + "Note"] || "")}</p></section>` +
+    `<section><ul class="list">${rows.map(([d, , n, q]) => `<li><button class="k link" data-agg-s="${q}">${esc(aggName(d))}</button><span class="v">${esc(num(n))}</span>` +
+      `<span class="d">${esc(aggRowOfB(d))} · ${esc(Math.round((100 * n) / Math.max(1, B[d].n)) + (lang === "en" ? "%" : " %"))}</span></li>`).join("")}</ul></section>`;
+  aggSel = null;
+  aggPanel(t.aggNoParent, stubName(g), "", html);
+}
+$("aggkey").addEventListener("click", (e) => { const b = e.target.closest("[data-agg-stubkind]"); if (b) aggKindPanel(b.dataset.aggStubkind); });
 function aggTipHtml([kind, id]) {
   const B = agg.blocks;
   if (kind === "b") {
@@ -3093,7 +3139,7 @@ function aggTipHtml([kind, id]) {
     return `<b>${esc(aggName(id))}</b><span>${esc(aggRowOfB(id))}</span><span>${esc(b.r === "bv" || b.r === 4 ? t.aggRestN(num(b.o)) : t.aggActs(num(n)))}${b.d ? " · " + esc(t.aggDec(num(b.d))) : ""}</span><span class="hint">${esc(t.aggTip)}</span>`;
   }
   if (kind === "f") { const f = aggG.flows[id]; return `<b>${esc(t.aggFlow(num(f.n), aggName(f.d), aggName(f.s)))}</b><span>${esc(aggRowName(B[f.d].r))} ← ${esc(aggRowName(B[f.s].r))}</span><span class="hint">${esc(t.aggTip)}</span>`; }
-  if (kind === "s") { const s = aggG.stubs[id]; return `<b>${esc(aggName(s.d))}: ${esc(t.aggActs(num(s.n)))}</b><span>${esc(s.g === "fed" ? t.aggOnlyFed : t.aggNone)}</span><span class="hint">${esc(t.aggTip)}</span>`; }
+  if (kind === "s") { const s = aggG.stubs[id]; return `<b>${esc(aggName(s.d))}: ${esc(t.aggActs(num(s.n)))}</b><span>${esc(stubName(s.g))}</span><span class="hint">${esc(t.aggTip)}</span>`; }
   if (kind === "l") {
     const x = aggG.links[id];
     return `<b>${esc(aggName(x.a))} ${aggLayer === "law" ? "→" : "↔"} ${esc(aggName(x.b))}</b><span>${esc(aggLayer === "law" ? t.aggLawTip(num(x.n), num(x.p)) : t.aggCourtTip(num(x.n), x.l.toFixed(1).replace(".", lang === "en" ? "." : ",")))}</span>`;
@@ -3117,7 +3163,7 @@ function aggBlockPanel(b) {
     (B.d ? `<p class="note">${esc(t.aggDecNote(num(B.d)))}</p>` : "") + `</section>`;
   const ins = (G.ins[b] || []).slice().sort((p, q) => q.n - p.n), outs = (G.outs[b] || []).slice().sort((p, q) => q.n - p.n);
   if (ins.length && B.r !== "bv") html += `<section><h3><i class="sw tree"></i>${esc(t.aggFrom)}</h3><ul class="list">${ins.map((f) =>
-    `<li><button class="k link" ${f.g ? `data-agg-s="${f.q}"` : `data-agg-f="${f.q}"`}>${esc(f.g ? (f.g === "fed" ? t.aggOnlyFed : t.aggNone) : aggName(f.s))}</button><span class="v">${esc(num(f.n))}</span><span class="d">${esc(f.g ? "" : aggRowOfB(f.s))}</span></li>`).join("")}</ul></section>`;
+    `<li><button class="k link" ${f.g ? `data-agg-s="${f.q}"` : `data-agg-f="${f.q}"`}>${f.g ? `<i class="sws ${f.g}"></i>` : ""}${esc(f.g ? stubName(f.g) : aggName(f.s))}</button><span class="v">${esc(num(f.n))}</span><span class="d">${esc(f.g ? "" : aggRowOfB(f.s))}</span></li>`).join("")}</ul></section>`;
   if (outs.length) html += `<section><h3><i class="sw tree"></i>${esc(t.aggTo)}</h3><ul class="list">${outs.slice(0, 30).map((f) =>
     `<li><button class="k link" data-agg-f="${f.q}">${esc(aggName(f.d))}</button><span class="v">${esc(num(f.n))}</span><span class="d">${esc(aggRowName(agg.blocks[f.d].r))}</span></li>`).join("")}</ul></section>`;
   for (const layer of ["law", "court"]) {
@@ -3133,9 +3179,10 @@ function aggBlockPanel(b) {
 }
 function aggFlowPanel(q, stub) {
   const f = stub ? aggG.stubs[q] : aggG.flows[q];
-  const head = stub ? `${aggName(f.d)}: ${f.g === "fed" ? t.aggOnlyFed : t.aggNone}` : t.aggFlow(num(f.n), aggName(f.d), aggName(f.s));
+  const head = stub ? `${aggName(f.d)}: ${stubName(f.g)}` : t.aggFlow(num(f.n), aggName(f.d), aggName(f.s));
   aggSel = [stub ? "s" : "f", q];
-  aggPanel(t.aggBasis, t.aggActs(num(f.n)), head, `<section><button class="chip" data-agg-lensf="${stub ? "s" : "f"}${q}">${esc(t.aggShowTree)}</button>${aggActList(f.m.map((x) => x))}</section>`);
+  aggPanel(t.aggBasis, t.aggActs(num(f.n)), head, (stub ? stubCompare(f) : "") +
+    `<section><button class="chip" data-agg-lensf="${stub ? "s" : "f"}${q}">${esc(t.aggShowTree)}</button>${aggActList(f.m.map((x) => x))}</section>`);
 }
 function aggGo(i) {                                  // an act: into the Stufenbau, with its connections
   showAgg(false);
@@ -3189,7 +3236,7 @@ $("pbody").addEventListener("click", (e) => {        // the overview's own links
   else if (l) aggLens(agg.members[+l.dataset.aggLens]);
   else if (lf) { const v = lf.dataset.aggLensf; aggLens((v[0] === "s" ? aggG.stubs : aggG.flows)[+v.slice(1)].m); }
 }, true);
-$("magg").onclick = () => showAgg(true);
+$("magg").onclick = () => { showAgg(true); store("slm-view", "agg"); };
 function refreshAgg() {                              // language, theme, size: redraw, and the panel's content
   if (!aggOn) return;
   renderAgg();

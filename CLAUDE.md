@@ -138,22 +138,33 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     constitutions (SR 131.2, `pipeline/cantons.py`) hang from Art. 51 BV (a constitutional link, not
     an Ingress; drawn down the central axis). Below, every act in force of the 26 official collections
     (16,358 + 26 constitutions) on floors by the issuer its Ingress names: 5 parliament/people/
-    Landsgemeinde/intercantonal (6,244), 6 government + cantonal courts (7,894), 7 directorates,
-    offices, other bodies incl. communal bodies some cantons publish and church constitutions (2,220);
-    no issuer → from the title (1,395, marked; agreements between governments → 6, other agreements,
-    incl. with foreign states → 5; 284 with no telling title → 7, marked "unknown"). Parent = the nearest higher cantonal basis the Ingress names
-    (a KV article node `KV:<ct>:art_N`, or a cantonal act), then text order; only federal bases →
-    group "only federal law named"; nothing → "no basis named" (incl. 1,200 acts whose collection
-    publishes no Ingress: TG above all). A basis is identified by its footnote/inline collection
+    Landsgemeinde/intercantonal (6,375), 6 government + cantonal courts (7,791), 7 directorates,
+    offices, other bodies incl. communal bodies some cantons publish and church constitutions (2,192);
+    no issuer → from the title (1,423, marked; every agreement, intercantonal or with a foreign state,
+    → 5 whoever concluded it: intercantonal law prevails over cantonal law, Art. 48 Abs. 5 BV — until
+    2026-10-26 agreements between governments went to 6 by title but to 5 by Ingress, 131 acts moved;
+    a contract of the canton "vertreten durch den Regierungsrat" with a commune → 6; 256 with no
+    telling title → 7, marked "unknown"). Parent = the nearest higher cantonal basis the Ingress names
+    (a KV article node `KV:<ct>:art_N`, or a cantonal act), then text order. No parent → one of five
+    groups, in this order (decision 24): "basis named, not identifiable" (474), "names only acts not
+    above it" (lower floor or a same-floor circle, 299), "only federal law named" (1,271, incl. earlier
+    federal acts and federal law in general), "no basis named" (2,584), "no preamble published"
+    (1,215: TG above all; ZG's "published only on Intlex" notes count here). A basis is identified by its footnote/inline collection
     number, the name of a constitution, a fixed federal title (not inside "Einführungsgesetz zum …"),
     type + date matched against the SR taxonomy titles (DE/FR/IT) or the canton's own acts (same type
     and agreeing title words required; a federal act only when the text says "Bundes-/fédéral/
     federale" or, without a cantonal act of that date, on ≥ 2 agreeing title words; ties → "?"), or an
     abbreviation the canton states. Amendment dates ("Fassung gemäss Nachtrag vom …") are skipped.
-    23,423 bases: 3,564 KV, 11,667 cantonal, 6,242 federal in force, 164 earlier federal, 1,786
-    unresolved (7.6 %); 459 cite a federal law by its old date while the footnote gives today's SR
-    number (flag "old"). 20 name a KV article that does not exist. Spot checks (3 × 40 random bases):
-    no wrong target after the fixes. Decision codes → the act whose collection states that
+    Since decision 24 also: a title without date that equals exactly one act's title ("des
+    Bundesgesetzes über die Binnenschiffahrt", "Einführungsgesetz zum ZGB" = "Gesetz über die
+    Einführung des ZGB"), an abbreviation with a date ("Art. 11 GSchG vom 8. Oktober 1971" → the
+    earlier act), "son ordonnance d'exécution" after a federal act, and "Bundesgesetzgebung über …"
+    as federal law in general ("SR ?"). 24,486 bases: 3,591 KV, 11,924 cantonal, 6,912 federal in
+    force, 166 earlier federal, 393 federal law in general, 1,500 not identifiable (1,893 unresolved
+    incl. the general ones, 7.7 %); 534 cite a federal law by its old date while the footnote gives
+    today's SR number (flag "old"; the number may since carry another act, e.g. SR 832.102.2). 20
+    name a KV article that does not exist. Spot checks (3 × 40 random bases; 2026-10-26 another
+    3 × 40 of the new matches): no wrong target after the fixes. Decision codes → the act whose collection states that
     abbreviation (any official language; a second code for the same act is merged, decisions counted
     as the exact union): 1,207 codes, 497,161 decisions; 2,599 codes (142,706 decisions) have no act
     in force (mostly repealed: pre-2011 procedure codes; communal BZO) → group "cited, not in the
@@ -203,17 +214,39 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     `#aufbau`): rows = floors (BV parts, Bundesversammlung, Bundesrat + courts, departments; the 26
     constitutions, cantonal floors 5–7), blocks = SR area (first digit) for federal law, canton for
     cantonal law (156 blocks). Every act in force (18,395) counts once in its block and arrives by one
-    flow from its primary parent (360 flows), so a block's inflows + stubs = its acts (asserted in 07).
-    Stubs instead of flows: no basis named (4,529, grey), cantonal acts naming only federal law (1,528,
-    blue). Widths = acts on three disclosed scales (BV parts by what rests on them; federal; cantonal);
+    flow from its primary parent (362 flows), so a block's inflows + stubs = its acts (asserted in 07).
+    Stubs instead of flows, five kinds (decision 24): only federal law named (1,271, blue), basis named
+    but not identifiable (474) and only acts not above it (299; both ochre), no basis named (2,664 incl.
+    80 federal, grey), no preamble published (1,215, hatched); a key below the cantons lists them and
+    opens each kind across all blocks. Widths = acts on three disclosed scales (BV parts by what rests on them; federal; cantonal);
     a flow is exact at its lower end and a share of the source's outflow at its upper end (parallel-sets
-    style). 1,569 acts skip a floor: their flows run in a lane beside the target column instead of
+    style). 1,555 acts skip a floor: their flows run in a lane beside the target column instead of
     through the floor between. Art. 51 BV → 26 constitutions as a trunk on the left (not an Ingress).
     Layers: legislation = provisions of federal acts naming an act of another block (treaties naming
     treaties dropped); case law = distinct decisions citing acts of both blocks (refs_valid, BV by
     article → part), ranked by n·ln(lift), lift ≥ 1.5 (raw counts are dominated by BGG/BV/ZPO, cited
     everywhere); 90 strongest pairs drawn, all of a block's on pointing. Decisions per block exact
     (distinct); 936,926 decisions refer to at least one act in force (979,726 incl. earlier acts).
+
+24. The 54 % check (2026-10-26). 3,476 of the 6,375 acts on cantonal floor 5 (54.5 %) hang from no
+    cantonal basis; that share is real, but "no cantonal basis" was one grey group mixing five cases.
+    Now: 1,774 the Ingress names no basis (27.8 %; sample 25/25 genuine: "Der Grosse Rat …
+    beschliesst:", "Le Grand Conseil … décrète"; drafting practice differs: JU 0 %, UR 4 %, GR 6 % vs
+    LU 58 %, GL 54 %, TI 54 %, GE 50 %), 731 no preamble published (11.5 %), 735 only federal law
+    (11.5 %), 160 a basis named but not identifiable (2.5 %), 76 only acts not above them (1.2 %).
+    Parser fixes found on the way (each checked by diff against the previous run; 29 targets changed,
+    all corrections): footnote digits glued to the year ("19912"); "gestützt §", "in Hinsicht auf",
+    "im Hinblick auf", "gemäss", "dans le respect de" (weak keywords only before the enacting formula);
+    a footnote giving the act's own number no longer hides the KV beside it; the head of a designation
+    decides its type ("l'ordonnance … relative au code pénal militaire" is not the MStG); two footnotes
+    or "(SR …)" naming different acts are two references; "et des communes" no longer splits a title;
+    the DE/FR/IT titles of one federal act are no rivals in a tie; Fedlex FR/IT titles write
+    "1<sup>er</sup>", so every federal act adopted on the 1st was missing from the FR/IT index (FR "loi
+    fédérale du 1er juillet 1966 sur les épizooties" had gone to the cantonal finance act); taxonomy
+    cross-reference nodes ("BG über …") are not acts. A canton's stub panel compares its share with the
+    same floor in all cantons (computed; cantons with ≥ 20 acts on the floor). Aufbau is the first view:
+    no hash → overview unless the visitor last chose the cone (`slm-view`); the opening plays the first
+    time the visitor enters the cone; act links (`#SR_220--art_41`) open the act as before.
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -292,7 +325,7 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
   ("which provisions of other acts name this article") needs article-precise targets, which the
   footnotes do not give (they name the act).
 - Cantonal law: article-level targets for bases naming a cantonal act's article (today the act);
-  read the 1,786 unresolved mentions by hand per canton; TI/SZ from their own portals when reachable;
+  read the 1,500 not identifiable mentions by hand per canton; TI/SZ from their own portals when reachable;
   communal law (BZO …) is out of scope of the cantonal collections.
 - The 13 dangling bases and 79 acts without a basis are Phase-2 material (lacunae, outdated Ingress).
 - Phase 2 (simplification, contradictions, lacunae) builds on `fedlex_structure.json.gz` and the

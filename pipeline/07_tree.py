@@ -191,7 +191,9 @@ def main() -> None:
                           {"ct": ct, **({"ksr": col["kv"], "u": kvrec.get("url")} if kvrec else {})})
         if kvrec:
             kinfo[kv_node[ct]] = kvrec
-        for g in ("fed", "none", "cited"):          # acts naming only federal law; no basis; cited, not found
+        # acts naming only federal law; a basis named that cannot be identified; only cantonal acts of a lower floor;
+        # no basis named; no Ingress published; cited, not found
+        for g in ("fed", "unres", "lower", "none", "noing", "cited"):
             kgroup[(ct, g)] = add(f"KG:{ct}:{g}", "tgroup", kv_node[ct], -1, "kvart", {"ct": ct})
         for ksr, rec in col.get("acts", {}).items():
             if ksr == col.get("kv"):
@@ -443,6 +445,9 @@ def main() -> None:
                 eids = [eid_of(n) for n in arts if eid_of(n) in bvart]
                 stats["k_bases_federal"] += 1
                 out.append([bvart[eids[0]] if eids else root, eids, clause, "basis", via, int(len(eids) == len(arts))])
+            elif tgt == "SR ?":                       # federal law named in general ("Bundesgesetzgebung über …")
+                stats["k_bases_federal_unidentified"] += 1
+                out.append([-1, [], clause, "basis", "fedany", 0])
             elif tgt.startswith("SR ") and "@" not in tgt and tgt[3:] in act_node:
                 stats["k_bases_federal"] += 1
                 out.append([act_node[tgt[3:]], fed_eids(tgt[3:], arts), clause, "basis", via, 1])
@@ -463,22 +468,31 @@ def main() -> None:
         if best is not None:
             parent[me] = out[best[1]][0]
             stats["k_parent_same_floor"] += int(not best[0][0])
-        elif any(c[0] >= 0 for c in out):
-            parent[me] = kgroup[(ct, "fed")]
-            stats["k_only_federal_basis"] += 1
         else:
-            parent[me] = kgroup[(ct, "none")]
-            stats["k_no_basis_in_ingress" if kinfo[me].get("ingress") else "k_no_ingress_published"] += 1
+            # no cantonal basis to hang from: say why, in this order
+            if any(c[4] == "unresolved" for c in out):
+                g = "unres"                          # a basis named that the collection in force does not identify
+            elif any(c[0] >= 0 and is_k(c[0]) for c in out):
+                g = "lower"                          # it names only cantonal acts of a lower floor
+            elif out:
+                g = "fed"                            # only federal law (in force, earlier, or in general)
+            elif (kinfo[me].get("ingress") or "").strip() and not re.match(r"\s*Dieser Erlass wird nur noch über", kinfo[me]["ingress"]):
+                g = "none"                           # the Ingress names no basis (ZG: an editorial note "published only on Intlex" is no Ingress)
+            else:
+                g = "noing"                          # the collection publishes no Ingress
+            parent[me] = kgroup[(ct, g)]
+            stats[{"unres": "k_basis_unidentified", "lower": "k_basis_lower_floor_only", "fed": "k_only_federal_basis",
+                   "none": "k_no_basis_in_ingress", "noing": "k_no_ingress_published"}[g]] += 1
         for k_, c in enumerate(out):
             c.append(1 if best is not None and k_ == best[1] else 0)
         kresolved[me] = out
-    for (ct, ksr), me in kact.items():                       # same-floor chains: a cycle goes to "no basis"
+    for (ct, ksr), me in kact.items():                       # same-floor chains: a cycle goes to "names no act above it"
         seen, j = set(), me
         while j is not None and j >= 0 and j not in seen:
             seen.add(j)
             j = parent[j]
         if j == me:
-            parent[me] = kgroup[(ct, "none")]
+            parent[me] = kgroup[(ct, "lower")]      # same-floor bases that run in a circle
             stats["k_cycle_broken"] += 1
 
     # ---- sizes
@@ -709,10 +723,10 @@ def main() -> None:
         bmembers[me].append(t)
         p = parent[t]
         g = kgroup_kind.get(p)
-        if p is None or p < 0 or p == nob or g == "none":
+        if p is None or p < 0 or p == nob:
             bstubs[(me, "none")].append(t)
-        elif g == "fed":
-            bstubs[(me, "fed")].append(t)
+        elif g in ("none", "noing", "unres", "lower", "fed"):
+            bstubs[(me, g)].append(t)
         else:
             bflows[(block(key_of(p)), me)].append(t)
     by_dec = lambda t: (-nof(t), t)
@@ -764,8 +778,10 @@ def main() -> None:
     stats["agg_flows"] = len(bflows)
     stats["agg_acts"] = sum(len(v) for v in bmembers.values())
     stats["agg_dec_any"] = dec_any
-    stats["agg_no_basis"] = sum(len(v) for (_, g), v in bstubs.items() if g == "none")
-    stats["agg_only_federal"] = sum(len(v) for (_, g), v in bstubs.items() if g == "fed")
+    for g_ in ("none", "noing", "unres", "lower", "fed"):
+        stats[f"agg_stub_{g_}"] = sum(len(v) for (_, g), v in bstubs.items() if g == g_)
+    stats["agg_no_basis"] = stats["agg_stub_none"]
+    stats["agg_only_federal"] = stats["agg_stub_fed"]
     rowno = lambda r: 0 if r == "bv" else r                # the Constitution's row is floor 0
     stats["agg_skip_flows"] = sum(len(v) for (s_, d_), v in bflows.items()   # a floor skipped, within one part (the trunk aside)
                                   if rowno(blocks[d_]["r"]) - rowno(blocks[s_]["r"]) > 1 and (rowno(blocks[s_]["r"]) >= 4) == (blocks[d_]["r"] >= 4))

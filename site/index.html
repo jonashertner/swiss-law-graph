@@ -181,6 +181,17 @@ body.webbing #spine, body.webbing #legend, body.webbing #layers { display: none 
 @media (max-width: 760px) { #aggscale { top: calc(136px + env(safe-area-inset-top, 0px)); left: 16px; right: auto !important; max-width: 340px; justify-content: flex-start; gap: 4px 12px; } }
 #aggscale span { display: inline-flex; align-items: center; gap: 6px; }
 #aggscale i { display: inline-block; height: 3px; background: var(--fg-soft); border-radius: 1px; }
+#aggkey { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); max-width: calc(100% - 520px); display: flex; flex-wrap: wrap;
+  justify-content: flex-end; align-items: center; gap: 2px 14px; font: 500 11px var(--font-data); color: var(--muted); }
+#aggkey button { all: unset; cursor: pointer; display: inline-flex; align-items: center; white-space: nowrap; padding: 2px 0; border-bottom: 1px solid transparent; }
+#aggkey button:hover, #aggkey button:focus-visible { color: var(--fg); border-bottom-color: var(--line-strong); }
+#aggkey b { font-weight: 600; color: var(--fg-soft); margin-left: 5px; }
+@media (max-width: 760px) { #aggkey { left: 16px; right: auto; max-width: 888px; justify-content: flex-start; } }
+.sws { display: inline-block; width: 10px !important; height: 10px !important; border-radius: 2px; margin-right: 5px; vertical-align: -1px; flex: none; }
+.sws.fed { background: color-mix(in srgb, var(--current) 62%, transparent) !important; }
+.sws.unres, .sws.lower { background: color-mix(in srgb, var(--basis) 62%, transparent) !important; }
+.sws.none { background: color-mix(in srgb, var(--faint) 80%, transparent) !important; }
+.sws.noing { background: repeating-linear-gradient(45deg, var(--faint) 0 1.6px, transparent 1.6px 4px) !important; }
 #aggsvg .act { font: 600 10px var(--font-data); letter-spacing: 0.04em; fill: var(--lab-dom); opacity: 0.8; }
 #aggsvg .abv { font: 500 11px var(--font-body); fill: var(--lab-title); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
 #aggsvg { display: block; font-family: var(--font-body); }
@@ -466,7 +477,7 @@ body.immersive #vignette { background: radial-gradient(ellipse 70% 65% at 50% 46
 <canvas id="map" aria-label="Map of Swiss law" role="img" tabindex="0"></canvas>
 <div id="labels" aria-hidden="true"></div>
 <div id="wveil" aria-hidden="true"></div>
-<div id="agg" hidden><div id="agghead"></div><div id="aggscale"></div><svg id="aggsvg" role="group" aria-label="Overview"></svg></div>
+<div id="agg" hidden><div id="agghead"></div><div id="aggscale"></div><svg id="aggsvg" role="group" aria-label="Overview"></svg><div id="aggkey"></div></div>
 <svg id="wedges" aria-hidden="true"></svg>
 <div id="web" role="group" aria-label="Connections"></div>
 <div id="loading">Swiss Law Map …</div>
