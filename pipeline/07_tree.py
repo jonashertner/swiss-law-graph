@@ -249,6 +249,7 @@ def main() -> None:
     # an act cited under several codes: the distinct decisions citing any of them (exact, not a sum)
     multi = {t: [core["nodes"][core_i[t]]["i"]] + [core["nodes"][k]["i"] for k in info[t]["al"]]
              for t in kact.values() if info[t].get("al") and core_i[t] >= 0}
+    alias_ids = dict(multi)                     # every code an act is cited under (for the overview's counts)
     if multi:
         pairs = [(t, a) for t, codes in multi.items() for a in codes]
         duckdb.sql("create or replace temp table mc(t int, act_id varchar)")
@@ -665,6 +666,111 @@ def main() -> None:
         {"id": "verkehr", "stops": [{"k": "node", "i": x} for x in thread("art_82", "741.01")] + [{"k": "courts", "i": act_node["741.01"]}]},
         {"id": "bauen", "stops": [{"k": "node", "i": x} for x in thread("art_75", "700")] + [{"k": "courts", "i": act_node["700"]}]},
     ]
+    # ---- the overview ("Aufbau"): one block per floor and SR area (federal law) or canton. Every
+    # act in force sits in exactly one block and arrives by exactly one flow, its place in the tree
+    # (primary basis), so the flows into a block plus its stubs ("no basis named", "only federal
+    # law named") sum to its acts. Case law between blocks: distinct decisions citing both.
+    kgroup_kind = {v: k[1] for k, v in kgroup.items()}
+    kv_ct = {v: k for k, v in kv_node.items()}
+    act_ct = {t: ct for (ct, _), t in kact.items()}
+    fed_acts = set(act_node.values())
+    blocks, bidx = [], {}
+
+    def block(key):
+        if key not in bidx:
+            bidx[key] = len(blocks)
+            blocks.append({"r": key[0], "k": key[1]})
+        return bidx[key]
+
+    def key_of(t):                                    # the block a node belongs to
+        if t in fed_acts:
+            return (lv[t], ids[t][3])                 # SR area: the first digit
+        if t in kv_ct:
+            return (4, kv_ct[t])
+        if kind[t] == "kvart":
+            return (4, info[t]["ct"])
+        if t in act_ct:
+            return (lv[t], act_ct[t])
+        if t == abv:
+            return ("bv", "1874")
+        if t == intl or t in treaty_set:
+            return ("bv", "int")
+        if t == root:
+            return ("bv", root)
+        if kind[t] == "bvart":                        # an article: the section (or chapter, title) it stands in
+            p = parent[t]
+            return ("bv", p if p is not None and p != root and kind[p] in ("title", "chapter", "section") else root)
+        if kind[t] in ("title", "chapter", "section"):
+            return ("bv", t)
+        return None
+    bmembers, bflows, bstubs = defaultdict(list), defaultdict(list), defaultdict(list)
+    for t in list(act_node.values()) + list(kv_ct) + list(act_ct):
+        me = block(key_of(t))
+        bmembers[me].append(t)
+        p = parent[t]
+        g = kgroup_kind.get(p)
+        if p is None or p < 0 or p == nob or g == "none":
+            bstubs[(me, "none")].append(t)
+        elif g == "fed":
+            bstubs[(me, "fed")].append(t)
+        else:
+            bflows[(block(key_of(p)), me)].append(t)
+    by_dec = lambda t: (-nof(t), t)
+    for b in range(len(blocks)):
+        blocks[b]["n"] = len(bmembers[b])
+        blocks[b]["o"] = sum(len(v) for (s, _), v in bflows.items() if s == b)
+    # decisions per block, and per pair of blocks: distinct decisions citing an act of each
+    act_rows, bv_rows = [], []
+    for t in list(act_node.values()) + list(kv_ct) + list(act_ct):
+        codes = alias_ids.get(t) or ([core["nodes"][core_i[t]]["i"]] if core_i[t] >= 0 else [])
+        act_rows += [(c, bidx[key_of(t)]) for c in codes]
+    for e, t in bvart.items():
+        bv_rows.append((e, bidx.get(key_of(t), bidx.get(("bv", root), -1))))
+    duckdb.sql("create or replace temp table bm_act(act_id varchar, b int)")
+    duckdb.executemany("insert into bm_act values (?, ?)", act_rows)
+    duckdb.sql("create or replace temp table bm_bv(art varchar, b int)")
+    duckdb.executemany("insert into bm_bv values (?, ?)", bv_rows)
+    bv_root = block(("bv", root))
+    duckdb.sql(f"""create or replace temp table db as
+        select distinct r.decision_id d, m.b from '{ROOT}/build/refs_valid.parquet' r join bm_act m using (act_id)
+        union
+        select distinct r.decision_id d, coalesce(a.b, {bv_root}) b from '{ROOT}/build/refs_valid.parquet' r
+          left join bm_bv a on a.art = r.art where r.act_id = 'SR 101'""")
+    for b, n_ in duckdb.sql("select b, count(distinct d) from db group by 1").fetchall():
+        blocks[b]["d"] = n_
+    dec_any = duckdb.sql("select count(distinct d) from db").fetchall()[0][0]
+    court = [[a, b, n_] for a, b, n_ in duckdb.sql(
+        "select x.b, y.b, count(*) from db x join db y on x.d = y.d and x.b < y.b group by 1, 2 order by 3 desc").fetchall()]
+    # legislation between blocks: provisions of one act naming another (the whole BV for SR 101)
+    core_block = {core_i[t]: bidx[key_of(t)] for t in act_node.values()}
+    core_block[cidx["SR 101"]] = bv_root
+    for k, n in enumerate(core["nodes"]):
+        if n["i"].startswith("SR 0.") and n["k"] == "act":
+            core_block[k] = block(("bv", "int"))
+    law = defaultdict(lambda: [0, 0])
+    int_block = block(("bv", "int"))
+    for a, b, n_ in core.get("xedges", []):              # domestic acts naming others (treaties naming treaties: out)
+        if a in core_block and b in core_block and core_block[a] != int_block:
+            x = law[(core_block[a], core_block[b])]
+            x[0] += n_; x[1] += 1
+    for b in range(len(blocks)):                      # blocks created for the legislation layer only
+        blocks[b].setdefault("n", 0); blocks[b].setdefault("o", 0)
+    agg = {"blocks": blocks, "members": [sorted(bmembers[b], key=by_dec) for b in range(len(blocks))],
+           "flows": [[s, d, sorted(v, key=by_dec)] for (s, d), v in sorted(bflows.items(), key=lambda x: (-len(x[1]), x[0]))],
+           "stubs": [[d, g, sorted(v, key=by_dec)] for (d, g), v in sorted(bstubs.items())],
+           "law": [[a, b, v[0], v[1]] for (a, b), v in sorted(law.items(), key=lambda x: (-x[1][0], x[0]))],
+           "court": court, "dec_any": dec_any, "ct_order": ct_order}
+    stats["agg_blocks"] = len(blocks)
+    stats["agg_flows"] = len(bflows)
+    stats["agg_acts"] = sum(len(v) for v in bmembers.values())
+    stats["agg_dec_any"] = dec_any
+    stats["agg_no_basis"] = sum(len(v) for (_, g), v in bstubs.items() if g == "none")
+    stats["agg_only_federal"] = sum(len(v) for (_, g), v in bstubs.items() if g == "fed")
+    rowno = lambda r: 0 if r == "bv" else r                # the Constitution's row is floor 0
+    stats["agg_skip_flows"] = sum(len(v) for (s_, d_), v in bflows.items()   # a floor skipped, within one part (the trunk aside)
+                                  if rowno(blocks[d_]["r"]) - rowno(blocks[s_]["r"]) > 1 and (rowno(blocks[s_]["r"]) >= 4) == (blocks[d_]["r"] >= 4))
+    assert stats["agg_acts"] == sum(len(v) for v in bflows.values()) + sum(len(v) for v in bstubs.values())
+
     out_nodes = []
     for t in range(len(ids)):
         o = {"i": ids[t], "k": kind[t], "p": parent[t] if parent[t] is not None else -1, "c": core_i[t],
@@ -714,6 +820,7 @@ def main() -> None:
               [round(KY[7] * C, 3), round(ring_abs[7] + 0.02 * Rk, 3), "lv7"]]
     json.dump({"nodes": out_nodes, "bases": bases_out, "root": root, "method": method, "plates": plates, "tours": tours},
               open(SITE / "tree.json", "w"), ensure_ascii=False, separators=(",", ":"))
+    json.dump(agg, open(SITE / "agg.json", "w"), ensure_ascii=False, separators=(",", ":"))
     json.dump({act_node[sr]: [issuer_of(r), r.get("ingress", "")] for sr, r in members.items()},
               open(SITE / "ingress.json", "w"), ensure_ascii=False, separators=(",", ":"))
     json.dump({t: [r.get("issuer") or "", r.get("ingress") or "", kclauses.get(t, [])] for t, r in kinfo.items() if r.get("ingress")},

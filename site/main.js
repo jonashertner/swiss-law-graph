@@ -186,7 +186,8 @@ async function boot() {
   home(false);
   $("loading").hidden = true;
   const h = decodeHash();
-  if (h) select(h.i, h.art, true);
+  if (location.hash === "#aufbau") showAgg(true);
+  else if (h) select(h.i, h.art, true);
   else if (mode === "tree" && tree && !seenOpening()) opening();
   else if (mode !== "tree" && !seenIntro()) $("intro").hidden = false;
   requestAnimationFrame(loop);
@@ -1215,7 +1216,7 @@ function titleLang(i) { const v = titles[i]; return v && typeof v !== "string" ?
 let lastT = performance.now(), lastLabels = 0, moving = false, lastCam = "";
 function loop(now) {
   requestAnimationFrame(loop);
-  if (!core) return;
+  if (!core || aggOn) return;                       // the overview covers the scene: nothing to draw
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
   if (anim) anim.step(now);
@@ -1360,7 +1361,7 @@ function resize() {
   camera.updateProjectionMatrix();
   edgesDirty = true;
   if (!$("story").hidden) storyTop = $("story").getBoundingClientRect().top;
-  relayoutWeb();
+  relayoutWeb(); refreshAgg();
 }
 addEventListener("keydown", (e) => {
   if (e.target.matches("input, select, textarea")) return;
@@ -1387,6 +1388,7 @@ function select(i, art = null, animate = true, quiet = false) {
     const was = !$("panel").hidden;
     sel = { i: -1, art: null }; $("panel").hidden = true; $("tools").classList.remove("raised");
     hideCourts(); webFor(-1);
+    if (aggOn) { aggSel = null; renderAgg(); }
     refreshStates(); refreshHover(); writeHash(); crumbs(); renderSpine();
     if (was && animate) recentre();
     return;
@@ -1829,6 +1831,7 @@ function writeHash() {
       : id.replace(/ /g, "_").replace(/@/g, "~").replace(/\*/g, "x").replace(/^(BV|TREE):/, "$1.").replace(/\//g, "~~");
     if (sel.art) h += "--" + sel.art.replace(/\//g, "~");
   }
+  if (aggOn) h = "aufbau";                       // the overview has its own link
   try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) { /* sandboxed */ }
 }
 function decodeHash() {
@@ -2004,10 +2007,10 @@ $("tilt").onclick = () => {
 $("theme").onclick = () => {
   theme = theme === "light" ? "dark" : "light";
   try { localStorage.setItem("slm-theme", theme); } catch (e) { /* storage unavailable */ }
-  applyTheme(); buildLegend(); refreshPanel(); updateLabels(); relayoutWeb();
+  applyTheme(); buildLegend(); refreshPanel(); updateLabels(); relayoutWeb(); refreshAgg();
 };
-$("mtree").onclick = () => setMode("tree");
-$("msr").onclick = () => setMode("sr");
+$("mtree").onclick = () => { if (aggOn) showAgg(false); setMode("tree"); applyLang(); };
+$("msr").onclick = () => { if (aggOn) showAgg(false); setMode("sr"); applyLang(); };
 $("lwire").onclick = () => { showWire = !showWire; $("lwire").setAttribute("aria-pressed", showWire); edgesDirty = true; };
 $("lall").onclick = () => { treeAll = !treeAll; $("lall").setAttribute("aria-pressed", treeAll); edgesDirty = true; };
 $("lcurrent").onclick = () => { showCurrent = !showCurrent; $("lcurrent").setAttribute("aria-pressed", showCurrent); edgesDirty = true; };
@@ -2065,6 +2068,8 @@ function applyLang() {
   $("home").textContent = t.home; $("periodbtn").textContent = t.time; $("methodbtn").textContent = t.method;
   $("webbtn").textContent = t.webBtn; $("webbtn").title = t.webHint; $("webbtn").setAttribute("aria-pressed", webOn);
   if (web) { web.G = webGroups(web.i, !(story && story.tr)); relayoutWeb(); }
+  $("magg").textContent = t.viewAgg; $("magg").hidden = !tree;
+  if (aggOn) refreshAgg();
   $("tilt").textContent = core ? tiltLabel() : t.view3d; $("play").textContent = playing ? t.pause : t.play;
   $("l-from").textContent = t.from; $("l-to").textContent = t.to; $("periodnote").textContent = t.periodNote;
   $("introtext").textContent = mode === "tree" ? t.introTree : t.intro; $("introok").textContent = t.introOk; $("introtitle").textContent = t.name;
@@ -2073,7 +2078,8 @@ function applyLang() {
   $("focusbtn").title = t.focusMode; $("focusbtn").setAttribute("aria-label", t.focusMode);
   $("opening").querySelector(".op-skip").textContent = t.opSkip;
   if (core) { setGrowthUI(); renderSpine(); }
-  $("mtree").setAttribute("aria-pressed", mode === "tree"); $("msr").setAttribute("aria-pressed", mode === "sr");
+  $("mtree").setAttribute("aria-pressed", !aggOn && mode === "tree"); $("msr").setAttribute("aria-pressed", !aggOn && mode === "sr");
+  $("magg").setAttribute("aria-pressed", aggOn);
   $("mtree").hidden = $("msr").hidden = !LAY.tree;
   $("ltree").hidden = mode !== "tree";
   $("lall").hidden = mode !== "tree"; $("lalltext").textContent = t.treeAll;
@@ -2171,6 +2177,7 @@ const linkTo = (j, text) => `<button class="link" data-sel="${j}">${esc(text ?? 
 
 // --- tours
 function startTour(id) {
+  if (aggOn) showAgg(false);
   closeIntro(); $("opening").hidden = true; $("tourmenu").hidden = true;
   if (mode !== "tree") setMode("tree", false);
   lens = null; growthYear = null; setGrowthUI();
@@ -2295,7 +2302,7 @@ async function opening() {
   $("opening").querySelector(".op-num").textContent = t.opAsk;
   $("opening").querySelector(".op-text").textContent = "";
   $("opening").querySelector(".op-actions").innerHTML = tree.tours.map((tr) => `<button class="chip strong" data-tour="${tr.id}">${esc(t["tour_" + tr.id])}</button>`).join("") +
-    `<button class="chip" data-op="explore">${esc(t.opExplore)}</button>`;
+    `<button class="chip strong" data-op="agg">${esc(t.opAgg)}</button><button class="chip" data-op="explore">${esc(t.opExplore)}</button>`;
   story = null;
 }
 function skipOpening() {
@@ -2308,6 +2315,7 @@ function skipOpening() {
 $("opening").addEventListener("click", (e) => {
   const b = e.target.closest("[data-tour]");
   if (b) { skipOpening(); startTour(b.dataset.tour); return; }
+  if (e.target.closest("[data-op='agg']")) { skipOpening(); showAgg(true); return; }
   if (e.target.closest("[data-op='explore'], .op-skip")) { skipOpening(); home(); }
 });
 function seenOpening() { try { return localStorage.getItem("slm-opening") === "1"; } catch (e) { return false; } }
@@ -2316,6 +2324,7 @@ function seenOpening() { try { return localStorage.getItem("slm-opening") === "1
 $("tourbtn").onclick = () => {
   const m = $("tourmenu");
   m.innerHTML = `<p class="eyebrow">${esc(t.tours)}</p>` + tree.tours.map((tr) => `<button data-tour="${tr.id}"><b>${esc(t["tour_" + tr.id])}</b><span>${esc(t["tourSub_" + tr.id])}</span></button>`).join("") +
+    `<button data-op="agg"><b>${esc(t.opAgg)}</b><span>${esc(t.opAggSub)}</span></button>` +
     `<button data-op="replay"><b>${esc(t.replay)}</b><span>${esc(t.replaySub)}</span></button>`;
   m.hidden = !m.hidden;
 };
@@ -2324,7 +2333,8 @@ $("tourmenu").addEventListener("click", (e) => {
   if (!b) return;
   $("tourmenu").hidden = true;
   if (b.dataset.tour) startTour(b.dataset.tour);
-  else { endTour(false); select(-1, null, false); if (mode !== "tree") setMode("tree", false); opening(); }
+  else if (b.dataset.op === "agg") showAgg(true);
+  else { if (aggOn) showAgg(false); endTour(false); select(-1, null, false); if (mode !== "tree") setMode("tree", false); opening(); }
 });
 
 // --- descent: from the Constitution down the chain of delegation to the act
@@ -2765,6 +2775,426 @@ $("webbtn").onclick = () => {
   if (!webOn && sel.i >= 0 && mode === "tree" && K[sel.i] === "act" && !story) courtsFor(sel.i);
   else hideCourts();
 };
+
+// ---------- the overview ("Aufbau"): floors × SR areas / cantons, with exact flows ----------
+// 18,395 acts cannot each be legible at once. Here every act in force is counted once, in its block
+// (its floor and SR area; in cantonal law its floor and canton), and arrives by one flow, from the
+// basis it hangs from in the tree. Widths are counts, on one scale for federal and one for cantonal
+// law (both shown as scale bars); every number comes from data/agg.json (step 7). Flows that skip a
+// floor run down a lane beside the block they pass; the 26 constitutions hang from Art. 51 BV by a
+// trunk on the left (as in the cone, a constitutional link, not an Ingress). Two other layers swap
+// the flows for links between blocks: legislation (provisions naming the other block's acts) and
+// case law (decisions citing both, ranked by n·ln(lift)). A click lists the acts; each leads into
+// the Stufenbau.
+let agg = null, aggWait = null, aggOn = false, aggLayer = "basis", aggG = null, aggSel = null;
+const AGG_ROWS = ["bv", 1, 2, 3, 4, 5, 6, 7];
+const AGG_TOP = 90;                                  // links shown per layer (all of a block's on pointing)
+function ensureAgg() {
+  if (agg) return Promise.resolve(agg);
+  if (!aggWait) aggWait = getJSON("data/agg.json").then((d) => { agg = d; aggWait = null; return d; });
+  return aggWait;
+}
+const aggRowOf = (b) => AGG_ROWS.indexOf(agg.blocks[b].r);
+const aggSize = (b) => (agg.blocks[b].r === "bv" || agg.blocks[b].r === 4 ? agg.blocks[b].o : agg.blocks[b].n);
+function aggName(b, short) {
+  const { r, k } = agg.blocks[b];
+  if (r === "bv") {
+    if (k === "1874") return short ? "BV 1874" : t.abv;
+    if (k === "int") return t.aggTreaties;
+    if (k === tree.root) return t.aggBvNoArt;
+    const o = node(gi(k)), num = pickL(o.num).replace(/:$/, ""), h = pickL(o.h);
+    return short ? h || num : `${num} ${h}`.trim();
+  }
+  if (r >= 1 && r <= 3) {
+    const a = idIndex.get("A " + k), l = a !== undefined ? label(a) : "";
+    return short ? `${k} ${l.split(/\s*[-–,]\s*/)[0]}` : `${k} ${l}`;
+  }
+  if (r === 4) return short ? k : `${t.kvShort} ${k} · ${cantonName(k)}`;
+  return short ? k : cantonName(k);
+}
+const aggRowName = (r) => (r === "bv" ? t.lvBV : (t["lv" + r] || "").split(" · ").reverse().join(" · "));
+const aggRowOfB = (b) => (agg.blocks[b].k === "int" ? t.INT : aggRowName(agg.blocks[b].r));   // treaties: international law
+const aggHue = (b) => { const { r, k } = agg.blocks[b]; return r === "bv" ? "bv" : r >= 1 && r <= 3 ? k : "k"; };
+
+function aggLayout() {
+  const phone = W <= 760, panel = !$("panel").hidden && !phone;
+  const VW = phone ? Math.max(920, W) : W - (panel ? 424 : 0), VH = phone ? Math.max(780, H + 150) : H;   // phone: it scrolls
+  const x0 = (phone ? 16 : 26) + 22, x1 = VW - (phone ? 16 : 26);     // 22 px on the left: the constitutional trunk
+  const y0 = phone ? 250 : 196, y1 = VH - (phone ? 170 : 96);
+  const rowH = phone ? 15 : 18;
+  const unit = (y1 - y0 - AGG_ROWS.length * rowH) / 7.6;
+  const Y = []; let y = y0;
+  AGG_ROWS.forEach((r, q) => { Y.push(y); y += rowH + (q === 3 ? unit * 1.6 : unit); });
+  const B = agg.blocks, nB = B.length;
+  const part = (b) => (aggRowOf(b) <= 3 ? "F" : "C");
+  const flows = agg.flows.map(([s, d, m], q) => ({ q, s, d, n: m.length, m }));
+  const trunk = flows.filter((f) => B[f.s].r === "bv" && B[f.d].r === 4);
+  const isSkip = (f) => aggRowOf(f.d) - aggRowOf(f.s) > 1 && part(f.s) === part(f.d);
+  // columns: SR areas 1-9 (federal), cantons in SR 131.2 order (cantonal); each as wide as its widest floor plus a lane
+  const cols = { F: ["1", "2", "3", "4", "5", "6", "7", "8", "9"], C: agg.ct_order };
+  const colOf = (b) => (B[b].r === "bv" ? null : B[b].k);
+  const wmax = {}, lane = {};
+  for (let b = 0; b < nB; b++) { const c = colOf(b); if (c != null && aggSize(b)) wmax[c] = Math.max(wmax[c] || 0, aggSize(b)); }
+  for (const f of flows) if (isSkip(f)) lane[colOf(f.d)] = (lane[colOf(f.d)] || 0) + f.n;
+  const geo = { phone, VW, VH, x0, x1, y0, y1, rowH, Y, unit, k: {}, blocks: [], flows, trunk, lanes: {} };
+  for (const P of ["F", "C"]) {
+    const gap = P === "F" ? 10 : phone ? 5 : 4, list = cols[P].filter((c) => wmax[c]);
+    const units = list.reduce((s, c) => s + wmax[c] + (lane[c] || 0), 0);
+    const k = (x1 - x0 - gap * (list.length - 1) - list.filter((c) => lane[c]).length * 3) / units;
+    geo.k[P] = k;
+    let x = x0;
+    for (const c of list) {
+      geo.lanes[c] = { x: x + wmax[c] * k + 2, used: 0 };
+      geo[c] = { x, w: wmax[c] * k };
+      x += wmax[c] * k + (lane[c] ? lane[c] * k + 3 : 0) + gap;
+    }
+  }
+  for (let b = 0; b < nB; b++) {                     // blocks of the floors: centred in their column
+    const c = colOf(b), w = aggSize(b) * geo.k[part(b)];
+    if (c == null || !w) continue;
+    geo.blocks[b] = { x: geo[c].x + (geo[c].w - w) / 2, y: Y[aggRowOf(b)], w, h: rowH };
+  }
+  // the Constitution's row, on its own scale (what rests on each of its parts): each part near the
+  // mean position of what rests on it, in that order
+  const bvList = []; for (let b = 0; b < nB; b++) if (B[b].r === "bv" && B[b].o) bvList.push(b);
+  geo.k.BV = (x1 - x0 - 6 * (bvList.length - 1)) / Math.max(1, bvList.reduce((s, b) => s + B[b].o, 0));
+  const bvs = [];
+  for (const b of bvList) {
+    let sx = 0, sn = 0;
+    for (const f of flows) if (f.s === b && geo.blocks[f.d] && B[f.d].r !== 4) { sx += (geo.blocks[f.d].x + geo.blocks[f.d].w / 2) * f.n; sn += f.n; }
+    bvs.push([b, sn ? sx / sn : x0, B[b].o * geo.k.BV]);
+  }
+  bvs.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  let right = x0 - 6;
+  for (const [b, c, w] of bvs) { const x = Math.max(c - w / 2, right + 6); geo.blocks[b] = { x, y: Y[0], w, h: rowH }; right = x + w; }
+  if (right > x1) { const sh = right - x1; for (const [b] of bvs) geo.blocks[b].x = Math.max(x0, geo.blocks[b].x - sh); }
+  for (let q = 1; q < bvs.length; q++) {             // after the shift: no overlap
+    const a = geo.blocks[bvs[q - 1][0]], z = geo.blocks[bvs[q][0]];
+    if (z.x < a.x + a.w + 4) z.x = a.x + a.w + 4;
+  }
+  // where each flow leaves (share of the source's bottom) and arrives (count at the target's scale)
+  const cx = (b) => geo.blocks[b].x + geo.blocks[b].w / 2;
+  const ins = {}, outs = {};
+  for (const f of flows) { (outs[f.s] = outs[f.s] || []).push(f); (ins[f.d] = ins[f.d] || []).push(f); }
+  const stubs = agg.stubs.map(([d, g, m], q) => ({ q, d, g, n: m.length, m }));
+  for (const s of stubs) (ins[s.d] = ins[s.d] || []).push(s);
+  for (const f of flows) if (isSkip(f)) {            // a lane beside the target's column
+    const L = geo.lanes[colOf(f.d)], w = f.n * geo.k[part(f.d)];
+    f.lane = [L.x + L.used, L.x + L.used + w]; L.used += w;
+  }
+  for (const [b, list] of Object.entries(outs)) {
+    const g = geo.blocks[b], tot = list.reduce((s, f) => s + f.n, 0);
+    list.sort((p, q) => (p.lane ? p.lane[0] : B[p.d].r === 4 ? -1e9 : cx(p.d)) - (q.lane ? q.lane[0] : B[q.d].r === 4 ? -1e9 : cx(q.d)) || p.q - q.q);
+    let x = g.x;
+    for (const f of list) { const w = (f.n / tot) * g.w; f.sa = x; f.sb = x + w; x += w; }
+  }
+  for (const [b, list] of Object.entries(ins)) {
+    const g = geo.blocks[b], k = geo.k[part(+b)];
+    const key = (f) => (f.g ? -2e9 + (f.g === "fed" ? 0 : 1) : f.lane ? 1e9 + f.lane[0] : B[f.s].r === "bv" && B[+b].r === 4 ? -1.5e9 : cx(f.s));
+    list.sort((p, q) => key(p) - key(q) || (p.q ?? 0) - (q.q ?? 0));
+    let x = g.x;
+    for (const f of list) { const w = f.n * k; f.ta = x; f.tb = x + w; x += w; }
+  }
+  geo.stubs = stubs; geo.ins = ins; geo.outs = outs;
+  return geo;
+}
+
+function aggRibbon(f, G) {
+  const s = G.blocks[f.s], d = G.blocks[f.d];
+  const ys = s.y + s.h, yt = d.y, f2 = (v) => v.toFixed(1);
+  if (f.lane) {
+    const [la, lb] = f.lane, y1 = ys + G.unit * 0.42, y2 = yt - G.unit * 0.42, m1 = (ys + y1) / 2, m2 = (y2 + yt) / 2;
+    return `M${f2(f.sa)},${f2(ys)}C${f2(f.sa)},${f2(m1)} ${f2(la)},${f2(m1)} ${f2(la)},${f2(y1)}L${f2(la)},${f2(y2)}C${f2(la)},${f2(m2)} ${f2(f.ta)},${f2(m2)} ${f2(f.ta)},${f2(yt)}` +
+      `L${f2(f.tb)},${f2(yt)}C${f2(f.tb)},${f2(m2)} ${f2(lb)},${f2(m2)} ${f2(lb)},${f2(y2)}L${f2(lb)},${f2(y1)}C${f2(lb)},${f2(m1)} ${f2(f.sb)},${f2(m1)} ${f2(f.sb)},${f2(ys)}Z`;
+  }
+  const ym = (ys + yt) / 2;
+  return `M${f2(f.sa)},${f2(ys)}C${f2(f.sa)},${f2(ym)} ${f2(f.ta)},${f2(ym)} ${f2(f.ta)},${f2(yt)}L${f2(f.tb)},${f2(yt)}C${f2(f.tb)},${f2(ym)} ${f2(f.sb)},${f2(ym)} ${f2(f.sb)},${f2(ys)}Z`;
+}
+// Links between blocks for the legislation and case-law layers: [a, b, weight, label data]
+function aggLinks(layer) {
+  const B = agg.blocks;
+  if (layer === "law") return agg.law.filter(([a, b]) => a !== b).map(([a, b, n, p]) => ({ a, b, w: n, n, p }));
+  const D = agg.dec_any;
+  return agg.court.map(([a, b, n]) => {
+    const l = (n * D) / Math.max(1, (B[a].d || 1) * (B[b].d || 1));
+    return { a, b, n, l, w: l > 1 ? n * Math.log(l) : 0 };
+  }).filter((x) => x.l >= 1.5);
+}
+function aggArc(a, b, G) {
+  const A = G.blocks[a], Z = G.blocks[b];
+  const ax = A.x + A.w / 2, zx = Z.x + Z.w / 2, f2 = (v) => v.toFixed(1);
+  if (A.y === Z.y) {                                   // same floor: an arc above it
+    const ay = A.y, lift = Math.min(G.unit * 0.95, 14 + Math.abs(zx - ax) * 0.22);
+    return `M${f2(ax)},${f2(ay)}Q${f2((ax + zx) / 2)},${f2(ay - lift)} ${f2(zx)},${f2(ay)}`;
+  }
+  const [P, Q] = A.y < Z.y ? [[ax, A.y + A.h], [zx, Z.y]] : [[ax, A.y], [zx, Z.y + Z.h]];
+  const my = (P[1] + Q[1]) / 2;
+  return `M${f2(P[0])},${f2(P[1])}C${f2(P[0])},${f2(my)} ${f2(Q[0])},${f2(my)} ${f2(Q[0])},${f2(Q[1])}`;
+}
+
+function renderAgg() {
+  if (!aggOn || !agg) return;
+  const G = aggG = aggLayout(), B = agg.blocks, svg = $("aggsvg");
+  svg.setAttribute("viewBox", `0 0 ${G.VW} ${G.VH}`);
+  svg.setAttribute("width", G.VW); svg.setAttribute("height", G.VH);
+  const f2 = (v) => v.toFixed(1), out = [];
+  out.push(`<defs><linearGradient id="gNone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--faint)" stop-opacity="0"/><stop offset="1" stop-color="var(--faint)" stop-opacity="0.75"/></linearGradient>` +
+    `<linearGradient id="gFed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--current)" stop-opacity="0"/><stop offset="1" stop-color="var(--current)" stop-opacity="0.6"/></linearGradient></defs>`);
+  // floors: the row names, the part divider with Art. 49 BV, the scale bars
+  const rowTot = {};
+  for (let b = 0; b < B.length; b++) rowTot[B[b].r] = (rowTot[B[b].r] || 0) + (B[b].r === "bv" ? 0 : B[b].n);
+  AGG_ROWS.forEach((r, q) => {
+    const y = G.Y[q] - 7, n = r === "bv" ? 0 : rowTot[r];
+    out.push(`<text class="ar" x="${f2(G.x0)}" y="${f2(y)}">${esc(aggRowName(r))}${n ? ` · ${esc(t.aggActs(num(n)))}` : ""}</text>`);
+  });
+  const yDiv = G.Y[3] + G.rowH + G.unit * 0.8;
+  out.push(`<line class="adiv" x1="${f2(G.x0 - 18)}" x2="${f2(G.x1)}" y1="${f2(yDiv)}" y2="${f2(yDiv)}"/>`);
+  out.push(`<text class="ap" x="${f2(G.x1)}" y="${f2(yDiv - 7)}" text-anchor="end">${esc(t.aggFed)}</text><text class="ap" x="${f2(G.x1)}" y="${f2(yDiv + 15)}" text-anchor="end">${esc(t.aggKant)} · ${esc(t.aggPrevails)}</text>`);
+  const scaleBar = (k, y, x) => {                    // a round number of acts, drawn at this part's scale
+    const n = [5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].filter((v) => v * k <= (G.phone ? 80 : 110)).pop() || 5;
+    return `<g class="asc"><line x1="${f2(x)}" x2="${f2(x + n * k)}" y1="${f2(y - 3.5)}" y2="${f2(y - 3.5)}"/><text x="${f2(x + n * k + 6)}" y="${f2(y)}">= ${esc(t.aggActs(num(n)))}</text></g>`;
+  };
+  // each canton's column carries its code below the lowest floor
+  const yFoot = G.Y[7] + G.rowH + 14;
+  for (const ct of agg.ct_order) if (G[ct]) out.push(`<text class="act" x="${f2(G[ct].x + G[ct].w / 2)}" y="${f2(yFoot)}" text-anchor="middle">${esc(ct)}</text>`);
+  // the layer: flows (basis) or links (legislation, case law)
+  out.push(`<g id="aggflows" class="${aggLayer === "basis" ? "" : "off"}">`);
+  for (const f of G.flows) {
+    if (!G.blocks[f.s] || !G.blocks[f.d] || f.sa == null) continue;
+    if (B[f.s].r === "bv" && B[f.d].r === 4) continue;           // the trunk is drawn below
+    out.push(`<path class="af" data-f="${f.q}" style="--c:${cssHue(aggHue(f.s))}" d="${aggRibbon(f, G)}"/>`);
+  }
+  for (const s of G.stubs) {
+    const g = G.blocks[s.d]; if (!g) continue;
+    const h = Math.min(G.unit * 0.55, 30);
+    out.push(`<rect class="as ${s.g}" data-s="${s.q}" x="${f2(s.ta)}" y="${f2(g.y - h)}" width="${f2(Math.max(0.6, s.tb - s.ta))}" height="${f2(h)}" fill="url(#${s.g === "fed" ? "gFed" : "gNone"})"/>`);
+  }
+  if (G.trunk.length) {                               // Art. 51 BV: one trunk down the left, a comb into the 26 constitutions
+    const src = G.blocks[G.trunk[0].s], sa = Math.min(...G.trunk.map((f) => f.sa)), sb = Math.max(...G.trunk.map((f) => f.sb));
+    const xt = G.x0 - 13, yb = G.Y[4] - G.unit * 0.42, ys = src.y + src.h;
+    out.push(`<path class="atk" data-trunk="1" d="M${f2((sa + sb) / 2)},${f2(ys)}C${f2((sa + sb) / 2)},${f2(ys + G.unit * 0.5)} ${f2(xt)},${f2(ys + G.unit * 0.3)} ${f2(xt)},${f2(ys + G.unit)}L${f2(xt)},${f2(yb)}L${f2(Math.max(...G.trunk.map((f) => G.blocks[f.d].x)))},${f2(yb)}"/>`);
+    for (const f of G.trunk) { const d = G.blocks[f.d]; out.push(`<path class="atk thin" data-trunk="1" d="M${f2(d.x + 1)},${f2(yb)}L${f2(d.x + 1)},${f2(d.y)}"/>`); }
+    out.push(`<text class="ak" x="${f2(xt + 6)}" y="${f2(yb - 5)}">${esc(t.aggTrunk)}</text>`);
+  }
+  out.push(`</g><g id="agglinks"></g>`);
+  // blocks, with their names where they fit
+  let bvLast = -1e9;
+  const order = [...B.keys()].sort((p, q) => (G.blocks[p] ? G.blocks[p].x : 0) - (G.blocks[q] ? G.blocks[q].x : 0));
+  for (const b of order) {
+    const g = G.blocks[b]; if (!g) continue;
+    const name = aggName(b, true), n = B[b].r === "bv" ? B[b].o : B[b].n;
+    const fits = (s) => s.length * 6.3 + 8 < g.w;
+    const txt = B[b].r === "bv" ? (fits(num(n)) ? num(n) : "") :
+      fits(`${name} · ${num(n)}`) ? `${name} · ${num(n)}` : fits(name) ? name : fits(String(B[b].k)) ? String(B[b].k) : "";
+    if (B[b].r === "bv" && n >= 3 && g.x - bvLast >= 26) {     // names at an angle, where they do not run into each other
+      const nm = name.length > 27 ? name.slice(0, 26) + "…" : name;
+      bvLast = g.x;
+      out.push(`<text class="abv" transform="translate(${f2(g.x + 3)},${f2(g.y - 5)}) rotate(-32)">${esc(nm)}</text>`);
+    }
+    out.push(`<g class="ab" data-b="${b}" tabindex="0" role="button" aria-label="${esc(aggRowName(B[b].r) + ": " + aggName(b) + ", " + t.aggActs(num(n)))}">` +
+      `<rect x="${f2(g.x)}" y="${f2(g.y)}" width="${f2(Math.max(1, g.w))}" height="${f2(g.h)}" rx="2" style="--c:${cssHue(aggHue(b))}"/>` +
+      (txt ? `<text x="${f2(g.x + 4)}" y="${f2(g.y + g.h / 2 + 4)}">${esc(txt)}</text>` : "") + `</g>`);
+  }
+  svg.innerHTML = out.join("");
+  svg.classList.remove("dim"); aggSvgHot = "";
+  aggHeader();
+  // one legend for the three scales: the Constitution's parts, federal and cantonal floors
+  const sc = (k) => { const n = [5, 10, 20, 50, 100, 200, 500, 1000, 2000].filter((v) => v * k <= 64).pop() || 5; return [n, n * k]; };
+  $("aggscale").style.right = (G.phone ? 16 : 26 + W - G.VW) + "px";
+  $("aggscale").innerHTML = [[t.lvBV, G.k.BV], [t.aggFed, G.k.F], [t.aggKant, G.k.C]].map(([l, k]) => { const [n, w] = sc(k);
+    return `<span><i style="width:${w.toFixed(1)}px"></i>${esc(l)}: ${esc(t.aggActs(num(n)))}</span>`; }).join("");
+  if (aggLayer !== "basis") drawAggLinks(null);
+  if (aggSel && aggSel[0] === "b") aggHot("b", aggSel[1]);          // the block the panel shows stays lit
+  else if (aggSel) aggHot(aggSel[0], aggSel[1]);
+}
+function drawAggLinks(focusB) {
+  const G = aggG, el = $("agglinks"); if (!el || !G) return;
+  if (aggLayer === "basis") { el.innerHTML = ""; return; }
+  const all = aggLinks(aggLayer).filter((x) => G.blocks[x.a] && G.blocks[x.b]);
+  all.sort((p, q) => q.w - p.w || p.a - q.a || p.b - q.b);
+  const list = focusB == null ? all.slice(0, AGG_TOP) : all.filter((x) => x.a === focusB || x.b === focusB);
+  const wmax = Math.max(1, ...list.map((x) => x.w));
+  el.innerHTML = list.map((x, q) => `<path class="al ${aggLayer}" data-l="${all.indexOf(x)}" d="${aggArc(x.a, x.b, G)}" stroke-width="${(0.8 + 7 * Math.sqrt(x.w / wmax)).toFixed(2)}"/>`).join("");
+  aggG.links = all;
+}
+function aggHeader() {
+  const h = $("agghead");
+  const note = aggLayer === "basis" ? t.aggNoteBasis : aggLayer === "law" ? t.aggNoteLaw(AGG_TOP) : t.aggNoteCourt(AGG_TOP);
+  const open = h.querySelector("details")?.open;
+  h.innerHTML = `<div class="seg" role="group" aria-label="${esc(t.aggLayers)}">${[["basis", t.aggBasis], ["law", t.webLaw], ["court", t.webCourt]]
+    .map(([k, l]) => `<button data-layer="${k}" aria-pressed="${aggLayer === k}">${esc(l)}</button>`).join("")}</div>` +
+    `<details${open ? " open" : ""}><summary>${esc(t.aggHow)}</summary><p>${esc(note)}</p></details>`;
+}
+
+async function showAgg(on) {
+  if (on && !tree) return;
+  if (on) { try { await ensureAgg(); } catch (e) { return; } }
+  aggOn = on;
+  document.body.classList.toggle("agg", on);
+  $("agg").hidden = !on;
+  if (on) {
+    if (story) endTour(false);
+    select(-1, null, false); clearWeb(); aggSel = null; $("panel").hidden = true;
+    renderAgg();
+  } else { $("tip").hidden = true; if (aggSel) { aggSel = null; $("panel").hidden = true; } }
+  $("magg").setAttribute("aria-pressed", on);
+  $("mtree").setAttribute("aria-pressed", !on && mode === "tree"); $("msr").setAttribute("aria-pressed", !on && mode === "sr");
+  writeHash();
+}
+// pointing: the block's flows (or links) stand out
+function aggHot(kind, id) {
+  const svg = $("aggsvg"); if (!aggG) return;
+  svg.querySelectorAll(".on").forEach((e) => e.classList.remove("on"));
+  svg.classList.toggle("dim", kind != null);
+  if (kind == null) { if (aggLayer !== "basis") drawAggLinks(null); return; }
+  if (kind === "b") {
+    svg.querySelector(`.ab[data-b="${id}"]`)?.classList.add("on");
+    if (aggLayer === "basis") {
+      for (const f of aggG.flows) if (f.s === id || f.d === id) { svg.querySelector(`.af[data-f="${f.q}"]`)?.classList.add("on"); svg.querySelector(`.ab[data-b="${f.s === id ? f.d : f.s}"]`)?.classList.add("on"); }
+      for (const s of aggG.stubs) if (s.d === id) svg.querySelector(`.as[data-s="${s.q}"]`)?.classList.add("on");
+      if (agg.blocks[id].r === 4 || aggG.trunk.some((f) => f.s === id)) svg.querySelectorAll("[data-trunk]").forEach((e) => e.classList.add("on"));
+    } else {
+      drawAggLinks(id);
+      svg.querySelectorAll(".al").forEach((e) => { e.classList.add("on"); const x = aggG.links[+e.dataset.l]; svg.querySelector(`.ab[data-b="${x.a === id ? x.b : x.a}"]`)?.classList.add("on"); });
+    }
+  } else if (kind === "f") {
+    const f = aggG.flows[id];
+    svg.querySelector(`.af[data-f="${id}"]`)?.classList.add("on");
+    for (const b of [f.s, f.d]) svg.querySelector(`.ab[data-b="${b}"]`)?.classList.add("on");
+  } else if (kind === "s") {
+    const s = aggG.stubs[id];
+    svg.querySelector(`.as[data-s="${id}"]`)?.classList.add("on"); svg.querySelector(`.ab[data-b="${s.d}"]`)?.classList.add("on");
+  } else if (kind === "l") {
+    const x = aggG.links[id];
+    svg.querySelector(`.al[data-l="${id}"]`)?.classList.add("on");
+    for (const b of [x.a, x.b]) svg.querySelector(`.ab[data-b="${b}"]`)?.classList.add("on");
+  }
+}
+function aggTip(e, html) {
+  const tip = $("tip");
+  if (!html) { tip.hidden = true; return; }
+  tip.innerHTML = html; tip.hidden = false;
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px";
+  tip.style.top = Math.min(e.clientY + 16, innerHeight - tip.offsetHeight - 8) + "px";
+}
+function aggTarget(e) {
+  const el = e.target.closest("[data-b], [data-f], [data-s], [data-l], [data-trunk]");
+  if (!el) return null;
+  if (el.dataset.b != null) return ["b", +el.dataset.b];
+  if (el.dataset.f != null) return ["f", +el.dataset.f];
+  if (el.dataset.s != null) return ["s", +el.dataset.s];
+  if (el.dataset.l != null) return ["l", +el.dataset.l];
+  return ["trunk", 0];
+}
+function aggTipHtml([kind, id]) {
+  const B = agg.blocks;
+  if (kind === "b") {
+    const b = B[id], n = b.r === "bv" ? b.o : b.n;
+    return `<b>${esc(aggName(id))}</b><span>${esc(aggRowOfB(id))}</span><span>${esc(b.r === "bv" || b.r === 4 ? t.aggRestN(num(b.o)) : t.aggActs(num(n)))}${b.d ? " · " + esc(t.aggDec(num(b.d))) : ""}</span><span class="hint">${esc(t.aggTip)}</span>`;
+  }
+  if (kind === "f") { const f = aggG.flows[id]; return `<b>${esc(t.aggFlow(num(f.n), aggName(f.d), aggName(f.s)))}</b><span>${esc(aggRowName(B[f.d].r))} ← ${esc(aggRowName(B[f.s].r))}</span><span class="hint">${esc(t.aggTip)}</span>`; }
+  if (kind === "s") { const s = aggG.stubs[id]; return `<b>${esc(aggName(s.d))}: ${esc(t.aggActs(num(s.n)))}</b><span>${esc(s.g === "fed" ? t.aggOnlyFed : t.aggNone)}</span><span class="hint">${esc(t.aggTip)}</span>`; }
+  if (kind === "l") {
+    const x = aggG.links[id];
+    return `<b>${esc(aggName(x.a))} ${aggLayer === "law" ? "→" : "↔"} ${esc(aggName(x.b))}</b><span>${esc(aggLayer === "law" ? t.aggLawTip(num(x.n), num(x.p)) : t.aggCourtTip(num(x.n), x.l.toFixed(1).replace(".", lang === "en" ? "." : ",")))}</span>`;
+  }
+  return `<b>${esc(t.aggTrunk)}</b><span>${esc(t.aggTrunkNote)}</span>`;
+}
+// the panel: what a block or a flow holds, each act leading into the Stufenbau
+function aggPanel(eyebrow, h2, sub, html) {
+  $("phead").innerHTML = `<p class="eyebrow">${esc(eyebrow)}</p><h2>${esc(h2)}</h2>${sub ? `<p class="sub">${esc(sub)}</p>` : ""}`;
+  $("pbody").innerHTML = html; $("pbody").scrollTop = 0;
+  const was = $("panel").hidden;
+  $("panel").hidden = false;
+  if (was) renderAgg();
+}
+const aggActList = (m, cap = 80) => `<ul class="list">${m.slice(0, cap).map((k) => { const i = gi(k);
+  return `<li><button class="k link" data-agg-act="${i}">${esc(fullLabel(i))}</button><span class="v">${esc(num((TN[i] && TN[i].dn) || NC[i]))}</span><span class="d">${esc(title(i))}</span></li>`; }).join("")}</ul>` +
+  (m.length > cap ? `<p class="note">+ ${esc(num(m.length - cap))}</p>` : "");
+function aggBlockPanel(b) {
+  const B = agg.blocks[b], G = aggG, n = B.r === "bv" ? B.o : B.n;
+  let html = `<section><div class="big"><b>${num(B.r === "bv" || B.r === 4 ? B.o : B.n)}</b><span>${esc(B.r === "bv" || B.r === 4 ? t.aggRest : t.aggActsIn)}</span></div>` +
+    (B.d ? `<p class="note">${esc(t.aggDecNote(num(B.d)))}</p>` : "") + `</section>`;
+  const ins = (G.ins[b] || []).slice().sort((p, q) => q.n - p.n), outs = (G.outs[b] || []).slice().sort((p, q) => q.n - p.n);
+  if (ins.length && B.r !== "bv") html += `<section><h3><i class="sw tree"></i>${esc(t.aggFrom)}</h3><ul class="list">${ins.map((f) =>
+    `<li><button class="k link" ${f.g ? `data-agg-s="${f.q}"` : `data-agg-f="${f.q}"`}>${esc(f.g ? (f.g === "fed" ? t.aggOnlyFed : t.aggNone) : aggName(f.s))}</button><span class="v">${esc(num(f.n))}</span><span class="d">${esc(f.g ? "" : aggRowOfB(f.s))}</span></li>`).join("")}</ul></section>`;
+  if (outs.length) html += `<section><h3><i class="sw tree"></i>${esc(t.aggTo)}</h3><ul class="list">${outs.slice(0, 30).map((f) =>
+    `<li><button class="k link" data-agg-f="${f.q}">${esc(aggName(f.d))}</button><span class="v">${esc(num(f.n))}</span><span class="d">${esc(aggRowName(agg.blocks[f.d].r))}</span></li>`).join("")}</ul></section>`;
+  for (const layer of ["law", "court"]) {
+    const L = aggLinks(layer).filter((x) => x.a === b || x.b === b).sort((p, q) => q.w - p.w).slice(0, 8);
+    if (L.length) html += `<section><h3><i class="sw ${layer === "law" ? "wire" : "current"}"></i>${esc(layer === "law" ? t.webLaw : t.webCourt)}</h3><ul class="list">${L.map((x) => {
+      const o = x.a === b ? x.b : x.a, dir = layer === "law" ? (x.a === b ? "→ " : "← ") : "";
+      return `<li><button class="k link" data-agg-b="${o}">${esc(dir + aggName(o))}</button><span class="v">${esc(layer === "law" ? t.refsN(num(x.n)) : t.aggDec(num(x.n)))}</span><span class="d">${esc(aggRowOfB(o))}</span></li>`; }).join("")}</ul></section>`;
+  }
+  const m = agg.members[b] || [];
+  if (m.length) html += `<section><h3>${esc(t.aggList)}</h3><button class="chip" data-agg-lens="${b}">${esc(t.aggShowTree)}</button>${aggActList(m)}</section>`;
+  aggSel = ["b", b];
+  aggPanel(aggRowOfB(b), aggName(b), B.r >= 1 && B.r <= 3 ? t.aggArea : "", html);
+}
+function aggFlowPanel(q, stub) {
+  const f = stub ? aggG.stubs[q] : aggG.flows[q];
+  const head = stub ? `${aggName(f.d)}: ${f.g === "fed" ? t.aggOnlyFed : t.aggNone}` : t.aggFlow(num(f.n), aggName(f.d), aggName(f.s));
+  aggSel = [stub ? "s" : "f", q];
+  aggPanel(t.aggBasis, t.aggActs(num(f.n)), head, `<section><button class="chip" data-agg-lensf="${stub ? "s" : "f"}${q}">${esc(t.aggShowTree)}</button>${aggActList(f.m.map((x) => x))}</section>`);
+}
+function aggGo(i) {                                  // an act: into the Stufenbau, with its connections
+  showAgg(false);
+  if (mode !== "tree" && inLayoutOf("tree", i)) setMode("tree", false);
+  select(i);
+}
+const inLayoutOf = (m, i) => LAY[m] && (i === LAY[m].root || LAY[m].P[i] >= 0);
+function aggLens(members) {                          // a block or flow, highlighted on every floor of the cone
+  showAgg(false);
+  if (mode !== "tree") setMode("tree", false);
+  select(-1, null, false);
+  setFocus(new Set(members.map(gi)));
+  home();
+}
+$("aggsvg").addEventListener("pointermove", (e) => {
+  const h = aggTarget(e), key = h ? h.join(":") : "";
+  if (key !== aggSvgHot) { aggSvgHot = key; aggHot(h ? h[0] : null, h ? h[1] : null); }
+  aggTip(e, h ? aggTipHtml(h) : "");
+});
+let aggSvgHot = "";
+$("aggsvg").addEventListener("pointerleave", () => { aggSvgHot = ""; aggHot(null); $("tip").hidden = true; });
+$("aggsvg").addEventListener("click", (e) => {
+  const h = aggTarget(e); if (!h) return;
+  $("tip").hidden = true;
+  if (h[0] === "b") aggBlockPanel(h[1]);
+  else if (h[0] === "f") aggFlowPanel(h[1]);
+  else if (h[0] === "s") aggFlowPanel(h[1], true);
+  else if (h[0] === "l") { const x = aggG.links[h[1]]; aggBlockPanel(x.a); }
+  else if (h[0] === "trunk") { const kv = agg.blocks.findIndex((b) => b.r === 4); if (kv >= 0) aggBlockPanel(kv); }
+});
+$("aggsvg").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const g = e.target.closest("[data-b]"); if (!g) return;
+  e.preventDefault(); aggBlockPanel(+g.dataset.b);
+});
+$("aggsvg").addEventListener("focusin", (e) => { const g = e.target.closest("[data-b]"); aggHot(g ? "b" : null, g ? +g.dataset.b : null); });
+$("agghead").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-layer]"); if (!b) return;
+  aggLayer = b.dataset.layer;
+  $("aggflows")?.classList.toggle("off", aggLayer !== "basis");
+  drawAggLinks(null); aggHeader();
+});
+$("pbody").addEventListener("click", (e) => {        // the overview's own links in the panel
+  if (!aggOn) return;
+  const a = e.target.closest("[data-agg-act]"), f = e.target.closest("[data-agg-f]"), s = e.target.closest("[data-agg-s]"),
+    b = e.target.closest("[data-agg-b]"), l = e.target.closest("[data-agg-lens]"), lf = e.target.closest("[data-agg-lensf]");
+  if (a) { e.stopPropagation(); aggGo(+a.dataset.aggAct); }
+  else if (f) aggFlowPanel(+f.dataset.aggF);
+  else if (s) aggFlowPanel(+s.dataset.aggS, true);
+  else if (b) aggBlockPanel(+b.dataset.aggB);
+  else if (l) aggLens(agg.members[+l.dataset.aggLens]);
+  else if (lf) { const v = lf.dataset.aggLensf; aggLens((v[0] === "s" ? aggG.stubs : aggG.flows)[+v.slice(1)].m); }
+}, true);
+$("magg").onclick = () => showAgg(true);
+function refreshAgg() {                              // language, theme, size: redraw, and the panel's content
+  if (!aggOn) return;
+  renderAgg();
+  if (aggSel && !$("panel").hidden) { const [k, q] = aggSel; if (k === "b") aggBlockPanel(q); else aggFlowPanel(q, k === "s"); }
+}
 
 // --- focus mode, idle orbit
 $("focusbtn").onclick = () => {

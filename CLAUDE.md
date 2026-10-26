@@ -59,7 +59,7 @@ python3 pipeline/03_graph.py                        # 40 s
 python3 pipeline/04_hierarchy.py && (cd layout && npm ci && node pack.mjs)
 python3 pipeline/05_site.py                         # 40 s -> site/data (44 MB, not in git)
 python3 pipeline/cantonal_basis.py                  # 10 s, offline: data/cantonal_basis.json
-python3 pipeline/07_tree.py                         # site/data/tree.json + ingress(_k).json (Stufenbau)
+python3 pipeline/07_tree.py                         # site/data/tree.json + ingress(_k).json + agg.json (Stufenbau, Aufbau)
 python3 pipeline/06_artifact.py                     # site/artifact.html for claude.ai preview
 python3 -m http.server -d site 8765                 # local view: http://localhost:8765
 ```
@@ -199,6 +199,22 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
 22. Fedlex titles carry markup (CO<sub>2</sub>, 1<sup>er</sup>, <p>, <em>, a stray <BD>): `05_site.py::plain`
     writes text only (CO₂, 1er).
 
+23. Aggregated overview "Aufbau" (`07_tree.py` → `site/data/agg.json`, 0.25 MB; view in `main.js`, deep link
+    `#aufbau`): rows = floors (BV parts, Bundesversammlung, Bundesrat + courts, departments; the 26
+    constitutions, cantonal floors 5–7), blocks = SR area (first digit) for federal law, canton for
+    cantonal law (156 blocks). Every act in force (18,395) counts once in its block and arrives by one
+    flow from its primary parent (360 flows), so a block's inflows + stubs = its acts (asserted in 07).
+    Stubs instead of flows: no basis named (4,529, grey), cantonal acts naming only federal law (1,528,
+    blue). Widths = acts on three disclosed scales (BV parts by what rests on them; federal; cantonal);
+    a flow is exact at its lower end and a share of the source's outflow at its upper end (parallel-sets
+    style). 1,569 acts skip a floor: their flows run in a lane beside the target column instead of
+    through the floor between. Art. 51 BV → 26 constitutions as a trunk on the left (not an Ingress).
+    Layers: legislation = provisions of federal acts naming an act of another block (treaties naming
+    treaties dropped); case law = distinct decisions citing acts of both blocks (refs_valid, BV by
+    article → part), ranked by n·ln(lift), lift ≥ 1.5 (raw counts are dominated by BGG/BV/ZPO, cited
+    everywhere); 90 strongest pairs drawn, all of a block's on pointing. Decisions per block exact
+    (distinct); 936,926 decisions refer to at least one act in force (979,726 incl. earlier acts).
+
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
       Deterministic (ties broken explicitly); two runs give identical reports.
@@ -251,6 +267,11 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
 - [x] Step 9 connections (decision 21): constellation per selected act, desktop + phone (phone: smaller
       caps, toolbar steps aside while it is shown; the sheet's × brings it back). Small spheres on
       paper get more ink and a darker outline (gl.js) so uncited acts no longer vanish into the page.
+- [x] Step 10 overview (decision 23): SVG view with hover (a block's flows light up), panel per block/flow
+      (counts, where they rest, what rests on them, legislation/case-law partners, the acts → Stufenbau
+      with constellation; "highlight in the hierarchy" = focus set in the cone); offered in the opening
+      and the tour menu; phone: 920 px wide canvas that scrolls, sheet panel. The 3D loop rests while
+      it is shown.
 - [x] Step 5 partly: counts cross-checked with the opencaselaw MCP (BGE 143 IV 241 in-degree;
       Art. 41 OR — the MCP undercounts, see report D1); desktop + phone screenshots via Playwright.
 
