@@ -188,7 +188,8 @@ async function boot() {
   const h = decodeHash();
   // the first view: the overview ("Aufbau"), unless a link names an act or the visitor last chose the 3D views
   const last = store("slm-view");
-  if (location.hash === "#aufbau" || (!h && tree && (!last || last === "agg"))) showAgg(true);
+  if (location.hash === "#matrix" || (!h && tree && last === "mat")) showAgg(true, "mat");
+  else if (location.hash === "#aufbau" || (!h && tree && (!last || last === "agg"))) showAgg(true, "flow");
   else if (h) select(h.i, h.art, true);
   else if (mode === "tree" && tree && !seenOpening()) opening();
   else if (mode !== "tree" && !seenIntro()) $("intro").hidden = false;
@@ -1390,7 +1391,7 @@ function select(i, art = null, animate = true, quiet = false) {
     const was = !$("panel").hidden;
     sel = { i: -1, art: null }; $("panel").hidden = true; $("tools").classList.remove("raised");
     hideCourts(); webFor(-1);
-    if (aggOn) { aggSel = null; renderAgg(); }
+    if (aggOn) { aggSel = null; matSel = null; renderAgg(); }
     refreshStates(); refreshHover(); writeHash(); crumbs(); renderSpine();
     if (was && animate) recentre();
     return;
@@ -1833,7 +1834,7 @@ function writeHash() {
       : id.replace(/ /g, "_").replace(/@/g, "~").replace(/\*/g, "x").replace(/^(BV|TREE):/, "$1.").replace(/\//g, "~~");
     if (sel.art) h += "--" + sel.art.replace(/\//g, "~");
   }
-  if (aggOn) h = "aufbau";                       // the overview has its own link
+  if (aggOn) h = aggView === "mat" ? "matrix" : "aufbau";      // the overview and the matrix have their own links
   try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) { /* sandboxed */ }
 }
 function decodeHash() {
@@ -2072,6 +2073,7 @@ function applyLang() {
   $("webbtn").textContent = t.webBtn; $("webbtn").title = t.webHint; $("webbtn").setAttribute("aria-pressed", webOn);
   if (web) { web.G = webGroups(web.i, !(story && story.tr)); relayoutWeb(); }
   $("magg").textContent = t.viewAgg; $("magg").hidden = !tree;
+  $("mmat").textContent = t.viewMat; $("mmat").hidden = !tree; $("matx").setAttribute("aria-label", t.matAria);
   if (aggOn) refreshAgg();
   $("tilt").textContent = core ? tiltLabel() : t.view3d; $("play").textContent = playing ? t.pause : t.play;
   $("l-from").textContent = t.from; $("l-to").textContent = t.to; $("periodnote").textContent = t.periodNote;
@@ -2082,7 +2084,7 @@ function applyLang() {
   $("opening").querySelector(".op-skip").textContent = t.opSkip;
   if (core) { setGrowthUI(); renderSpine(); }
   $("mtree").setAttribute("aria-pressed", !aggOn && mode === "tree"); $("msr").setAttribute("aria-pressed", !aggOn && mode === "sr");
-  $("magg").setAttribute("aria-pressed", aggOn);
+  $("magg").setAttribute("aria-pressed", aggOn && aggView === "flow"); $("mmat").setAttribute("aria-pressed", aggOn && aggView === "mat");
   $("mtree").hidden = $("msr").hidden = !LAY.tree;
   $("ltree").hidden = mode !== "tree";
   $("lall").hidden = mode !== "tree"; $("lalltext").textContent = t.treeAll;
@@ -2943,6 +2945,8 @@ function aggArc(a, b, G) {
 
 function renderAgg() {
   if (!aggOn || !agg) return;
+  $("agg").classList.toggle("mat", aggView === "mat");
+  if (aggView === "mat") { aggHeader(); renderMat(); return; }
   const G = aggG = aggLayout(), B = agg.blocks, svg = $("aggsvg");
   svg.setAttribute("viewBox", `0 0 ${G.VW} ${G.VH}`);
   svg.setAttribute("width", G.VW); svg.setAttribute("height", G.VH);
@@ -3035,25 +3039,30 @@ function drawAggLinks(focusB) {
 }
 function aggHeader() {
   const h = $("agghead");
-  const note = aggLayer === "basis" ? t.aggNoteBasis : aggLayer === "law" ? t.aggNoteLaw(AGG_TOP) : t.aggNoteCourt(AGG_TOP);
+  const rk = agg.rank || {}, rt = (rk.higher || 0) + (rk.same || 0) + (rk.lower || 0) || 1, pc = (x) => `${Math.round((100 * x) / rt)} %`.replace(" %", lang === "en" ? "%" : " %");
+  const note = aggView === "mat" ? (aggLayer === "basis" ? t.matNoteBasis(num(rt), pc(rk.higher), pc(rk.same), pc(rk.lower)) : aggLayer === "law" ? t.matNoteLaw : t.matNoteCourt(MAT_MIN_DEC))
+    : aggLayer === "basis" ? t.aggNoteBasis : aggLayer === "law" ? t.aggNoteLaw(AGG_TOP) : t.aggNoteCourt(AGG_TOP);
   const open = h.querySelector("details")?.open;
   h.innerHTML = `<div class="seg" role="group" aria-label="${esc(t.aggLayers)}">${[["basis", t.aggBasis], ["law", t.webLaw], ["court", t.webCourt]]
     .map(([k, l]) => `<button data-layer="${k}" aria-pressed="${aggLayer === k}">${esc(l)}</button>`).join("")}</div>` +
+    (aggView === "mat" ? `<div class="seg" role="group" aria-label="${esc(t.matScope)}">${[["all", t.matAll], ["fed", t.matFed], ["cant", t.matCant]]
+      .map(([k, l]) => `<button data-scope="${k}" aria-pressed="${matScope === k}">${esc(l)}</button>`).join("")}</div>` : "") +
     `<details${open ? " open" : ""}><summary>${esc(t.aggHow)}</summary><p>${esc(note)}</p></details>`;
 }
 
-async function showAgg(on) {
+async function showAgg(on, view) {
   if (on && !tree) return;
+  if (view) aggView = view;
   if (on) { try { await ensureAgg(); } catch (e) { return; } }
   aggOn = on;
   document.body.classList.toggle("agg", on);
   $("agg").hidden = !on;
   if (on) {
     if (story) endTour(false);
-    select(-1, null, false); clearWeb(); aggSel = null; $("panel").hidden = true;
+    select(-1, null, false); clearWeb(); aggSel = null; matSel = null; $("panel").hidden = true;
     renderAgg();
   } else { $("tip").hidden = true; if (aggSel) { aggSel = null; $("panel").hidden = true; } }
-  $("magg").setAttribute("aria-pressed", on);
+  $("magg").setAttribute("aria-pressed", on && aggView === "flow"); $("mmat").setAttribute("aria-pressed", on && aggView === "mat");
   $("mtree").setAttribute("aria-pressed", !on && mode === "tree"); $("msr").setAttribute("aria-pressed", !on && mode === "sr");
   writeHash();
 }
@@ -3220,8 +3229,11 @@ $("aggsvg").addEventListener("keydown", (e) => {
 });
 $("aggsvg").addEventListener("focusin", (e) => { const g = e.target.closest("[data-b]"); aggHot(g ? "b" : null, g ? +g.dataset.b : null); });
 $("agghead").addEventListener("click", (e) => {
+  const sc = e.target.closest("[data-scope]");
+  if (sc) { matScope = sc.dataset.scope; matHot = null; renderAgg(); if (aggSel && aggSel[0] === "m") matCellPanel(aggSel[1], aggSel[2]); return; }
   const b = e.target.closest("[data-layer]"); if (!b) return;
   aggLayer = b.dataset.layer;
+  if (aggView === "mat") { matHot = null; matSel = null; if (aggSel && aggSel[0] === "m") { aggSel = null; $("panel").hidden = true; } renderAgg(); return; }
   $("aggflows")?.classList.toggle("off", aggLayer !== "basis");
   drawAggLinks(null); aggHeader();
 });
@@ -3236,12 +3248,354 @@ $("pbody").addEventListener("click", (e) => {        // the overview's own links
   else if (l) aggLens(agg.members[+l.dataset.aggLens]);
   else if (lf) { const v = lf.dataset.aggLensf; aggLens((v[0] === "s" ? aggG.stubs : aggG.flows)[+v.slice(1)].m); }
 }, true);
-$("magg").onclick = () => { showAgg(true); store("slm-view", "agg"); };
+$("magg").onclick = () => { showAgg(true, "flow"); store("slm-view", "agg"); };
+$("mmat").onclick = () => { showAgg(true, "mat"); store("slm-view", "mat"); };
 function refreshAgg() {                              // language, theme, size: redraw, and the panel's content
   if (!aggOn) return;
   renderAgg();
-  if (aggSel && !$("panel").hidden) { const [k, q] = aggSel; if (k === "b") aggBlockPanel(q); else aggFlowPanel(q, k === "s"); }
+  if (aggSel && !$("panel").hidden) { const [k, q, r] = aggSel; if (k === "low") matLowPanel(); else if (k === "m") matCellPanel(q, r); else if (k === "b") aggBlockPanel(q); else aggFlowPanel(q, k === "s"); }
 }
+
+// ---------- the matrix: which block draws on which (a dependency structure matrix) ----------
+// Rows and columns are the overview's blocks in the order of the Stufenbau: the parts of the
+// Constitution, treaties, the three federal floors by SR area, then each canton (constitution,
+// floors 5–7). A cell says how much the row draws on the column: acts naming a basis there, provisions
+// naming an act there, or decisions citing both (lift). Below the diagonal the column is a higher
+// floor (the normal case), the shaded fields on the diagonal are the same floor, above it a lower one.
+let aggView = "flow", matScope = "all", matG = null, matHot = null, matSel = null;
+const MAT_MIN_DEC = 20;                              // case law: a pair is coloured from this many decisions
+function matIndex() {
+  if (agg._m) return agg._m;
+  const m = { basis: new Map(), law: new Map(), court: new Map(), gb: new Int16Array(N).fill(-1), coreBy: [] };
+  for (const [a, b, n, np] of agg.basis) m.basis.set(a * 1024 + b, [n, np]);
+  for (const [a, b, n, p] of agg.law) m.law.set(a * 1024 + b, [n, p]);
+  for (const [a, b, n] of agg.court) { m.court.set(a * 1024 + b, n); m.court.set(b * 1024 + a, n); }
+  agg.nb.forEach((b, k) => { if (b >= 0 && TMAP[k] != null) m.gb[TMAP[k]] = b; });
+  agg.cb.forEach((b, k) => { if (b >= 0 && m.gb[k] < 0) m.gb[k] = b; });
+  for (let i = 0; i < NCORE; i++) if (m.gb[i] >= 0) (m.coreBy[m.gb[i]] = m.coreBy[m.gb[i]] || []).push(i);
+  return (agg._m = m);
+}
+const matFloor = (b) => { const r = agg.blocks[b].r; return r === "bv" ? (agg.blocks[b].k === "int" ? -0.5 : 0) : r; };
+function matOrder(scope) {
+  const B = agg.blocks, bv = [], fed = { 1: [], 2: [], 3: [] };
+  let int = -1;
+  B.forEach((b, i) => {
+    if (b.r === "bv") { if (b.k === "int") int = i; else bv.push(i); } else if (b.r >= 1 && b.r <= 3) fed[b.r].push(i);
+  });
+  const bvKey = (i) => (B[i].k === tree.root ? -1 : B[i].k === "1874" ? 1e9 : +B[i].k);    // the parts in the Constitution's order
+  bv.sort((a, b) => bvKey(a) - bvKey(b));
+  if (aggLayer === "law") bv.splice(0, bv.length, ...bv.filter((i) => B[i].k === tree.root));   // cross-references name the BV as a whole
+  for (const f of [1, 2, 3]) fed[f].sort((a, b) => String(B[a].k).localeCompare(String(B[b].k)));
+  const F = [{ key: "bv", name: t.lvBV, list: bv, same: true }];
+  if (int >= 0) F.push({ key: "int", name: t.aggTreaties, list: [int], same: true });
+  for (const f of [1, 2, 3]) F.push({ key: f, name: t["matF" + f], list: fed[f], same: true });
+  const at = (r, ct) => B.findIndex((b) => b.r === r && b.k === ct);
+  const C = agg.ct_order.map((ct) => ({ key: "ct", ct, name: ct, list: [4, 5, 6, 7].map((r) => at(r, ct)).filter((i) => i >= 0), module: true }));
+  // the Constitution's parts and the treaties rest on nothing: in the basis layer they are columns only
+  const FR = aggLayer === "basis" ? F.filter((g) => g.key !== "bv" && g.key !== "int") : F;
+  if (scope === "fed") return { rows: FR, cols: F };
+  if (scope === "cant") return { rows: C, cols: [...F, { key: "own", name: t.matOwn, list: [4, 5, 6, 7].map((r) => ({ own: r })), own: true }] };
+  return { rows: [...FR, ...C], cols: [...F, ...C] };
+}
+// the column a virtual "own canton" entry stands for in a row
+const matCol = (c, a) => (typeof c === "number" ? c : agg.blocks.findIndex((b) => b.r === c.own && b.k === agg.blocks[a].k));
+function matValue(a, b) {                            // [colour 0..1 before scaling, the cell's numbers]
+  if (a < 0 || b < 0) return null;
+  const m = matIndex();
+  if (aggLayer === "basis") { const v = m.basis.get(a * 1024 + b); return v ? { v: v[0], n: v[0], np: v[1] } : null; }
+  if (aggLayer === "law") { const v = m.law.get(a * 1024 + b); return v ? { v: v[0], n: v[0], p: v[1] } : null; }
+  if (a === b) return null;
+  const n = m.court.get(a * 1024 + b); if (!n) return null;
+  const B = agg.blocks, l = (n * agg.dec_any) / Math.max(1, (B[a].d || 1) * (B[b].d || 1));
+  return { v: n >= MAT_MIN_DEC && l > 1 ? l : 0, n, l };
+}
+function matLayout() {
+  const phone = W <= 760, panel = !$("panel").hidden && !phone, O = matOrder(matScope);
+  const flat = (gs) => { const out = []; gs.forEach((g, gi_) => g.list.forEach((x) => out.push({ x, g: gi_ }))); return out; };
+  const rows = flat(O.rows), cols = flat(O.cols), fed = matScope === "fed";
+  // phone: the page scrolls both ways, so the margins can keep full names; the header there has two rows
+  const left = fed ? (phone ? 170 : 210) : (phone ? 122 : 128), top = (phone ? 262 : 132) + (matScope === "all" ? 40 : 118);
+  const VW0 = phone ? W : W - (panel ? 424 : 0);
+  let cw = (VW0 - left - (phone ? 16 : 40)) / cols.length, ch = (H - top - (phone ? 150 : 88)) / rows.length;
+  if (matScope === "cant") ch = Math.min(ch, cw); else cw = ch = Math.min(cw, ch);
+  const minS = phone ? 7 : 3;
+  cw = Math.max(cw, minS); ch = Math.max(ch, minS);
+  const VW = Math.max(VW0, left + cols.length * cw + 24), VH = Math.max(H, Math.ceil(top + rows.length * ch + (phone ? 170 : 88)));
+  return { phone, panel, O, rows, cols, left, top, cw, ch, VW, VH };
+}
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+function matCanvas(id, G) {
+  const c = $(id), ctx = c.getContext("2d");
+  c.width = Math.round(G.VW * dpr); c.height = Math.round(G.VH * dpr);
+  c.style.width = G.VW + "px"; c.style.height = G.VH + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
+}
+function renderMat() {
+  const G = matG = matLayout(), ctx = matCanvas("matc", G), { rows, cols, left, top, cw, ch } = G;
+  matCanvas("matx", G);
+  ctx.clearRect(0, 0, G.VW, G.VH);
+  const col = cssVar(aggLayer === "basis" ? "--basis" : aggLayer === "law" ? "--wire" : "--current");
+  const fg = cssVar("--fg"), muted = cssVar("--muted"), line = cssVar("--line"), lineS = cssVar("--line-strong"), track = cssVar("--track");
+  // the scale: logarithmic up to the largest cell shown
+  let vmax = 1;
+  const val = rows.map((r) => cols.map((c) => { const b = matCol(c.x, r.x), v = matValue(r.x, b); if (v && v.v > vmax) vmax = v.v; return v; }));
+  if (aggLayer === "court") {
+    const ls = val.flat().filter((v) => v && v.v).map((v) => v.v).sort((a, b) => a - b);
+    if (ls.length) vmax = Math.max(2, ls[Math.floor(0.98 * (ls.length - 1))]);
+    G.capped = ls.length && ls[ls.length - 1] > vmax;
+  }
+  G.vmax = vmax; G.val = val;
+  const X = (j) => left + j * cw, Y = (i) => top + i * ch;
+  // fields of the same floor on the diagonal, and each canton's module
+  const span = (list, gs) => { const out = []; let k = 0; gs.forEach((g) => { out.push([k, k + g.list.length, g]); k += g.list.length; }); return out; };
+  const RS = span(rows, G.O.rows), CS = span(cols, G.O.cols);
+  ctx.fillStyle = track;
+  const colOf = new Map(cols.map((c, j) => [typeof c.x === "number" ? c.x : "own" + c.x.own, j]));
+  for (const [a, b, g] of RS) {
+    if (g.same) {                                    // a federal floor: its field, where its columns are
+      const cg = CS.find((x) => x[2].key === g.key);
+      if (cg) ctx.fillRect(X(cg[0]), Y(a), (cg[1] - cg[0]) * cw, (b - a) * ch);
+    }
+    if (g.module) for (let k = a; k < b; k++) {      // a canton: the cell where a floor meets itself
+      const j = matScope === "cant" ? colOf.get("own" + agg.blocks[rows[k].x].r) : colOf.get(rows[k].x);
+      if (j != null) ctx.fillRect(X(j), Y(k), cw, ch);
+    }
+  }
+  // the cells
+  const gap = Math.min(cw, ch) >= 7 ? 1 : 0;
+  ctx.fillStyle = col;
+  const lv = Math.log1p(vmax);
+  val.forEach((row, i) => row.forEach((v, j) => {
+    if (!v || !v.v) return;
+    ctx.globalAlpha = 0.14 + 0.86 * (aggLayer === "court" ? Math.min(1, Math.log(v.v) / Math.log(Math.max(2, vmax))) : Math.log1p(v.v) / lv);
+    ctx.fillRect(X(j), Y(i), cw - gap, ch - gap);
+  }));
+  ctx.globalAlpha = 1;
+  // group lines and labels
+  ctx.strokeStyle = line; ctx.lineWidth = 1;
+  const W_ = cols.length * cw, H_ = rows.length * ch;
+  ctx.beginPath();
+  for (const [a] of RS.slice(1)) { ctx.moveTo(left - 6, Y(a) + 0.5); ctx.lineTo(left + W_, Y(a) + 0.5); }
+  for (const [a] of CS.slice(1)) { ctx.moveTo(X(a) + 0.5, top - 6); ctx.lineTo(X(a) + 0.5, top + H_); }
+  ctx.stroke();
+  ctx.strokeStyle = lineS; ctx.strokeRect(left + 0.5, top + 0.5, W_, H_);
+  // the federal / cantonal divide (Art. 49 BV)
+  const fedN = (gs) => gs.filter((g) => g.key !== "ct" && g.key !== "own").reduce((s, g) => s + g.list.length, 0);
+  if (matScope === "all") {
+    const k = fedN(G.O.rows), kc = fedN(G.O.cols);
+    ctx.strokeStyle = fg; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(left - 10, Y(k)); ctx.lineTo(left + W_, Y(k)); ctx.moveTo(X(kc), top - 10); ctx.lineTo(X(kc), top + H_); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.lineWidth = 1;
+  }
+  const mono = (sz, w = 500) => `${w} ${sz}px ${cssVar("--font-data") || "monospace"}`, body = (sz, w = 500) => `${w} ${sz}px ${cssVar("--font-body") || "sans-serif"}`;
+  ctx.fillStyle = muted; ctx.textBaseline = "middle";
+  const rowLabels = matScope === "fed" || ch >= 11;
+  for (const [a, b, g] of RS) {                      // row groups: a bracket and the name
+    const y0 = Y(a), y1 = Y(b), cx = left - (rowLabels && g.key !== "ct" ? 0 : 8);
+    if (g.key === "ct" || !rowLabels) {
+      ctx.font = g.key === "ct" ? mono(Math.min(11, Math.max(8, (y1 - y0) * 0.6)), 600) : body(11, 600);
+      ctx.textAlign = "right"; ctx.fillStyle = g.key === "ct" ? fg : muted;
+      const txt = g.name;
+      if (y1 - y0 >= 9) ctx.fillText(txt, cx - 4, (y0 + y1) / 2, left - 18);
+    }
+  }
+  if (rowLabels) {                                    // per row: the block's short name; groups as a vertical band
+    ctx.font = body(Math.min(11.5, ch * 0.82)); ctx.textAlign = "right"; ctx.fillStyle = cssVar("--fg-soft");
+    rows.forEach((r, i) => ctx.fillText(matRowLabel(r.x), left - 8, Y(i) + ch / 2, left - 40));
+    ctx.font = body(10, 600); ctx.fillStyle = muted;
+    for (const [a, b, g] of RS) {
+      if (Y(b) - Y(a) < ctx.measureText(g.name).width * 0.8) continue;      // a band too short for its name
+      ctx.save(); ctx.translate(14, (Y(a) + Y(b)) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center";
+      ctx.fillText(g.name, 0, 0, Math.max(10, Y(b) - Y(a) - 4)); ctx.restore();
+    }
+  }
+  // columns: group names above; per column a rotated short name where there is room
+  ctx.textAlign = "center";
+  for (const [a, b, g] of CS) {
+    const x0 = X(a), x1 = X(b), w = x1 - x0;
+    ctx.fillStyle = g.key === "ct" ? fg : muted;
+    if (g.key === "ct") { ctx.font = mono(Math.min(11, Math.max(7.5, w * 0.42)), 600); if (w >= 11) ctx.fillText(g.name, (x0 + x1) / 2, top - 10); }
+    else if (matScope !== "all") { ctx.font = body(10, 600); if (w >= ctx.measureText(g.name).width * 0.8) ctx.fillText(g.name, (x0 + x1) / 2, top - 112, Math.max(20, w - 4)); }
+  }
+  if (matScope === "all") {                         // the federal columns run in the rows' order: one name over them
+    const k = fedN(G.O.cols);
+    ctx.font = body(10.5, 600); ctx.fillStyle = muted;
+    ctx.fillText(t.aggFed, left + (k * cw) / 2, top - 10, k * cw - 6);
+  }
+  if (matScope !== "all" && cw >= 9) {
+    ctx.font = body(Math.min(11, cw * 0.8)); ctx.fillStyle = cssVar("--fg-soft"); ctx.textAlign = "left";
+    cols.forEach((c, j) => {
+      if (typeof c.x !== "number" && matScope !== "cant") return;
+      const txt = typeof c.x === "number" ? matRowLabel(c.x) : t["matK" + c.x.own];
+      const steep = cw < 15;                          // narrow columns: upright labels, so they do not overlap
+      ctx.save(); ctx.translate(X(j) + cw * (steep ? 0.5 : 0.62), top - 6); ctx.rotate(steep ? -Math.PI / 2 : -Math.PI / 3);
+      ctx.textBaseline = steep ? "middle" : "alphabetic"; ctx.fillText(txt, 0, 0, 100); ctx.restore();
+    });
+  }
+  matLegend(G);
+  matSide(G);
+  matDrawHot();
+}
+function matSide(G) {
+  const el = $("matside"), x = G.left + G.cols.length * G.cw + 40, w = Math.min(380, G.VW - x - 28);
+  el.hidden = G.phone || w < 240;
+  if (el.hidden) return;
+  el.style.left = x + "px"; el.style.top = G.top + "px"; el.style.width = w + "px";
+  const cells = [];
+  const seenPair = new Set();
+  G.val.forEach((row, i) => row.forEach((v, j) => {
+    if (!v || !v.v) return;
+    if (aggLayer === "court") {                      // co-citation is symmetric: one entry per pair
+      const a = G.rows[i].x, b = matCol(G.cols[j].x, a), k = Math.min(a, b) * 1024 + Math.max(a, b);
+      if (seenPair.has(k)) return; seenPair.add(k);
+    }
+    cells.push([i, j, v]);
+  }));
+  const score = (v) => (aggLayer === "court" ? v.n * Math.log(v.l) : v.v);
+  cells.sort((p, q) => score(q[2]) - score(p[2]));
+  const short = (b) => { const B = agg.blocks[b]; return B.r >= 4 ? `${B.k} ${t["matK" + B.r]}` : B.r === "bv" ? aggName(b, true) : `${aggName(b, true)} · ${t["matF" + B.r]}`; };
+  const fmtV = (v) => (aggLayer === "basis" ? t.aggActs(num(v.n)) : aggLayer === "law" ? `${num(v.n)} ${t.matScaleLaw}` : `${t.matScaleCourt} ${v.l.toFixed(1).replace(".", lang === "en" ? "." : ",")} · ${t.aggDec(num(v.n))}`);
+  let html = "";
+  if (aggLayer === "basis" && agg.rank) {
+    const r = agg.rank, tot = r.higher + r.same + r.lower, pc = (x) => (100 * x) / tot;
+    html += `<p class="eyebrow">${esc(t.matWhere)}</p><div class="mbar"><i class="h" style="width:${pc(r.higher).toFixed(1)}%"></i><i class="s" style="width:${pc(r.same).toFixed(1)}%"></i><i class="l" style="width:${pc(r.lower).toFixed(1)}%"></i></div>` +
+      `<p class="mbarkey"><span><i class="h"></i>${esc(t.matHigher)} ${Math.round(pc(r.higher))} %</span><span><i class="s"></i>${esc(t.matSameF)} ${Math.round(pc(r.same))} %</span><button class="lowbtn" data-mat-low="1"><i class="l"></i>${esc(t.matLower)} ${num(r.lower)}</button></p>`;
+  }
+  html += `<p class="eyebrow">${esc(t.matTop)}</p><ol>${cells.slice(0, 12).map(([i, j, v]) => { const a = G.rows[i].x, b = matCol(G.cols[j].x, a);
+    return `<li><button data-mat="${a},${b}"><span>${esc(short(a))} <em>${aggLayer === "court" ? "↔" : "→"}</em> ${esc(short(b))}</span><b>${esc(fmtV(v))}</b></button></li>`; }).join("")}</ol>`;
+  el.innerHTML = html;
+}
+function matRowLabel(b) {
+  const B = agg.blocks[b];
+  if (B.k === tree.root && aggLayer === "law") return t.lvBV;     // cross-references name the BV as a whole
+  if (B.r >= 4) return `${B.k} · ${t["matK" + B.r]}`;
+  return aggName(b, true);
+}
+function matLegend(G) {
+  const unit = aggLayer === "basis" ? t.matScaleBasis : aggLayer === "law" ? t.matScaleLaw : t.matScaleCourt;
+  const ticks = (aggLayer === "court" ? [2, 10, 100, 1000] : [1, 10, 100, 1000, 10000]).filter((v) => v <= G.vmax * 0.8);
+  const pos = (v) => (aggLayer === "court" ? Math.log(v) / Math.log(Math.max(2, G.vmax)) : Math.log1p(v) / Math.log1p(G.vmax)) * 100;
+  $("aggscale").style.right = (G.phone ? 16 : 26 + (G.panel ? 424 : 0)) + "px";
+  $("aggscale").innerHTML = `<span class="mleg"><b>${esc(unit)}</b><i class="ramp" style="--c:var(${aggLayer === "basis" ? "--basis" : aggLayer === "law" ? "--wire" : "--current"})">${ticks.map((v) =>
+    `<em style="left:${pos(v).toFixed(1)}%">${esc(aggLayer === "court" ? String(v).replace(".", lang === "en" ? "." : ",") : num(v))}</em>`).join("")}</i>` +
+    `<em class="mx">${esc((G.capped ? "≥ " : "") + (aggLayer === "court" ? num(Math.round(G.vmax)) : num(G.vmax)))}</em></span><span class="mleg"><i class="sw2"></i>${esc(t.matSame)}</span>`;
+}
+function matDrawHot() {
+  const G = matG; if (!G) return;
+  const ctx = $("matx").getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, G.VW, G.VH);
+  const draw = (cell, strong) => {
+    if (!cell) return;
+    const [i, j] = cell, x = G.left + j * G.cw, y = G.top + i * G.ch;
+    ctx.fillStyle = cssVar("--hoverbg");
+    if (strong) { ctx.fillRect(G.left, y, G.cols.length * G.cw, G.ch); ctx.fillRect(x, G.top, G.cw, G.rows.length * G.ch); }
+    ctx.strokeStyle = cssVar("--fg"); ctx.lineWidth = strong ? 1.5 : 2;
+    ctx.strokeRect(x - 0.5, y - 0.5, G.cw + 1, G.ch + 1);
+  };
+  draw(matSel, false); draw(matHot, true);
+}
+function matCellAt(e) {
+  const G = matG; if (!G) return null;
+  const r = $("matx").getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  const j = Math.floor((x - G.left) / G.cw), i = Math.floor((y - G.top) / G.ch);
+  return i >= 0 && j >= 0 && i < G.rows.length && j < G.cols.length ? [i, j] : null;
+}
+const matFull = (b) => { const B = agg.blocks[b]; return B.r >= 4 ? `${cantonName(B.k)} · ${t["matK" + B.r]}` : B.r === "bv" ? aggName(b) : `${aggName(b)} · ${t["matF" + B.r]}`; };
+function matTipHtml([i, j]) {
+  const G = matG, a = G.rows[i].x, b = matCol(G.cols[j].x, a), v = G.val[i][j];
+  let s;
+  if (aggLayer === "basis") s = v ? t.matBasisTip(num(v.n), num(v.np)) : t.matNone;
+  else if (aggLayer === "law") s = v ? t.matLawTip(num(v.n), num(v.p)) : (agg.blocks[a].r >= 4 ? t.matLawCant : t.matNone);
+  else s = a === b ? t.matCourtDiag : !v ? t.matNone : v.n < MAT_MIN_DEC || v.l <= 1 ? t.matCourtFew(num(v.n), v.l.toFixed(1)) : t.matCourtTip(num(v.n), v.l.toFixed(1).replace(".", lang === "en" ? "." : ","));
+  const rel = matFloor(b) < matFloor(a) ? t.matHigher : matFloor(b) === matFloor(a) ? t.matSameF : t.matLower;
+  return `<b>${esc(matFull(a))}</b><span>→ ${esc(matFull(b))}</span><span>${esc(s)}</span>${aggLayer === "basis" && v ? `<span>${esc(rel)}</span>` : ""}${v ? `<span class="hint">${esc(t.matClick)}</span>` : ""}`;
+}
+// the panel: the acts behind a cell
+function matCellPanel(a, b) {
+  const m = matIndex(), v = matValue(a, b);
+  matSel = matG ? matCellOf(a, b) : null; aggSel = ["m", a, b];
+  let html = "";
+  const row = (i, d) => `<li><button class="k link" data-agg-act="${i}">${esc(fullLabel(i))}</button><span class="v">${esc(num(decOf(i)))}</span><span class="d">${esc(d)}</span></li>`;
+  if (aggLayer === "basis") {
+    const items = [];
+    for (const k of agg.members[a] || []) {
+      const i = gi(k), bs = (basisOf[i] || []).filter((x) => x.j >= 0 && m.gb[x.j] === b);
+      if (bs.length) items.push([i, bs]);
+    }
+    items.sort((p, q) => decOf(q[0]) - decOf(p[0]) || p[0] - q[0]);
+    const tgt = (x) => (K[x.j] === "bvart" || K[x.j] === "kvart" ? label(x.j) : `${artList(artNames(x.eids || []))} ${fullLabel(x.j)}`.trim()) + (x.prim ? ` (${t.matPrim})` : "");
+    html = `<section><div class="big"><b>${num(items.length)}</b><span>${esc(t.acts)}</span></div><p class="note">${esc(v ? t.matBasisTip(num(v.n), num(v.np)) : t.matNone)}</p></section>` +
+      `<section><h3><i class="sw tree"></i>${esc(t.matPanelBasis)}</h3><ul class="list">${items.slice(0, 120).map(([i, bs]) => row(i, "→ " + bs.map(tgt).join("; "))).join("")}</ul>${items.length > 120 ? `<p class="note">+ ${esc(num(items.length - 120))}</p>` : ""}</section>`;
+  } else if (aggLayer === "law") {
+    const pairs = [];
+    for (const i of m.coreBy[a] || []) for (const [j, n] of wOut[i] || []) if (m.gb[j] === b) pairs.push([i, j, n]);
+    pairs.sort((p, q) => q[2] - p[2] || p[0] - q[0]);
+    html = `<section><div class="big"><b>${num(v ? v.n : 0)}</b><span>${esc(t.matScaleLaw)}</span></div><p class="note">${esc(t.matLawNote)}</p></section>` +
+      `<section><h3><i class="sw wire"></i>${esc(t.matPanelLaw)}</h3><ul class="list">${pairs.slice(0, 120).map(([i, j, n]) =>
+        `<li><button class="k link" data-agg-act="${i}">${esc(fullLabel(i))}</button><span class="v">${esc(num(n))}</span><span class="d">→ <button class="link" data-agg-act="${j}">${esc(fullLabel(j))}</button></span></li>`).join("")}</ul></section>`;
+  } else {
+    const pairs = [];
+    for (const i of m.coreBy[a] || []) for (const [j, n] of jAdj[i] || []) if (m.gb[j] === b) pairs.push([i, j, n]);
+    pairs.sort((p, q) => q[2] - p[2] || p[0] - q[0]);
+    html = `<section><div class="big"><b>${num(v ? v.n : 0)}</b><span>${esc(t.decisions)}</span></div>${v ? `<p class="note">${esc(t.matCourtNote(num(v.n), v.l.toFixed(1).replace(".", lang === "en" ? "." : ",")))}</p>` : ""}</section>` +
+      (pairs.length ? `<section><h3><i class="sw current"></i>${esc(t.matPanelCourt)}</h3><p class="note">${esc(t.matCourtPairs)}</p><ul class="list">${pairs.slice(0, 60).map(([i, j, n]) =>
+        `<li><button class="k link" data-agg-act="${i}">${esc(fullLabel(i))}</button><span class="v">${esc(num(n))}</span><span class="d">↔ <button class="link" data-agg-act="${j}">${esc(fullLabel(j))}</button></span></li>`).join("")}</ul></section>` : "");
+  }
+  aggPanel(aggLayer === "basis" ? t.aggBasis : aggLayer === "law" ? t.webLaw : t.webCourt, matFull(a), "→ " + matFull(b), html);
+  matDrawHot();
+}
+function matCellOf(a, b) {                          // where a pair of blocks sits in the current layout
+  const G = matG; if (!G) return null;
+  const i = G.rows.findIndex((r) => r.x === a), j = G.cols.findIndex((c) => matCol(c.x, a) === b);
+  return i >= 0 && j >= 0 ? [i, j] : null;
+}
+$("matx").addEventListener("pointermove", (e) => {
+  const c = matCellAt(e), key = c ? c.join(":") : "";
+  if (key !== (matHot ? matHot.join(":") : "")) { matHot = c; matDrawHot(); }
+  aggTip(e, c ? matTipHtml(c) : "");
+});
+$("matx").addEventListener("pointerleave", () => { matHot = null; matDrawHot(); $("tip").hidden = true; });
+// bases on a lower floor than the act that names them: the Stufenbau upside down
+const nodeFloor = (j) => { const l = TN[j] ? TN[j].l : -1; return K[j] === "kvart" ? 4 : l < 0 || l === undefined ? 0 : l; };
+function matLowPanel() {
+  const items = [];
+  for (let i = 0; i < N; i++) {
+    const bs = (basisOf[i] || []).filter((x) => x.j >= 0 && nodeFloor(x.j) > nodeFloor(i));
+    if (bs.length && (K[i] === "act")) items.push([i, bs]);
+  }
+  items.sort((p, q) => decOf(q[0]) - decOf(p[0]) || p[0] - q[0]);
+  const n = items.reduce((a, x) => a + new Set(x[1].map((y) => y.j)).size, 0);
+  const html = `<section><div class="big"><b>${num(n)}</b><span>${esc(t.matLowUnit)}</span></div><p class="note">${esc(t.matLowNote)}</p></section>` +
+    `<section><ul class="list">${items.map(([i, bs]) => `<li><button class="k link" data-agg-act="${i}">${esc(fullLabel(i))}</button><span class="v">${esc(LV(i) >= 5 ? t["matK" + LV(i)] : t["matF" + LV(i)] || "")}</span>` +
+      `<span class="d">→ ${bs.map((x) => `${esc(fullLabel(x.j))} (${esc(nodeFloor(x.j) >= 5 ? t["matK" + nodeFloor(x.j)] : t["matF" + nodeFloor(x.j)] || "")})`).join("; ")}</span></li>`).join("")}</ul></section>`;
+  aggSel = ["low"];
+  aggPanel(t.aggBasis, t.matLower, "", html);
+}
+$("matside").addEventListener("click", (e) => { if (e.target.closest("[data-mat-low]")) { matLowPanel(); return; } const b = e.target.closest("[data-mat]"); if (!b) return; const [a, c] = b.dataset.mat.split(",").map(Number); matCellPanel(a, c); });
+$("matside").addEventListener("pointerover", (e) => { const b = e.target.closest("[data-mat]"); matHot = b ? matCellOf(...b.dataset.mat.split(",").map(Number)) : null; matDrawHot(); });
+$("matx").addEventListener("click", (e) => {
+  const c = matCellAt(e); if (!c) return;
+  const a = matG.rows[c[0]].x, b = matCol(matG.cols[c[1]].x, a);
+  if (!matValue(a, b)) return;
+  $("tip").hidden = true;
+  matCellPanel(a, b);
+});
+$("matx").addEventListener("keydown", (e) => {     // the keyboard: arrows move, Enter opens the cell
+  const G = matG; if (!G) return;
+  const d = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+  if (d) {
+    e.preventDefault();
+    const [i, j] = matHot || [0, 0];
+    matHot = [Math.max(0, Math.min(G.rows.length - 1, i + d[0])), Math.max(0, Math.min(G.cols.length - 1, j + d[1]))];
+    matDrawHot();
+    const r = $("matx").getBoundingClientRect();
+    aggTip({ clientX: r.left + G.left + (matHot[1] + 1) * G.cw, clientY: r.top + G.top + (matHot[0] + 1) * G.ch }, matTipHtml(matHot));
+  } else if (e.key === "Enter" && matHot) {
+    const a = G.rows[matHot[0]].x, b = matCol(G.cols[matHot[1]].x, a);
+    if (matValue(a, b)) matCellPanel(a, b);
+  }
+});
 
 // --- focus mode, idle orbit
 $("focusbtn").onclick = () => {

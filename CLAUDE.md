@@ -138,16 +138,21 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     constitutions (SR 131.2, `pipeline/cantons.py`) hang from Art. 51 BV (a constitutional link, not
     an Ingress; drawn down the central axis). Below, every act in force of the 26 official collections
     (16,358 + 26 constitutions) on floors by the issuer its Ingress names: 5 parliament/people/
-    Landsgemeinde/intercantonal (6,375), 6 government + cantonal courts (7,791), 7 directorates,
-    offices, other bodies incl. communal bodies some cantons publish and church constitutions (2,192);
-    no issuer → from the title (1,423, marked; every agreement, intercantonal or with a foreign state,
+    Landsgemeinde/intercantonal (6,770), 6 government + cantonal courts (7,799), 7 directorates,
+    offices, other bodies incl. communal bodies some cantons publish and church constitutions (1,789);
+    no issuer → from the title (1,429, marked; every agreement, intercantonal or with a foreign state,
     → 5 whoever concluded it: intercantonal law prevails over cantonal law, Art. 48 Abs. 5 BV — until
     2026-10-26 agreements between governments went to 6 by title but to 5 by Ingress, 131 acts moved;
-    a contract of the canton "vertreten durch den Regierungsrat" with a commune → 6; 256 with no
-    telling title → 7, marked "unknown"). Parent = the nearest higher cantonal basis the Ingress names
+    a contract of the canton "vertreten durch den Regierungsrat" with a commune → 6; 250 with no
+    telling title → 7, marked "unknown"). Found through the matrix (decision 25): "Le Parlement de la
+    République et Canton du Jura" and GR's "Vom Volke angenommen" were not read as parliament/people
+    (287 acts were on floor 7); agreements whose Ingress lists the cantons one by one or says "die dieser
+    Vereinbarung beigetretenen Kantone", or whose title names the agreement later ("Zentralschweizer
+    Fachhochschul-Vereinbarung"), → 5 (117); "Plenarausschuss/Geschäftsleitung der Gerichte" → 6.
+    Acts of an intercantonal body (its Verwaltungsrat, departments of several cantons) stay on 7. Parent = the nearest higher cantonal basis the Ingress names
     (a KV article node `KV:<ct>:art_N`, or a cantonal act), then text order. No parent → one of five
-    groups, in this order (decision 24): "basis named, not identifiable" (474), "names only acts not
-    above it" (lower floor or a same-floor circle, 299), "only federal law named" (1,271, incl. earlier
+    groups, in this order (decision 24): "basis named, not identifiable" (461), "names only acts not
+    above it" (lower floor or a same-floor circle, 33), "only federal law named" (1,271, incl. earlier
     federal acts and federal law in general), "no basis named" (2,584), "no preamble published"
     (1,215: TG above all; ZG's "published only on Intlex" notes count here). A basis is identified by its footnote/inline collection
     number, the name of a constitution, a fixed federal title (not inside "Einführungsgesetz zum …"),
@@ -214,13 +219,13 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     `#aufbau`): rows = floors (BV parts, Bundesversammlung, Bundesrat + courts, departments; the 26
     constitutions, cantonal floors 5–7), blocks = SR area (first digit) for federal law, canton for
     cantonal law (156 blocks). Every act in force (18,395) counts once in its block and arrives by one
-    flow from its primary parent (362 flows), so a block's inflows + stubs = its acts (asserted in 07).
+    flow from its primary parent (359 flows), so a block's inflows + stubs = its acts (asserted in 07).
     Stubs instead of flows, five kinds (decision 24): only federal law named (1,271, blue), basis named
-    but not identifiable (474) and only acts not above it (299; both ochre), no basis named (2,664 incl.
+    but not identifiable (461) and only acts not above it (33; both ochre), no basis named (2,664 incl.
     80 federal, grey), no preamble published (1,215, hatched); a key below the cantons lists them and
     opens each kind across all blocks. Widths = acts on three disclosed scales (BV parts by what rests on them; federal; cantonal);
     a flow is exact at its lower end and a share of the source's outflow at its upper end (parallel-sets
-    style). 1,555 acts skip a floor: their flows run in a lane beside the target column instead of
+    style). 1,322 acts skip a floor: their flows run in a lane beside the target column instead of
     through the floor between. Art. 51 BV → 26 constitutions as a trunk on the left (not an Ingress).
     Layers: legislation = provisions of federal acts naming an act of another block (treaties naming
     treaties dropped); case law = distinct decisions citing acts of both blocks (refs_valid, BV by
@@ -228,12 +233,13 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     everywhere); 90 strongest pairs drawn, all of a block's on pointing. Decisions per block exact
     (distinct); 936,926 decisions refer to at least one act in force (979,726 incl. earlier acts).
 
-24. The 54 % check (2026-10-26). 3,476 of the 6,375 acts on cantonal floor 5 (54.5 %) hang from no
-    cantonal basis; that share is real, but "no cantonal basis" was one grey group mixing five cases.
-    Now: 1,774 the Ingress names no basis (27.8 %; sample 25/25 genuine: "Der Grosse Rat …
-    beschliesst:", "Le Grand Conseil … décrète"; drafting practice differs: JU 0 %, UR 4 %, GR 6 % vs
-    LU 58 %, GL 54 %, TI 54 %, GE 50 %), 731 no preamble published (11.5 %), 735 only federal law
-    (11.5 %), 160 a basis named but not identifiable (2.5 %), 76 only acts not above them (1.2 %).
+24. The 54 % check (2026-10-26). Floor 5 first showed 54 % of its acts hanging from no cantonal
+    basis; after the fixes below and the floor fixes of decision 17: 3,557 of 6,770 (52.5 %). The share
+    is real, but "no cantonal basis" was one grey group mixing five cases. Now: 1,851 the Ingress names
+    no basis (27.3 %; sample 25/25 genuine: "Der Grosse Rat … beschliesst:", "Le Grand Conseil …
+    décrète"; drafting practice differs: JU 2 %, UR 5 %, ZG 7 %, VS 8 % vs LU 57 %, GL 54 %, TI 54 %,
+    GE 50 %), 735 no preamble published (10.9 %), 782 only federal law (11.6 %), 164 a basis named but
+    not identifiable (2.4 %), 25 only acts not above them (0.4 %).
     Parser fixes found on the way (each checked by diff against the previous run; 29 targets changed,
     all corrections): footnote digits glued to the year ("19912"); "gestützt §", "in Hinsicht auf",
     "im Hinblick auf", "gemäss", "dans le respect de" (weak keywords only before the enacting formula);
@@ -247,6 +253,22 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     same floor in all cantons (computed; cantons with ≥ 20 acts on the floor). Aufbau is the first view:
     no hash → overview unless the visitor last chose the cone (`slm-view`); the opening plays the first
     time the visitor enters the cone; act links (`#SR_220--art_41`) open the act as before.
+
+25. Matrix (`main.js` "the matrix", deep link `#matrix`; data in `agg.json`: `basis` = every stated
+    basis by block pair [row, column, acts, acts whose place in the tree it is], `nb`/`cb` = tree/core
+    node → block, `rank`). A dependency structure matrix of the overview's blocks in Stufenbau order:
+    BV parts, treaties, floors 1–3 by SR area, then per canton KV, 5, 6, 7 (canton-major, so each canton
+    is a 4 × 4 module on the diagonal). Cell = acts of the row naming a basis in the column (all stated
+    bases, 24,677 act → target pairs in 1,502 cells), provisions (federal acts only), or case-law lift
+    (≥ 20 shared decisions; diagonal empty, not computable from pair counts). Log colour up to the
+    strongest cell shown. Grey fields = same floor; below = a higher floor (21,837 bases), same floor
+    2,731, a lower floor 109 (listed in a panel: Phase-2 material; it was 571 before the floor fixes
+    the matrix exposed). Sections: all (156 × 156), federal (with labels), cantons (104 rows × federal
+    columns + the canton's own four). In the basis layer BV parts and treaties are columns only (they
+    rest on nothing). Hover = row/column cross + tooltip; click = the acts behind the cell (basis: acts
+    and their targets; legislation: act pairs by provisions; case law: pairs of the pruned co-citation
+    network); the strongest 12 cells beside it; arrow keys + Enter. Panel counts checked against the
+    cells (18 of 18) and the lower-floor list against the pipeline (109).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.

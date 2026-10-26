@@ -135,15 +135,20 @@ AUTH = re.compile(r"(?:Rat\b|[Rr]äte\b|Regierung|Gericht|Volk|Landsgemeinde|Sti
                   r"Gemeinde|Conseil|Grand|Parlement|Gouvernement|peuple|Assemblée|Département|Direction|Commission|"
                   r"Conférence|cantons\b|Tribunal|Chambre|Office|Bureau|Collège|Consiglio|Gran\b|popolo|Dipartimento|"
                   r"Commissione|Conferenza|Cantoni\b|Tribunale|Ufficio|Camera|Erziehungsrat|Kirchenrat)", re.I)
-PARL = re.compile(r"Kantonsrat|Gro(?:ss|ß)e[rn]?\s+Rat|Grossrat|Landrat|Landsgemeinde|Kantonsparlament|Parlament|Volk\b|Stimmberechtigt|"
+PARL = re.compile(r"Kantonsrat|Gro(?:ss|ß)e[rn]?\s+Rat|Grossrat|Landrat|Landsgemeinde|Kantonsparlament|Parlament|Parlement\b|Volke?s?\b|Stimmberechtigt|"
                   r"Stimmbürger|Verfassungsrat|Grand\s+Conseil|GRAND\s+CONSEIL|peuple|Assemblée\s+constituante|Constituante|"
                   r"Gran\s+Consiglio|GRAN\s+CONSIGLIO|popolo|Landeskonferenz|Grosse\s+Landrat", re.I)
 INTERCANT = re.compile(r"^(?:Die|Les|I|Gli)\s+(?:Regierungen\s+der\s+)?(?:Kantone|cantons|Cantoni|Vereinbarungskantone|"
-                       r"Konkordatskantone)|Konferenz|Conférence|Conferenza|Vereinbarungs|Konkordats", re.I)
+                       r"Konkordatskantone)|Konferenz|Conférence|Conferenza|Vereinbarungs|Konkordats|"
+                       # the cantons named one by one, or "die dieser Vereinbarung beigetretenen Kantone"
+                       r"^(?:Le|Der|Il)\s+(?:Canton|Kanton|Cantone)\b[^,]{0,40},\s*(?:le|der|il|la)\s+(?:Canton|Kanton|Cantone|République)|"
+                       r"^(?!(?:Erlassen\s+vo[mn]\s+(?:der\s+|dem\s+)?)?(?:(?:Der|Die|Das|Le|La|L['’]|Il|Les|I)\s+)?(?:Verwaltungsrat|Vorstand|Hochschulrat|"
+                       r"Fachhochschulrat|Stiftungsrat|Geschäftsleitung|Direktion|Direktionen|Departemente|Kommission|conseil\s+d['’]administration|comité|"
+                       r"Comitato|commission|départements|dipartimenti)\b).*\b(?:Kantone|Kantonen|cantons|Cantoni)\b", re.I)
 GOV = re.compile(r"Regierungsrat|Regierung\b|Standeskommission|Landammann|Conseil\s+d['’]\s*[ÉE]tat|CONSEIL\s+D['’]\s*[ÉE]TAT|"
                  r"Conseil-exécutif|Consiglio\s+di\s+Stato|CONSIGLIO\s+DI\s+STATO|Gouvernement|Obergericht|Kantonsgericht|"
                  r"Verwaltungsgericht|Appellationsgericht|Tribunal\s+cantonal|Tribunale\s+d['’]appello|Cour\s+(?:suprême|de\s+justice)|"
-                 r"Justizleitung|Justizkommission|Gerichtsrat|Kantonsgerichtsausschuss|Plenum", re.I)
+                 r"Justizleitung|Justizkommission|Gerichtsrat|Kantonsgerichtsausschuss|Plenum|Plenarausschuss|\bGerichte\b", re.I)
 TITLE_FLOOR = [
     (re.compile(r"^(?:Verfassung|Constitution|Costituzione)\b", re.I), 4),
     # agreements (intercantonal or with another state) → 5, whoever concluded them: intercantonal law prevails over
@@ -166,6 +171,10 @@ TITLE_FLOOR = [
                 r"Landratsbeschluss|Grossratsbeschluss|Gro(?:ss|ß)ratsbeschluss|Konkordat|Concordat|Concordato|"
                 r"\w*[Vv]ereinbarung|Convention|Accord|Convenzione|Accordo|Beitritt|Adhésion|Adesione)\b", re.I), 5),
     (re.compile(r"^(?:\w*[Vv]erordnung|Ordonnance|Ordinanza|\w*[Rr]eglement|Règlement|Regolamento|Arrêté|Beschluss)\b", re.I), 6),
+    (re.compile(r"^(?!.*\b(?:Einwohnergemeinde|Bürgergemeinde|Gemeinde|commune|comune)\b)"
+                r"(?!(?:Actes?\s+d['’]exécution|Ausführung|Vollzug|Gebühren|Tarif|Weisung|Richtlinie|Directive|Direttiv))"
+                r".*(?:\w[Vv]ereinbarung|\b[Kk]onkordat|\bConvention\b|"
+                r"\bConcordat\b|\bAccord\b|\bConvenzione\b|\bConcordato\b)", re.I), 5),     # "Zentralschweizer Fachhochschul-Vereinbarung"
 ]
 
 # the canton's own collection, as footnotes write it ("BGS 111.1"); federal law: SR (de), RS (fr/it)

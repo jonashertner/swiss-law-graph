@@ -195,6 +195,39 @@ body.webbing #spine, body.webbing #legend, body.webbing #layers { display: none 
 #aggsvg .act { font: 600 10px var(--font-data); letter-spacing: 0.04em; fill: var(--lab-dom); opacity: 0.8; }
 #aggsvg .abv { font: 500 11px var(--font-body); fill: var(--lab-title); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
 #aggsvg { display: block; font-family: var(--font-body); }
+#matc, #matx { position: absolute; left: 0; top: 0; display: block; z-index: 0; }
+#agg.mat #agghead, #agg.mat #aggscale { z-index: 2; }
+#agg:not(.mat) #matside { display: none !important; }
+#matside { position: absolute; z-index: 1; font: 13px var(--font-body); color: var(--fg-soft); }
+#matside .eyebrow { margin: 0 0 8px; }
+#matside ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+#matside li button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: grid; gap: 1px; padding: 5px 8px; border-radius: 6px; line-height: 1.35; }
+#matside li button:hover, #matside li button:focus-visible { background: var(--hoverbg); color: var(--fg); }
+#matside li span { min-width: 0; }
+#matside li em { font-style: normal; color: var(--muted); }
+#matside li b { font: 500 11.5px var(--font-data); color: var(--muted); white-space: nowrap; }
+#matside .mbar { display: flex; height: 10px; border-radius: 3px; overflow: hidden; background: var(--track); margin-bottom: 6px; }
+#matside .mbar i, #matside .mbarkey i { display: block; }
+#matside .mbar .h, #matside .mbarkey .h { background: var(--basis); }
+#matside .mbar .s, #matside .mbarkey .s { background: color-mix(in srgb, var(--basis) 45%, var(--track)); }
+#matside .mbar .l, #matside .mbarkey .l { background: var(--court); }
+#matside .mbarkey { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 22px; font: 500 11px var(--font-data); color: var(--muted); }
+#matside .mbarkey span, #matside .mbarkey button { display: inline-flex; align-items: center; gap: 6px; }
+#matside .mbarkey button { all: unset; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border-bottom: 1px solid var(--line-strong); }
+#matside .mbarkey button:hover, #matside .mbarkey button:focus-visible { color: var(--fg); border-bottom-color: var(--fg); }
+#matside .mbarkey i { width: 10px; height: 10px; border-radius: 2px; }
+#matx { cursor: crosshair; outline: none; }
+#matx:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
+#agg:not(.mat) #matc, #agg:not(.mat) #matx, #agg.mat #aggsvg, #agg.mat #aggkey { display: none !important; }
+#aggscale .mleg { display: inline-flex; align-items: center; gap: 8px; }
+#aggscale .mleg b { font-weight: 600; color: var(--fg-soft); }
+#aggscale i.ramp { position: relative; display: inline-block; width: 150px; height: 9px; border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 14%, transparent), var(--c)); }
+#aggscale i.ramp em { position: absolute; top: 12px; transform: translateX(-50%); font-style: normal; font-size: 9.5px; }
+#aggscale .mleg em.mx { font-style: normal; }
+#aggscale i.sw2 { width: 12px; height: 12px; border-radius: 2px; background: var(--track); border: 1px solid var(--line-strong); }
+#agg.mat #aggscale { padding-bottom: 12px; }
+@media (max-width: 760px) { #agg.mat #aggscale { top: calc(214px + env(safe-area-inset-top, 0px)); row-gap: 22px; } }
 #aggsvg .ar { font: 600 10.5px/1 var(--font-data); letter-spacing: 0.07em; text-transform: uppercase; fill: var(--muted);
   paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
 #aggsvg .ap { font: 600 11px/1 var(--font-data); letter-spacing: 0.06em; text-transform: uppercase; fill: var(--fg-soft); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
@@ -477,7 +510,7 @@ body.immersive #vignette { background: radial-gradient(ellipse 70% 65% at 50% 46
 <canvas id="map" aria-label="Map of Swiss law" role="img" tabindex="0"></canvas>
 <div id="labels" aria-hidden="true"></div>
 <div id="wveil" aria-hidden="true"></div>
-<div id="agg" hidden><div id="agghead"></div><div id="aggscale"></div><svg id="aggsvg" role="group" aria-label="Overview"></svg><div id="aggkey"></div></div>
+<div id="agg" hidden><div id="agghead"></div><div id="aggscale"></div><svg id="aggsvg" role="group" aria-label="Overview"></svg><div id="aggkey"></div><canvas id="matc" aria-hidden="true"></canvas><canvas id="matx" tabindex="0" role="img" aria-label="Matrix"></canvas><div id="matside" hidden></div></div>
 <svg id="wedges" aria-hidden="true"></svg>
 <div id="web" role="group" aria-label="Connections"></div>
 <div id="loading">Swiss Law Map …</div>
@@ -511,7 +544,7 @@ body.immersive #vignette { background: radial-gradient(ellipse 70% 65% at 50% 46
   <div id="legend" class="float"></div>
   <div id="toolrow">
     <button class="chip strong" id="tourbtn"></button>
-    <div class="seg" role="group" aria-label="View"><button id="magg" aria-pressed="false"></button><button id="mtree" aria-pressed="true"></button><button id="msr" aria-pressed="false"></button></div>
+    <div class="seg" role="group" aria-label="View"><button id="magg" aria-pressed="false"></button><button id="mmat" aria-pressed="false"></button><button id="mtree" aria-pressed="true"></button><button id="msr" aria-pressed="false"></button></div>
     <button class="chip" id="zin" aria-label="Zoom in">+</button>
     <button class="chip" id="zout" aria-label="Zoom out">−</button>
     <button class="chip" id="home"></button>

@@ -769,7 +769,34 @@ def main() -> None:
             x[0] += n_; x[1] += 1
     for b in range(len(blocks)):                      # blocks created for the legislation layer only
         blocks[b].setdefault("n", 0); blocks[b].setdefault("o", 0)
+    # the matrix: every stated basis by pair of blocks (not only the one that places an act in the
+    # tree): acts of block a naming a basis in block b; of them, acts whose place in the tree is there
+    nb = [bidx.get(key_of(t), -1) if key_of(t) is not None else -1 for t in range(len(ids))]
+    core_blk = [core_block.get(k, -1) for k in range(len(core["nodes"]))]
+    floor_of = lambda t: lvl_of_node(t) if t not in kv_ct and kind[t] != "kvart" and t not in act_ct else (4 if t in kv_ct or kind[t] == "kvart" else lv[t])
+    bpair = defaultdict(lambda: [set(), set()])
+    rank = Counter()
+    seen_pair = set()
+    for me, targets in [(act_node[sr], [c[0] for c in cands]) for sr, cands in resolved.items()] + \
+            [(me, [c[0] for c in cands]) for me, cands in kresolved.items()]:
+        a = nb[me]
+        for t in targets:
+            if t is None or t < 0 or a < 0 or nb[t] < 0 or (me, t) in seen_pair:
+                continue
+            seen_pair.add((me, t))
+            x = bpair[(a, nb[t])]
+            x[0].add(me)
+            if parent[me] == t:
+                x[1].add(me)
+            fa, ft = floor_of(me), floor_of(t)
+            rank["higher" if ft < fa else "same" if ft == fa else "lower"] += 1
+    stats["mat_basis_pairs"] = len(seen_pair)
+    stats["mat_basis_cells"] = len(bpair)
+    for k_, v in rank.items():
+        stats[f"mat_basis_{k_}"] = v
     agg = {"blocks": blocks, "members": [sorted(bmembers[b], key=by_dec) for b in range(len(blocks))],
+           "basis": [[a, b, len(v[0]), len(v[1])] for (a, b), v in sorted(bpair.items())], "nb": nb, "cb": core_blk,
+           "rank": {k_: rank[k_] for k_ in ("higher", "same", "lower")},
            "flows": [[s, d, sorted(v, key=by_dec)] for (s, d), v in sorted(bflows.items(), key=lambda x: (-len(x[1]), x[0]))],
            "stubs": [[d, g, sorted(v, key=by_dec)] for (d, g), v in sorted(bstubs.items())],
            "law": [[a, b, v[0], v[1]] for (a, b), v in sorted(law.items(), key=lambda x: (-x[1][0], x[0]))],
