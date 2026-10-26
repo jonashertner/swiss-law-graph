@@ -159,6 +159,22 @@ acts in up to 24 cantons: `GEBV` (20 cantons), `BVV` (21), `VO` (21), `EG` (22),
 
 ---
 
+### B9. `KV` → SR 131.212 (Constitution of Bern) for every canton
+`docs/data/law_codes.json` has `alias_to_sr["KV"] = "131.212"` and lists `KV` among the federal
+abbreviations. "KV" is the generic abbreviation of *any* cantonal constitution (Bern's and
+Aargau's official short titles both use it). In the snapshot, 2,959 decisions cite "KV" and were
+all attributed to Bern; only 464 come from Bern. ZH 608, OW 350, GR 189, SG 156, SH 95, AR 70,
+SO 61, UR 54, GL 42, NW 31, … and 746 federal decisions (ambiguous). The same holds for Bern's
+French and Italian abbreviations: "ConstC" and "CostC" (5 GR decisions).
+Codes naming the canton are not mapped at all: "KV/ZH" (248 decisions), "KV/BE" (145), "KV/GR",
+"KV/SO", "KV/SG", "KV/SH", "KV/GL", "KV/OW", "KV/FR", "KV/AR", "Cst/VD" (48), "Cst/GE" (17), ….
+*Suggested fix:* treat `KV`, `ConstC`, `CstC`, `CostC` as cantonal-constitution homonyms (a
+cantonal decision → its own canton's constitution, SR 131.2xx; a federal decision → ambiguous)
+and map `KV/<canton>`, `Cst/<canton>` to that canton's SR number. The MCP language pairing
+(D1 fix) inherits the error: `KV` expands to Bern's `ConstC`/`CostC`.
+*Map:* done as above (2,924 decisions now resolve to the right constitution: ZH 831, BE 628,
+OW 364, GR 242, SG 188, …).
+
 ## D. MCP tools (checked live on 2026-10-26)
 
 ### D1. `analyze_legal_trend` does not pair language variants of a law code

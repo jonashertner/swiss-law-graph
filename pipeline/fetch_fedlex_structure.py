@@ -122,6 +122,12 @@ def parse(blob: bytes) -> tuple[list, list]:
 
 def main() -> None:
     srs = [l.strip() for l in open(ROOT / "pipeline/acts_to_validate.txt") if l.strip()]
+    out = ROOT / "data/fedlex_structure.json.gz"
+    known = {}
+    if "--missing" in sys.argv and out.exists():           # fetch only acts not yet in the file
+        known = json.load(gzip.open(out))["acts"]
+        srs = [s for s in srs if s not in known]
+        print(f"{len(srs)} acts missing", file=sys.stderr)
     latest: dict[tuple[str, str], tuple[str, str]] = {}
     for lang, code in LANGS.items():
         for i in range(0, len(srs), 40):
@@ -159,19 +165,18 @@ def main() -> None:
             rec["error"] = str(e)[:200]
         return sr, rec
 
-    result = {s: {"levels": None, "articles": None} for s in srs}
+    result = {**known, **{s: {"levels": None, "articles": None} for s in srs}}
     todo = sorted({sr for sr, lang in latest if lang == "de"})
     with ThreadPoolExecutor(max_workers=6) as ex:
         for k, (sr, rec) in enumerate(ex.map(work, todo)):
             result[sr] = rec
             if k % 50 == 0:
                 print(f"xml {k}/{len(todo)}", file=sys.stderr)
-    out = ROOT / "data/fedlex_structure.json.gz"
     with gzip.open(out, "wt", encoding="utf-8") as f:
         json.dump({"run_date": RUN_DATE, "source": "Fedlex SPARQL + filestore, consolidated XML DE/FR/IT",
                    "acts": result}, f, ensure_ascii=False, separators=(",", ":"))
     ok = sum(1 for r in result.values() if r.get("articles"))
-    print(f"done: {ok}/{len(srs)} acts with structure -> {out}", file=sys.stderr)
+    print(f"done: {ok}/{len(result)} acts with structure -> {out}", file=sys.stderr)
 
 
 if __name__ == "__main__":

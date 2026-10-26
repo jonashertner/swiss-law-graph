@@ -29,6 +29,12 @@ contradictions and lacunae. Owner: Jonas Hertner (also owner of opencaselaw.ch).
   article heading, not an AS amendment note) or an `eli/cc` link names another act
   (`fetch_fedlex_xrefs.py`, ~50 min). 28,075 references, 12,167 act pairs, 0 texts failed.
   Drafting rules put the footnote at the first mention only: 76 % of pairs have weight 1.
+- `data/fedlex_basis.json` — the Ingress of every act in force plus every cited act (5,147, current
+  consolidated DE XML): issuer, verbatim Ingress, stated bases (target SR from the footnote, article
+  numbers, the clause verbatim), adoption date, editorial notes, body article eIds
+  (`fetch_fedlex_basis.py`, ~6 min; SPARQL by ELI URI, cached in build/fedlex_xml_urls.json).
+  Only a footnote that *is* an SR reference marks a basis ("SR …", "[BS …]"); editorial notes
+  ("Der Titel wurde … PublG (SR 170.512) angepasst") let the clause run on.
 - Alias tables live in the opencaselaw repo: `docs/data/law_codes.json`,
   `docs/api/law_aliases.json` (public repo: clone `jonashertner/opencaselaw` next to this one).
 - Do NOT use `jonashertner/opencaselaw-data` (private telemetry; its cards forbid release).
@@ -44,11 +50,13 @@ python3 pipeline/02_validate.py                     # 20 s
 python3 pipeline/03_graph.py                        # 40 s
 python3 pipeline/04_hierarchy.py && (cd layout && npm ci && node pack.mjs)
 python3 pipeline/05_site.py                         # 40 s -> site/data (44 MB, not in git)
+python3 pipeline/07_tree.py                         # site/data/tree.json + ingress.json (Stufenbau)
 python3 pipeline/06_artifact.py                     # site/artifact.html for claude.ai preview
 python3 -m http.server -d site 8765                 # local view: http://localhost:8765
 ```
 Fedlex fetchers (only when refreshing data): `fetch_fedlex_acts.py`, `fetch_fedlex_articles.py`,
-`fetch_fedlex_structure.py`, then step 1, then `fetch_fedlex_regimes.py`.
+`fetch_fedlex_structure.py` (`--missing` adds new acts only), then step 1, then `fetch_fedlex_regimes.py`;
+`fetch_fedlex_xrefs.py` and `fetch_fedlex_basis.py` for the two legislative layers.
 Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republish from
 `site/artifact.html` with root `site` and the files under `site/data`.
 
@@ -105,6 +113,22 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     join two acts on the map (474 name an SR number without a node); 507 pairs are in both layers.
     Lines follow the SR tree (Holten bundling, β = 0.75) and merge into the visible areas from afar.
     Legislation is today's text only (no time series); case law has per-year counts (`ey.json`).
+16. Stufenbau (default view, `07_tree.py`): federal law in force as the tree its own Ingresses state.
+    Apex: the BV with its titles/chapters/sections/articles (all 232). Floors = enacting authority
+    named in the Ingress (Bundesversammlung 426; Bundesrat + federal courts 916; departments, offices,
+    other bodies 669; 37 from the title). Parent = a stated basis: nearest higher floor, then longest
+    common SR prefix, then Ingress order; every other basis kept (dashed). BV 1874 citations: the
+    article Fedlex gives as today's equivalent; with a plain "SR 101" footnote the 1874 text is meant
+    if the act predates 2000 and its Ingress was not revised since, or the number is old-style
+    (34ter) → node "BV 1874". 3,014 bases; 13 name an article missing from the target's current
+    text (real dangling bases, e.g. Art. 19/21 BWIS in SR 120.4, Art. 929a OR in SR 211.435.1).
+    Treaties appear only as the basis of a federal act (96); 79 acts have no basis in the tree.
+17. Cantonal floors (Art. 49 BV: federal law prevails, so they lie below every federal floor): the 26
+    constitutions (SR 131.2, `pipeline/cantons.py`) hang from Art. 51 BV (a constitutional link, not
+    an Ingress; drawn down the central axis); each canton's acts (3,811, from decision citations,
+    cantonal texts not read; includes communal regulations such as BZO) under its constitution.
+    Step 1: "KV/ZH", "Cst/VD" → that canton's constitution in any court; "KV", "ConstC", "CstC" →
+    the deciding canton's, excluded in federal courts (was: all "KV" → Bern; report B9).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -132,6 +156,12 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
       both hemispheres). Rebuilds of the bundles are skipped unless the set of open containers
       changes. The 2D Canvas version survives as `site/flat.html` + `app.js`.
       `06_artifact.py` inlines the modules (each its own scope) for the claude.ai Artifact.
+- [x] Step 7 `07_tree.py` + tree view in `main.js` (`setMode("tree"|"sr")`): per-view layouts (X, Z,
+      CY = centre height, R, P, kids, SPAN); radial cone, floors as glass plates, delegation lines
+      weighted by what hangs below, pulses running down; links bundled through the tree (attach to the
+      deepest ancestor whose span on screen ≥ 12 px); panel: verbatim Ingress, bases with clauses,
+      "provisions other acts rest on", dependents by floor; crumbs = delegation chain; search
+      "Art. 117 BV" opens the article in the tree; articles switch to the SR view's skyline.
 - [x] Step 5 partly: counts cross-checked with the opencaselaw MCP (BGE 143 IV 241 in-degree;
       Art. 41 OR — the MCP undercounts, see report D1); desktop + phone screenshots via Playwright.
 
@@ -151,6 +181,9 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
   ("which provisions of other acts name this article") needs article-precise targets, which the
   footnotes do not give (they name the act).
 - A guided tour (3–4 stops) for first-time visitors.
+- Cantonal law: read cantonal Ingresses (cantonal portals / LexFind) to place cantonal acts under
+  the article of their constitution or of the federal act they implement; cantonal titles.
+- The 13 dangling bases and 79 acts without a basis are Phase-2 material (lacunae, outdated Ingress).
 - Phase 2 (simplification, contradictions, lacunae) builds on `fedlex_structure.json.gz` and the
   article co-citation graph.
 

@@ -30,6 +30,8 @@
   --wire: #ffa040;           /* legislation: the statute text refers to another act */
   --current: #4dd1ff;        /* case law: cited together */
   --both: #fff7e6;
+  --basis: #ffdc94;          /* the tree: place of an act under its stated basis */
+  --basis2: #ffcc80;         /* a further stated basis */
   --focus: #9cc8ff;
   --font-display: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -55,6 +57,11 @@ body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(-
 .lab[data-kind="act"] { font-family: var(--font-display); font-weight: 600; color: #f4f8fb; }
 .lab[data-kind="art"] { font-family: var(--font-data); font-weight: 400; color: #b9c6d3; }
 .lab.on { color: #fff; text-shadow: 0 0 14px var(--hue, #fff), 0 0 3px var(--bg); }
+.lab[data-kind="title"] { font-family: var(--font-display); font-weight: 600; color: #f3e3c2; letter-spacing: 0.01em; }
+.lab[data-kind="chapter"], .lab[data-kind="section"] { color: #d9c9a8; }
+.lab[data-kind="bvart"] { font-family: var(--font-data); color: #f6e7c8; }
+.lab[data-kind="abv"], .lab[data-kind="tgroup"] { color: var(--muted); font-style: italic; }
+.lab[data-kind="plate"] { font: 600 10.5px/1.2 var(--font-data); letter-spacing: 0.08em; text-transform: uppercase; color: #9fb0c6; }
 .lab.edge { pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 3px 9px 3px 7px;
   border-radius: 999px; background: rgb(9 15 23 / 0.8); border: 1px solid var(--line); font-family: var(--font-body); font-weight: 500;
   text-shadow: none; color: #e6edf3; }
@@ -106,6 +113,19 @@ select.chip { padding-right: 4px; background: rgb(0 0 0 / 0.28); backdrop-filter
 .sw.current { border: 2px solid var(--current); border-bottom: 0; border-radius: 12px 12px 0 0; height: 8px;
   box-shadow: 0 -2px 8px -2px var(--current); box-sizing: border-box; }
 .sw.both { background: var(--both); height: 3px; margin-block: 3.5px; border-radius: 2px; box-shadow: 0 0 8px var(--both); }
+.sw.tree { width: 14px; height: 12px; border-left: 2px solid var(--basis); border-bottom: 2px solid var(--basis); border-radius: 0 0 0 9px;
+  box-sizing: border-box; box-shadow: -2px 2px 6px -2px var(--basis); }
+.sw.tree2 { width: 14px; height: 12px; border-left: 2px dashed var(--basis2); border-bottom: 2px dashed var(--basis2); border-radius: 0 0 0 9px; box-sizing: border-box; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--glass);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.seg button { height: 30px; padding: 0 11px; border: 0; background: none; color: var(--muted); font: 600 12.5px var(--font-body); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: #e6edf3; color: #0a111a; }
+.seg button + button { border-left: 1px solid var(--line); }
+details.ingress { margin-top: 4px; }
+details.ingress summary { cursor: pointer; color: var(--muted); font: 600 11px/1.6 var(--font-data); letter-spacing: 0.06em; text-transform: uppercase; }
+details.ingress blockquote { margin: 6px 0 0; padding: 8px 10px; border-left: 2px solid var(--basis); background: rgb(255 220 150 / 0.04);
+  font: 13px/1.55 var(--font-body); color: #d6dee6; text-wrap: pretty; }
+#legend button[disabled] { cursor: default; }
 
 /* Bottom-left: links, legend, tools */
 #tools { position: fixed; z-index: 4; left: max(16px, env(safe-area-inset-left, 0px));
@@ -253,9 +273,11 @@ button.link { border: 0; background: none; padding: 0; font: inherit; cursor: po
     <button id="lwire" aria-pressed="true"><i class="sw wire"></i><span></span><small id="lwiren"></small></button>
     <button id="lcurrent" aria-pressed="true"><i class="sw current"></i><span></span><small id="lcurrentn"></small></button>
     <p><i class="sw both"></i><span id="lboth"></span></p>
+    <p id="ltree"><i class="sw tree"></i><span id="ltreetext"></span></p>
   </div>
   <div id="legend" class="float"></div>
   <div id="toolrow">
+    <div class="seg" role="group" aria-label="View"><button id="mtree" aria-pressed="true"></button><button id="msr" aria-pressed="false"></button></div>
     <button class="chip" id="zin" aria-label="Zoom in">+</button>
     <button class="chip" id="zout" aria-label="Zoom out">−</button>
     <button class="chip" id="home"></button>

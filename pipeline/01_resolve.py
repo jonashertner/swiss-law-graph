@@ -51,6 +51,8 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
+from cantons import CANTON_CONSTITUTION
+
 ROOT = Path(__file__).resolve().parents[1]
 OCL = Path(sys.argv[1] if len(sys.argv) > 1 else ROOT.parent / "jonashertner/opencaselaw")
 BUILD = ROOT / "build"
@@ -63,6 +65,13 @@ norm = lambda s: re.sub(r"[.\s\-_/]+", "", s or "").upper()
 ALIAS_OVERRIDES = {
     "OPC": "831.301",   # OPC-AVS/AI (ELV), not SR 281.41
 }
+# Cantonal constitutions (SR 131.2, guaranteed by the Federal Assembly, Art. 51 BV), by the
+# title of each SR entry. Decisions write "KV/ZH", "Cst/VD" (canton named: that constitution,
+# in any court) or "KV", "ConstC", "CstC" (the deciding canton's; ambiguous in a federal court).
+# Before 2026-10-26 "KV" resolved to SR 131.212 (Bern, whose short title is "KV") whatever
+# the canton of the decision: 1,903 of its 2,959 decisions came from other cantons or courts.
+KV_GENERIC = {"KV", "CONSTC", "CSTC", "COSTC", "CONSTCANT", "CSTCANT"}
+KV_NAMED = re.compile(r"^(?:KV|CST|CONST|COST)[/-](" + "|".join(CANTON_CONSTITUTION) + r")$")
 # Identified cantonal acts sharing a federal abbreviation (read as the deciding canton's act).
 # The 2026-10-26 additions were found by the share of references whose article does
 # not exist in the federal act (StG in BE 82 %, SG 70 %, NW 78 %; PBG in SG 81 %; ...).
@@ -239,6 +248,8 @@ def main() -> None:
     c = duckdb.connect()
     c.register("al", al)
     c.register("hom", pd.DataFrame({"code": sorted(CANTONAL_HOMONYMS)}))
+    c.register("kvc", pd.DataFrame(list(CANTON_CONSTITUTION.items()), columns=["kv_canton", "kv_sr"]))
+    c.register("kvg", pd.DataFrame({"code": sorted(KV_GENERIC)}))
     c.register("unv", pd.DataFrame({"code": sorted(UNVERIFIED_HOMONYMS)}))
     # Extraction artifacts: a federal code with the article number glued on ("BV8", "ZGB8",
     # "LPGA1"). Unknown to the alias tables, they would become cantonal acts.
@@ -290,10 +301,12 @@ def main() -> None:
         from 'data/statute_references.parquet' s
         left join alias_map am on am.alias_id = s.decision_id
         left join meta m on m.decision_id = coalesce(am.canonical_id, s.decision_id)""")
-    c.sql("""create table res as
-      select r.*, al.sr, sec.section,
+    c.sql(f"""create table res as
+      select r.* exclude (kvcanton), coalesce(kv.kv_sr, al.sr) sr, sec.section,
         case
           when canton is null then 'no_decision_metadata'
+          when kv.kv_sr is not null then 'cantonal_constitution'
+          when r.code in (select code from kvg) then 'excluded_ambiguous_in_federal_court'
           when r.code in (select code from unv) then 'excluded_unverified_homonym'
           when r.code in (select code from notk) then 'excluded_not_a_cantonal_act'
           when exists (select 1 from dated where dated.code = r.code and (r.dt is null or r.dt >= cast(dated.until as date)))
@@ -305,7 +318,10 @@ def main() -> None:
           when canton not in ('CH','CE') then 'cantonal_unmapped'
           else 'excluded_unresolved'
         end resolution
-      from r left join al on al.code = r.code left join sec on sec.code = r.code""")
+      from (select r.*, case when r.code in (select code from kvg) and r.canton not in ('CH','CE') then r.canton
+                             else nullif(regexp_extract(r.code, '{KV_NAMED.pattern}', 1), '') end kvcanton from r) r
+      left join kvc kv on kv.kv_canton = r.kvcanton
+      left join al on al.code = r.code left join sec on sec.code = r.code""")
 
     # --- Regimes: which of the acts carried by an SR number a code means. ---
     code_sr = c.sql("select distinct code, sr from res where resolution = 'federal'").df()
@@ -326,6 +342,7 @@ def main() -> None:
              where resolution = 'federal' and sr in ('272','312.0') and regime = '' and dt < date '2011-01-01'""")
     c.sql("""create table out as select decision_id, dt,
         case when resolution='federal' then 'SR ' || sr || regime
+             when resolution='cantonal_constitution' then 'SR ' || sr
              when resolution in ('cantonal_homonym','cantonal_unmapped','cantonal_pre2011_procedure')
                then canton || ' ' || code
         end act_id, section, code, article, resolution

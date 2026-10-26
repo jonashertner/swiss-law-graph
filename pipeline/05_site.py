@@ -29,6 +29,7 @@ from pathlib import Path
 import duckdb
 
 from artnum import parse_eid
+from cantons import CANTON_CONSTITUTION
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build"
@@ -496,11 +497,18 @@ def main() -> None:
                     topics.append([index[aid], row[1], f"{row[2]} · {pick(h)}", n, pos.get((aid, row[4]), -1)])
         json.dump(topics, open(SITE / f"topics.{lang}.json", "w"), ensure_ascii=False, separators=(",", ":"))
 
+    # Cantonal constitutions: one label per canton (several share the short title "KV").
+    for ct, sr in CANTON_CONSTITUTION.items():
+        j = index.get("SR " + sr)
+        if j is not None:
+            out_nodes[j]["a"] = {"de": f"KV {ct}", "fr": f"Cst. {ct}", "it": f"Cost. {ct}", "en": f"Const. {ct}"}
     # Search aliases: every code the corpus uses for a federal act.
     alias = {}
     for k, v in lc["alias_to_sr"].items():
         if isinstance(v, str) and "SR " + v in index:
             alias[norm(k)] = index["SR " + v]
+    for g in ("KV", "CONSTC", "CSTC", "COSTC"):          # a cantonal constitution, but whose?
+        alias.pop(g, None)
     for o in out_nodes:
         for a in (o.get("a") or {}).values():
             alias.setdefault(norm(a), index[o["i"]])

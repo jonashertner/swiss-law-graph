@@ -1,6 +1,11 @@
-// Swiss Law Map, 3D. The official SR hierarchy is the ground plan (circle packing, fixed);
-// acts stand on it as orbs sized by the decisions that cite them. Two layers of
-// interdependency are routed along the SR tree (hierarchical edge bundling):
+// Swiss Law Map, 3D. Two views of the same acts:
+//   Stufenbau (default): federal law in force as the tree its own texts state — the
+//     Constitution at the apex, every act under the provision its Ingress names as its
+//     basis, on the floor of the authority that enacted it (data/tree.json, step 7);
+//   Systematik: the official SR classification as a ground plan (circle packing), acts
+//     standing on it as orbs sized by the decisions that cite them.
+// In both, two layers of interdependency are routed along the hierarchy (hierarchical
+// edge bundling):
 //   the courts' current — two acts cited in the same decisions — arcs above the plane;
 //   the legislature's wiring — the text of one act refers to another — arcs below it, seen
 //   through the glass floor. Arcs rise (or sink) further the further apart the two acts sit
@@ -22,7 +27,11 @@ const SAMPLES = 36;            // points per curve
 const HUE = {
   1: [0.42, 0.56, 1.0], 2: [0.2, 0.86, 0.74], 3: [1.0, 0.45, 0.33], 4: [0.72, 0.53, 1.0], 5: [0.68, 0.76, 0.32],
   6: [1.0, 0.72, 0.22], 7: [0.32, 0.72, 0.98], 8: [1.0, 0.45, 0.66], 9: [0.4, 0.82, 0.5], k: [0.82, 0.62, 0.42], n: [0.6, 0.66, 0.72],
+  bv: [1.0, 0.86, 0.58],
 };
+const PLATE = [0.5, 0.58, 0.72];     // the floors of the Stufenbau
+const BASIS2 = [1.0, 0.8, 0.5];     // a further stated basis (not the place in the tree)
+const SPAN_PX = 12;                 // tree: a node whose span on screen is narrower merges into its parent's links
 const WIRE = [1.0, 0.62, 0.25];   // legislation: amber, below the plane
 const CURRENT = [0.3, 0.82, 1.0]; // case law: cyan, above the plane
 const BOTH = [1.0, 0.97, 0.9];    // both layers: white
@@ -34,8 +43,12 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ---------- state ----------
 let lang = pickLang(), t = T[lang], fmt = new Intl.NumberFormat(lang + "-CH");
-let core, titles = [], N = 0;
-let X, Z, R, P, D, NC, K, HK, PK, kids, ids, idIndex, depthMax = 0;
+let core, titles = [], N = 0, NCORE = 0, XN = [], tree = null, ingress = null, ingressWait = null;
+let X, Z, R, P, NC, K, HK, PK, kids, ids, idIndex;
+let CY, SPAN, ROOT = 0, mode = pickMode();   // centre height of each sphere; span width (tree); root of the view
+const LAY = {};                              // per view: positions, hierarchy, meshes
+let TN = [], TK = [];                        // tree node record / index of a global node
+let basisOf = [], dependents = [];           // tree: an act's stated bases; who states a node as basis
 let jAdj = [], wOut = [], wIn = [];        // judicial adjacency; legislative out/in
 let pairKind = new Map();                  // "a|b" -> 1 law, 2 practice, 3 both
 let sel = { i: -1, art: null }, hover = { i: -1, art: null };
@@ -45,6 +58,10 @@ const origin = new THREE.Vector3();
 let W = innerWidth, H = innerHeight, dpr = Math.min(devicePixelRatio || 1, 2);
 const num = (n) => fmt.format(n || 0);
 
+function pickMode() {
+  try { const s = localStorage.getItem("slm-mode"); if (s === "sr" || s === "tree") return s; } catch (e) { /* storage unavailable */ }
+  return "tree";
+}
 function pickLang() {
   try { const s = localStorage.getItem("slm-lang"); if (LANGS.includes(s)) return s; } catch (e) { /* storage unavailable */ }
   const n = (navigator.language || "de").slice(0, 2);
@@ -70,7 +87,7 @@ controls.zoomToCursor = true;
 controls.screenSpacePanning = false;
 controls.maxPolarAngle = Math.PI * 0.47;
 controls.minDistance = 1e-4;
-controls.maxDistance = 9000;
+controls.maxDistance = 1e5;
 controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
 controls.rotateSpeed = 0.6;
@@ -84,26 +101,38 @@ composer.addPass(new OutputPass());
 
 const stars = makeStars();
 scene.add(stars);
-let rings, orbs, wires, current, focusRibbons, dots = null, stems = null, dotsAct = -1, artH = null, artFade = 0;
+let rings, orbs, wires, current, focusRibbons, treeLines, dots = null, stems = null, dotsAct = -1, artH = null, artFade = 0;
 
 // ---------- data ----------
 async function boot() {
-  const [c, tt] = await Promise.all([getJSON("data/core.json"), getJSON(`data/titles.${lang}.json`)]);
-  core = c; titles = tt;
+  const [c, tt, tr] = await Promise.all([getJSON("data/core.json"), getJSON(`data/titles.${lang}.json`),
+    getJSON("data/tree.json").catch(() => null)]);
+  core = c; titles = tt; tree = tr;
   const nodes = core.nodes;
-  N = nodes.length;
-  X = new Float64Array(N); Z = new Float64Array(N); R = new Float64Array(N);
-  P = new Int32Array(N); D = new Int32Array(N); NC = new Float64Array(N); PK = new Int32Array(N).fill(-1);
-  K = new Array(N); HK = new Array(N); ids = new Array(N); kids = Array.from({ length: N }, () => []);
+  NCORE = nodes.length;
+  XN = [];
+  // tree nodes that are acts are the map's own nodes; the Constitution's structure is added
+  const tmap = tree ? tree.nodes.map((o) => (o.c >= 0 ? o.c : NCORE + XN.push(o) - 1)) : [];
+  N = NCORE + XN.length;
+  NC = new Float64Array(N); PK = new Int32Array(N).fill(-1);
+  K = new Array(N); HK = new Array(N); ids = new Array(N);
   idIndex = new Map();
-  for (let i = 0; i < N; i++) {
+  const sr = layoutArrays();
+  for (let i = 0; i < NCORE; i++) {
     const o = nodes[i];
-    X[i] = o.x; Z[i] = o.y; R[i] = o.r; P[i] = o.p; K[i] = o.k; NC[i] = o.n || 0; ids[i] = o.i;
+    sr.X[i] = o.x; sr.Z[i] = o.y; sr.R[i] = o.r; sr.P[i] = o.p; K[i] = o.k; NC[i] = o.n || 0; ids[i] = o.i;
+    sr.CY[i] = o.k === "act" || o.k === "bucket" ? o.r : 0;      // orbs stand on the plane
     if (o.pk !== undefined) PK[i] = o.pk;
     idIndex.set(o.i, i);
-    if (o.p >= 0) { kids[o.p].push(i); D[i] = D[o.p] + 1; depthMax = Math.max(depthMax, D[i]); }
-    HK[i] = hueKey(o, i);
+    if (o.p >= 0) sr.kids[o.p].push(i);
   }
+  XN.forEach((o, k) => { const i = NCORE + k; K[i] = o.k; ids[i] = o.i; NC[i] = o.dec || 0; idIndex.set(o.i, i); });
+  sr.root = 0;
+  LAY.sr = sr;
+  P = sr.P;
+  for (let i = 0; i < NCORE; i++) HK[i] = hueKey(nodes[i], i);
+  for (let i = NCORE; i < N; i++) HK[i] = "bv";
+  if (tree) buildTreeLayout(tmap); else mode = "sr";
   jAdj = Array.from({ length: N }, () => []);
   for (const [a, b, n, l] of core.edges) {
     jAdj[a].push([b, n, l]); jAdj[b].push([a, n, l]);
@@ -119,7 +148,10 @@ async function boot() {
   for (const a of wOut) a.sort((p, q) => q[1] - p[1]);
   for (const a of wIn) a.sort((p, q) => q[1] - p[1]);
 
+  const want = mode;
   buildScene();
+  useLayout(want);
+  writeInstances(); refreshStates();
   applyLang();
   buildLegend();
   resize();
@@ -129,6 +161,68 @@ async function boot() {
   if (h) select(h.i, h.art, true);
   else if (!seenIntro()) $("intro").hidden = false;
   requestAnimationFrame(loop);
+}
+
+function layoutArrays() {
+  return { X: new Float64Array(N), Z: new Float64Array(N), CY: new Float64Array(N), R: new Float64Array(N),
+    SPAN: new Float64Array(N), P: new Int32Array(N).fill(-1), kids: Array.from({ length: N }, () => []), root: 0 };
+}
+// The Stufenbau: positions from step 7; bases and dependents by global index.
+function buildTreeLayout(tmap) {
+  const L = layoutArrays();
+  TN = new Array(N); TK = new Int32Array(N).fill(-1);
+  tree.nodes.forEach((o, k) => {
+    const i = tmap[k];
+    L.X[i] = o.x; L.Z[i] = o.z; L.CY[i] = o.y; L.R[i] = o.r; L.SPAN[i] = o.w;
+    L.P[i] = o.p >= 0 ? tmap[o.p] : -1;
+    TN[i] = o; TK[i] = k;
+  });
+  for (let i = 0; i < N; i++) if (L.P[i] >= 0) L.kids[L.P[i]].push(i);
+  L.root = tmap[tree.root];
+  // acts hanging under each node (for the weight of the tree lines)
+  L.size = new Float64Array(N);
+  const order = [];
+  const st = [L.root];
+  while (st.length) { const j = st.pop(); order.push(j); for (const c of L.kids[j]) st.push(c); }
+  for (let k = order.length - 1; k >= 0; k--) { const j = order[k]; L.size[j] += K[j] === "act" ? 1 : 0; if (L.P[j] >= 0) L.size[L.P[j]] += L.size[j]; }
+  LAY.tree = L;
+  basisOf = Array.from({ length: N }, () => []); dependents = Array.from({ length: N }, () => []);
+  for (const [k, list] of Object.entries(tree.bases)) {
+    const i = tmap[+k];
+    for (const [tk, eids, clause, how, via, found, prim] of list) {
+      const j = tmap[tk];
+      basisOf[i].push({ j, eids, clause, how, via, found, prim });
+      // a basis in the Constitution names articles: each of them carries the act
+      const arts = K[j] === "bvart" || j === L.root ? eids.map((e) => idIndex.get("BV:" + e)).filter((x) => x !== undefined) : [];
+      if (arts.length) arts.forEach((a, n) => dependents[a].push({ i, eids, prim: prim && n === 0 }));
+      else dependents[j].push({ i, eids, prim });
+    }
+  }
+}
+const node = (i) => (i < NCORE ? core.nodes[i] : XN[i - NCORE]);
+const inLayout = (i) => i >= 0 && (i === ROOT || P[i] >= 0);
+const pickL = (m) => (m ? m[lang] || m.de || m.fr || m.it || "" : "");
+function useLayout(m) {
+  mode = m;
+  const L = LAY[m];
+  X = L.X; Z = L.Z; CY = L.CY; R = L.R; P = L.P; kids = L.kids; SPAN = L.SPAN; ROOT = L.root;
+  orbIndex = L.orbIndex; ringIndex = L.ringIndex; orbOf = L.orbOf; ringOf = L.ringOf; rings = L.rings; orbs = L.orbs;
+  for (const k of Object.keys(LAY)) { LAY[k].rings.visible = k === m; LAY[k].orbs.visible = k === m; }
+  if (treeLines) treeLines.visible = m === "tree";
+  document.body.dataset.mode = m;
+  try { localStorage.setItem("slm-mode", m); } catch (e) { /* storage unavailable */ }
+}
+// Switch views, keeping the selection where it exists in both.
+function setMode(m, refocus = true) {
+  if (m === mode || !LAY[m]) return;
+  closeArticles();
+  useLayout(m);
+  writeInstances(); refreshStates(); refreshHover();
+  treeDirty = true; edgesDirty = true;
+  buildLegend(); applyLang();
+  if (!refocus) return;
+  if (sel.i >= 0 && inLayout(sel.i)) { sel.art = null; refreshStates(); focusOn(sel.i); refreshPanel(); crumbs(); writeHash(); }
+  else { select(-1, null, false); home(); }
 }
 
 function hueKey(o, i) {
@@ -143,24 +237,32 @@ function hueKey(o, i) {
 // ---------- scene ----------
 let ringIndex = [], orbIndex = [], orbOf = null, ringOf = null;
 function buildScene() {
-  ringIndex = []; orbIndex = [];
-  for (let i = 1; i < N; i++) (K[i] === "act" || K[i] === "bucket" ? orbIndex : ringIndex).push(i);
-  orbOf = new Int32Array(N).fill(-1); ringOf = new Int32Array(N).fill(-1);
-  orbIndex.forEach((i, j) => (orbOf[i] = j));
-  ringIndex.forEach((i, j) => (ringOf[i] = j));
-  rings = makeShells(ringIndex.length);
-  orbs = makeOrbs(orbIndex.length);
-  wires = makeRibbons(); current = makeRibbons(); focusRibbons = makeRibbons();
-  scene.add(rings, orbs, wires, current, focusRibbons);
-  writeInstances();
-  refreshStates();
+  for (const m of Object.keys(LAY)) {
+    const L = LAY[m];
+    L.orbIndex = []; L.ringIndex = [];
+    if (m === "sr") { for (let i = 1; i < NCORE; i++) (K[i] === "act" || K[i] === "bucket" ? L.orbIndex : L.ringIndex).push(i); }
+    else for (let i = 0; i < N; i++) if (i === L.root || L.P[i] >= 0) L.orbIndex.push(i);
+    L.orbOf = new Int32Array(N).fill(-1); L.ringOf = new Int32Array(N).fill(-1);
+    L.orbIndex.forEach((i, j) => (L.orbOf[i] = j));
+    L.ringIndex.forEach((i, j) => (L.ringOf[i] = j));
+    L.rings = makeShells(m === "tree" ? tree.plates.length : L.ringIndex.length);   // tree: the floors
+    L.orbs = makeOrbs(L.orbIndex.length);
+    scene.add(L.rings, L.orbs);
+  }
+  wires = makeRibbons(); current = makeRibbons(); focusRibbons = makeRibbons(); treeLines = makeRibbons();
+  scene.add(wires, current, focusRibbons, treeLines);
+  for (const m of Object.keys(LAY)) { useLayout(m); writeInstances(); refreshStates(); }
 }
 
-// Containers are flat discs on the plane; acts are orbs standing on it.
+// SR view: containers are flat discs on the plane, acts are orbs standing on it.
+// Tree view: every node is an orb at its place in the cone; the floors are discs.
 function writeInstances() {
   const rc = rings.geometry.attributes.iCenter.array, rr = rings.geometry.attributes.iRadius.array,
     rcol = rings.geometry.attributes.iColor.array;
-  ringIndex.forEach((i, j) => {
+  if (mode === "tree") tree.plates.forEach(([y, r], j) => {
+    rc.set([-origin.x, y - origin.y, -origin.z], j * 3); rr[j] = r; rcol.set(PLATE, j * 3);
+  });
+  else ringIndex.forEach((i, j) => {
     rc.set([X[i] - origin.x, -origin.y, Z[i] - origin.z], j * 3);
     rr[j] = R[i];
     rcol.set(HUE[HK[i]] || HUE.n, j * 3);
@@ -168,11 +270,12 @@ function writeInstances() {
   const oc = orbs.geometry.attributes.iCenter.array, orr = orbs.geometry.attributes.iRadius.array,
     ocol = orbs.geometry.attributes.iColor.array;
   orbIndex.forEach((i, j) => {
-    oc.set([X[i] - origin.x, R[i] - origin.y, Z[i] - origin.z], j * 3);   // orbs stand on the plane
+    oc.set([X[i] - origin.x, CY[i] - origin.y, Z[i] - origin.z], j * 3);
     orr[j] = R[i];
     const h = HUE[HK[i]] || HUE.n;
-    ocol.set(core.nodes[i].reg ? h.map((c) => 0.35 * c + 0.3) : h, j * 3);  // earlier act or edition: paler
+    ocol.set(node(i).reg ? h.map((c) => 0.35 * c + 0.3) : h, j * 3);  // earlier act or edition: paler
   });
+  treeDirty = true;
   for (const m of [rings, orbs]) {
     m.geometry.attributes.iCenter.needsUpdate = true;
     m.geometry.attributes.iRadius.needsUpdate = true;
@@ -195,11 +298,16 @@ function refreshStates() {
       for (const [j] of wOut[i]) addPath(j);
       for (const [j] of wIn[i]) addPath(j);
     }
+    if (mode === "tree") {             // every stated basis, and every act stating this one
+      for (const b of basisOf[sel.i] || []) addPath(b.j);
+      for (const d of dependents[sel.i] || []) addPath(d.i);
+    }
   }
   function addPath(j) { while (j >= 0 && !related.has(j)) { related.add(j); j = P[j]; } }
   const maxN = Math.log10(NC[0] + 1);
   const rs = rings.geometry.attributes.iState.array;
-  ringIndex.forEach((i, j) => {
+  if (mode === "tree") tree.plates.forEach((pl, j) => rs.set([related ? 0.3 : 0.55, 1, 0, 0], j * 4));
+  else ringIndex.forEach((i, j) => {
     const on = !related || related.has(i);
     const depthA = K[i] === "domain" ? 0.9 : 1.0;
     rs.set([on ? depthA : 0.18, 1, 0, 0], j * 4);
@@ -207,14 +315,14 @@ function refreshStates() {
   const os = orbs.geometry.attributes.iState.array;
   orbIndex.forEach((i, j) => {
     const on = !related || related.has(i);
-    const o = core.nodes[i];
-    let b = Math.log10(NC[i] + 1) / maxN;
+    const o = node(i);
+    let b = i >= NCORE && K[i] !== "bvart" ? 0.3 : Math.log10(NC[i] + 1) / maxN;   // the BV's titles and chapters: junctions
     if (period && o.ys) b *= Math.sqrt(share(o));
     os.set([on ? 1 : 0.16, b, 0, i === sel.i && !sel.art ? 0.38 : (i === hover.i ? 0.3 : 0)], j * 4);
   });
   rings.geometry.attributes.iState.needsUpdate = true;
   orbs.geometry.attributes.iState.needsUpdate = true;
-  edgesDirty = true;
+  edgesDirty = true; treeDirty = true;
 }
 function subtree(i) {
   const out = [i], st = [i];
@@ -238,7 +346,7 @@ function rebase(nx, nz) {
   if (anim) { anim.shift(dx, dz); }
   writeInstances();
   if (dots) for (const m of [dots, stems]) m.position.set(X[dotsAct] - origin.x, 0, Z[dotsAct] - origin.z);
-  edgesDirty = true;
+  edgesDirty = true; treeDirty = true;
 }
 const worldTarget = () => ({ x: controls.target.x + origin.x, z: controls.target.z + origin.z });
 
@@ -309,6 +417,13 @@ function interpolateZoom(p0, p1) {   // van Wijk & Nuij smooth zoom (d3-interpol
   return i;
 }
 function home(animate = true) {
+  if (mode === "tree") {               // the whole cone, seen from above at an angle
+    const ys = tree.plates.map((pl) => pl[0]), rmax = Math.max(...tree.plates.map((pl) => pl[1]));
+    const ytop = CY[ROOT] + R[ROOT], ybot = Math.min(...ys), phi = W <= 760 ? 0.7 : 1.2;
+    const extent = 0.86 * Math.max(rmax * (W <= 760 ? 1 : 0.8), 0.5 * ((ytop - ybot) * Math.sin(phi) + 2 * rmax * Math.cos(phi)));
+    flyTo(0, 0, distanceToFit(extent), phi, animate, (ytop + ybot) / 2);
+    return;
+  }
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   for (const j of kids[0]) { x0 = Math.min(x0, X[j] - R[j]); x1 = Math.max(x1, X[j] + R[j]); z0 = Math.min(z0, Z[j] - R[j]); z1 = Math.max(z1, Z[j] + R[j]); }
   const r = Math.max(x1 - x0, z1 - z0) / 2;
@@ -316,6 +431,11 @@ function home(animate = true) {
   flyTo((x0 + x1) / 2, (z0 + z1) / 2 + r * 0.12, distanceToFit(r) * (W <= 760 ? 0.92 : 0.8), polar, animate);
 }
 function focusOn(i, animate = true) {
+  if (mode === "tree") {               // the node with the span of what rests on it
+    const span = Math.max(R[i] * 5, (SPAN[i] || 0) * 0.55, tree.method.C * 0.015);
+    flyTo(X[i], Z[i], distanceToFit(span), W <= 760 ? 0.5 : 0.92, animate, CY[i]);
+    return;
+  }
   // an act is framed with room around it, so its links and partners stay in view;
   // zooming further dissolves it into its articles
   const isAct = K[i] === "act" || K[i] === "bucket";
@@ -327,8 +447,78 @@ function focusOn(i, animate = true) {
 let edgesDirty = true, lastEdgeBuild = 0, lastEntries = [], hoverLink = -1, buildMs = 0;
 const pv = new THREE.Vector3();
 function projectedPx(i) {
-  const d = camera.position.distanceTo(pv.set(X[i] - origin.x, K[i] === "act" ? R[i] - origin.y : 0, Z[i] - origin.z));
+  const d = camera.position.distanceTo(pv.set(X[i] - origin.x, CY[i] - origin.y, Z[i] - origin.z));
   return R[i] * pxPerUnitAt(d);
+}
+function spanPx(i) {   // tree: the width on screen of what hangs under a node
+  const d = camera.position.distanceTo(pv.set(X[i] - origin.x, CY[i] - origin.y, Z[i] - origin.z));
+  return SPAN[i] * pxPerUnitAt(d);
+}
+function treeFront(i) { let j = i; while (j !== ROOT && P[j] >= 0 && spanPx(j) < SPAN_PX) j = P[j]; return j; }
+// Tree: the path through the common basis, lifted (case law) or lowered (legislation).
+function controlPointsTree(a, b, lift) {
+  const A = ancestorsOf(a), B = ancestorsOf(b);
+  const setB = new Map(B.map((n, k) => [n, k]));
+  let ia = 0;
+  while (ia < A.length && !setB.has(A[ia])) ia++;
+  const lca = A[ia] ?? ROOT, ib = setB.get(lca) ?? B.length - 1;
+  const nodes = [...A.slice(0, ia + 1), ...B.slice(0, ib).reverse()];
+  const off = (lift ? 1 : -1) * tree.method.C * 0.012;
+  const pts = nodes.map((n, k) => [X[n] - origin.x, CY[n] - origin.y + (k === 0 || k === nodes.length - 1 ? 0 : off), Z[n] - origin.z]);
+  if (pts.length === 2) pts.splice(1, 0, pts[0].map((v, d) => (v + pts[1][d]) / 2 + (d === 1 ? off * 2 : 0)));
+  const n = pts.length - 1, p0 = pts[0], pn = pts[n];
+  return pts.map((p, k) => k === 0 || k === n ? p : p.map((v, d) => BETA * v + (1 - BETA) * (p0[d] + (k / n) * (pn[d] - p0[d]))));
+}
+// Tree links (place in the tree): a radial elbow from parent to child, as in a radial dendrogram.
+function radialLink(p, c, samples = 14) {
+  const r0 = Math.hypot(X[p], Z[p]), r1 = Math.hypot(X[c], Z[c]), rm = (r0 + r1) / 2;
+  const a1 = Math.atan2(Z[c], X[c]), a0 = r0 > 1e-6 ? Math.atan2(Z[p], X[p]) : a1;
+  const q = [[X[p], CY[p], Z[p]], [rm * Math.cos(a0), CY[p], rm * Math.sin(a0)], [rm * Math.cos(a1), CY[c], rm * Math.sin(a1)], [X[c], CY[c], Z[c]]];
+  const out = new Float32Array(samples * 3);
+  for (let s = 0; s < samples; s++) {
+    const u = s / (samples - 1), w = [(1 - u) ** 3, 3 * u * (1 - u) ** 2, 3 * u * u * (1 - u), u ** 3];
+    for (let d = 0; d < 3; d++) out[s * 3 + d] = w[0] * q[0][d] + w[1] * q[1][d] + w[2] * q[2][d] + w[3] * q[3][d] - (d === 0 ? origin.x : d === 1 ? origin.y : origin.z);
+  }
+  return out;
+}
+// Art. 51 BV → the 26 cantonal constitutions: down the central axis, then out to each canton.
+function axisLink(p, c, samples = 18) {
+  const C = tree.method.C;
+  const q = [[X[p], CY[p], Z[p]], [0, CY[p] - 0.2 * C, 0], [X[c] * 0.2, CY[c] + 0.22 * C, Z[c] * 0.2], [X[c], CY[c], Z[c]]];
+  const out = new Float32Array(samples * 3);
+  for (let s = 0; s < samples; s++) {
+    const u = s / (samples - 1), w = [(1 - u) ** 3, 3 * u * (1 - u) ** 2, 3 * u * u * (1 - u), u ** 3];
+    for (let d = 0; d < 3; d++) out[s * 3 + d] = w[0] * q[0][d] + w[1] * q[1][d] + w[2] * q[2][d] + w[3] * q[3][d] - (d === 0 ? origin.x : d === 1 ? origin.y : origin.z);
+  }
+  return out;
+}
+const LV = (i) => (TN[i] ? TN[i].l : -1);
+let treeDirty = true;
+function writeTreeLines() {
+  treeDirty = false;
+  if (mode !== "tree") return;
+  const lines = [], chain = new Set();
+  if (sel.i >= 0) { let j = sel.i; while (j >= 0) { chain.add(j); j = P[j]; } for (const d of subtree(sel.i)) chain.add(d); }
+  const size = LAY.tree.size, top = Math.log10(size[ROOT] + 1);
+  for (const i of orbIndex) {
+    const p = P[i];
+    if (p < 0) continue;
+    const on = chain.has(i) && chain.has(p);
+    const crown = K[i] !== "act";
+    const w = Math.log10(size[i] + 1) / top;          // a branch is as strong as what hangs from it
+    const lv = LV(i);
+    if (lv === 4) {                                     // constitutional link, not an Ingress: the taproot
+      lines.push({ pts: axisLink(p, i), width: on ? 2.6 : 1.1 + 2.6 * w, color: HUE.bv, alpha: on ? 0.95 : related ? 0.05 : 0.22 + 0.4 * w, flow: on ? 0.6 : 0.2 });
+      continue;
+    }
+    lines.push({ pts: radialLink(p, i), width: on ? (lv === 5 ? 1.1 : 2.4) : lv === 5 ? 0.6 : 0.7 + 3.6 * w, color: crown ? HUE.bv : HUE[HK[i]] || HUE.n,
+      alpha: on ? (lv === 5 ? 0.3 : 0.9) : related ? 0.04 : lv === 5 ? 0.12 : 0.16 + 0.5 * w, flow: on ? 0.6 : related || lv === 5 ? 0 : 0.18 });   // pulses run downwards: delegation
+  }
+  if (sel.i >= 0) {                    // further bases of the selection, and acts naming it as a further basis
+    for (const b of basisOf[sel.i] || []) if (!b.prim) lines.push({ pts: radialLink(b.j, sel.i), width: 1.5, color: BASIS2, alpha: 0.8, flow: 0.5 });
+    for (const d of dependents[sel.i] || []) if (!d.prim) lines.push({ pts: radialLink(sel.i, d.i), width: 1.2, color: BASIS2, alpha: 0.6, flow: 0.5 });
+  }
+  setRibbons(treeLines, lines);
 }
 // The node an act's link attaches to at the current zoom: the first ancestor whose
 // children are too small to tell apart (so links merge into readable bundles).
@@ -388,17 +578,18 @@ function buildEdges() {
     return v;
   };
   lastSig = openSignature();
-  const focus = sel.i >= 0 ? new Set(subtree(sel.i)) : null;
+  const focus = sel.i < 0 ? null : mode === "tree" ? new Set(K[sel.i] === "act" ? [sel.i] : []) : new Set(subtree(sel.i));
   const agg = new Map();    // "fa|fb|layer" -> weight
-  const fcache = new Map();
-  const front = (a) => { let f = fcache.get(a); if (f === undefined) { f = frontierOf(a, open); fcache.set(a, f); } return f; };
+  const fcache = new Map(), isTree = mode === "tree";
+  const front = (a) => { let f = fcache.get(a); if (f === undefined) { f = isTree ? treeFront(a) : frontierOf(a, open); fcache.set(a, f); } return f; };
   const add = (a, b, w, layer) => {
+    if (isTree && (!inLayout(a) || !inLayout(b))) return;      // an act outside today's federal tree
     const fa = focus && focus.has(a) ? a : front(a), fb = focus && focus.has(b) ? b : front(b);
     if (fa === fb) return;
     const key = layer === 1 ? fa + "|" + fb + "|1" : (fa < fb ? fa + "|" + fb : fb + "|" + fa) + "|2";
     agg.set(key, (agg.get(key) || 0) + w);
   };
-  const inFocus = (a, b) => !focus || focus.has(a) || focus.has(b);
+  const inFocus = (a, b) => !sel.art && (!focus || focus.has(a) || focus.has(b));   // an article: only its own links
   if (showCurrent) core.edges.forEach(([a, b, n], k) => {
     if (!inFocus(a, b)) return;
     let w = n;
@@ -424,12 +615,14 @@ function buildEdges() {
     const strong = Math.log10(w + 1) / Math.log10(maxW[layer] + 1), s3 = strong ** 3;
     let alpha = focus ? 0.22 + 0.4 * strong : 0.07 + 0.4 * s3;
     let width = focus ? 1 + 3.2 * strong ** 2 : 0.9 + 4.8 * s3;
+    if (isTree) { alpha *= focus ? 0.6 : 0.55; width *= 0.8; }      // the tree lines carry the picture
     if (focus && layer === 1) { alpha = 0.5 + 0.35 * strong; width = 1.6 + 2.2 * strong; }   // legislative weights are mostly 1
     if (hl) { if (hl.has(fa) || hl.has(fb)) { alpha = 0.95; width += 2; } else alpha *= 0.2; }
+    const cpf = isTree ? controlPointsTree : controlPoints;
     if (layer === 2) {
-      lines.current.push({ pts: bspline(controlPoints(fa, fb, true), SAMPLES), width, color: both ? BOTH : CURRENT, alpha, flow: 0.25 });
+      lines.current.push({ pts: bspline(cpf(fa, fb, true), SAMPLES), width, color: both ? BOTH : CURRENT, alpha, flow: 0.25 });
     } else {
-      lines.wire.push({ pts: bspline(controlPoints(fa, fb, false), SAMPLES), width: width * 1.1, color: both ? BOTH : WIRE, alpha, flow: 1, taper: true });
+      lines.wire.push({ pts: bspline(cpf(fa, fb, false), SAMPLES), width: width * 1.1, color: both ? BOTH : WIRE, alpha, flow: 1, taper: true });
     }
   }
   setRibbons(current, lines.current);
@@ -459,7 +652,11 @@ function buildEdges() {
 // origin moves): rebuilding is skipped while the set of open containers is the same.
 let lastSig = "";
 function openSignature() {
-  const out = [origin.x.toPrecision(8), origin.z.toPrecision(8)], st = [0];
+  const out = [origin.x.toPrecision(8), origin.z.toPrecision(8)], st = [ROOT];
+  if (mode === "tree") {
+    while (st.length) { const n = st.pop(); if (n !== ROOT && spanPx(n) < SPAN_PX) continue; out.push(n); for (const k of kids[n]) st.push(k); }
+    return out.join(",");
+  }
   while (st.length) {
     const n = st.pop();
     if (K[n] === "act" || K[n] === "bucket" || (n !== 0 && projectedPx(n) <= OPEN_PX)) continue;
@@ -534,6 +731,17 @@ function pick(px, py) {
   const v = new THREE.Vector2((px / W) * 2 - 1, -(py / H) * 2 + 1);
   ray.setFromCamera(v, camera);
   const o = ray.ray.origin, d = ray.ray.direction;
+  if (mode === "tree") {               // the node under the pointer, nearest the eye; small ones get 6 px
+    let best = -1, key = Infinity;
+    for (const i of orbIndex) {
+      const [sx, sy, sz] = toScreen(X[i], CY[i], Z[i]);
+      if (sz > 1) continue;
+      const rpx = projectedPx(i), dd = Math.hypot(sx - px, sy - py);
+      const k = dd <= rpx ? sz : dd <= 6 ? 2 + dd : Infinity;
+      if (k < key) { key = k; best = i; }
+    }
+    return { i: best, art: null };
+  }
   // 1. orbs (acts): nearest sphere hit among visible ones
   let best = -1, bestT = Infinity;
   const c = new THREE.Vector3();
@@ -609,8 +817,15 @@ function toScreen(x, y, z) {
 }
 function updateLabels() {
   const cand = [];
-  const st = [0];
+  const st = mode === "tree" ? [] : [0];
   const camD = (i) => projectedPx(i);
+  if (mode === "tree") for (const i of orbIndex) {
+    const px = camD(i), k = K[i];
+    if (k === "act") { if (px > 3.5) cand.push([i, px]); }
+    else if (k === "bvart") { if (px > 3 && spanPx(i) > 22) cand.push([i, px * 0.8]); }
+    else if (k === "title" || k === "chapter" || k === "section") { const sp = spanPx(i); if (sp > (k === "title" ? 90 : 160)) cand.push([i, sp * 0.1]); }
+    else if (spanPx(i) > 50) cand.push([i, 25]);
+  }
   while (st.length) {
     const i = st.pop();
     const isOrb = K[i] === "act" || K[i] === "bucket";
@@ -632,12 +847,14 @@ function updateLabels() {
   const fits = (b) => { for (const o of boxes) if (b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]) return false; boxes.push(b); return true; };
   for (const [i, px] of cand) {
     if (k >= 90 || used.has(i)) continue;
-    const isOrb = K[i] === "act" || K[i] === "bucket";
+    const isOrb = mode === "tree" || K[i] === "act" || K[i] === "bucket";
+    if (mode === "tree" && !inLayout(i)) continue;
     if (related && !related.has(i) && px < 1e5) continue;
-    const [sx, sy, sz] = isOrb ? toScreen(X[i], 2 * R[i], Z[i]) : toScreen(X[i], 0, Z[i] - R[i] * 0.93);
+    const [sx, sy, sz] = isOrb ? toScreen(X[i], CY[i] + R[i], Z[i]) : toScreen(X[i], 0, Z[i] - R[i] * 0.93);
     if (sz > 1) continue;
     const text = isOrb ? label(i) : areaLabel(i);
-    const size = isOrb ? Math.max(11, Math.min(22, Math.sqrt(px) * 2.2)) : (K[i] === "domain" ? 19 : Math.max(11, Math.min(16, Math.sqrt(px) * 1.2)));
+    const size = K[i] === "title" ? 13 : K[i] === "chapter" || K[i] === "section" ? 11.5 : K[i] === "bvart" ? 11 :
+      isOrb ? Math.max(11, Math.min(22, Math.sqrt(px) * 2.2)) : (K[i] === "domain" ? 19 : Math.max(11, Math.min(16, Math.sqrt(px) * 1.2)));
     const w = Math.min(Math.min(text.length, 46) * size * 0.56, 300), h = size * 1.3;
     if (sx - w / 2 < 4 || sx + w / 2 > W - 4 || sy - h < 4 || sy > H - 4) continue;
     const box = [sx - w / 2, sy - h - 4, sx + w / 2, sy];
@@ -647,11 +864,27 @@ function updateLabels() {
     el.textContent = text.length > 46 ? text.slice(0, 45) + "…" : text;
     el.style.transform = `translate(${sx.toFixed(1)}px, ${(sy - 4).toFixed(1)}px) translate(-50%, -100%)`;
     el.style.fontSize = size.toFixed(1) + "px";
-    el.dataset.kind = isOrb ? "act" : K[i];
+    el.dataset.kind = isOrb && K[i] === "act" ? "act" : K[i];
     el.style.setProperty("--hue", `rgb(${(HUE[HK[i]] || HUE.n).map((c) => Math.round(150 + 105 * c)).join(",")})`);
     el.classList.toggle("on", i === sel.i);
     el.classList.remove("edge");
     el.hidden = false;
+  }
+  // tree: the name of each floor, on its rim nearest the eye
+  if (mode === "tree") {
+    const ca = Math.atan2(camera.position.z + origin.z, camera.position.x + origin.x);
+    for (const [y, r, key] of tree.plates) {
+      const [sx, sy, sz] = toScreen(r * Math.cos(ca), y, r * Math.sin(ca));
+      if (sz > 1 || sx < 60 || sx > W - 60 || sy < 70 || sy > H - 30) continue;
+      const el = labelEl(k++);
+      const nn = key === "lvBV" ? null : tree.method.by_level[key.slice(2)];
+      el.textContent = t[key] + (nn ? ` · ${num(nn)}` : "");
+      el.style.transform = `translate(${sx.toFixed(1)}px, ${(sy + 6).toFixed(1)}px) translate(-50%, 0)`;
+      el.style.fontSize = "11.5px";
+      el.dataset.kind = "plate";
+      el.classList.remove("on", "edge");
+      el.hidden = false;
+    }
   }
   // article numbers when the floor plan is close enough to read
   if (dots) {
@@ -689,7 +922,8 @@ function updateLabels() {
       .filter((j) => j >= 0 && j !== sel.i);
     const placed = [];
     for (const j of list) {
-      const [sx, sy, sz] = toScreen(X[j], K[j] === "act" ? R[j] : 0, Z[j]);
+      if (!inLayout(j)) continue;
+      const [sx, sy, sz] = toScreen(X[j], CY[j], Z[j]);
       if (sz < 1 && sx > x0 && sx < x1 && sy > y0 && sy < y1) continue;
       let dx = sx - cx, dy = sy - cy;
       if (sz > 1) { dx = -dx; dy = -dy; }
@@ -715,7 +949,11 @@ function updateLabels() {
   for (let j = k; j < pool.length; j++) pool[j].hidden = true;
 }
 function label(i) {
-  const o = core.nodes[i];
+  const o = node(i);
+  if (o.k === "bvart") return `${t.art} ${o.n}`;
+  if (o.k === "title" || o.k === "chapter" || o.k === "section") return `${pickL(o.num).replace(/:$/, "")} ${pickL(o.h)}`.trim();
+  if (o.k === "abv") return t.abv;
+  if (o.k === "tgroup") return o.i === "TREE:int" ? t.tgIntl : t.tgNone;
   if (o.k === "root") return t.root;
   if (o.k === "domain") return t[o.i];
   if (o.k === "canton") return CANTON[o.c] ? CANTON[o.c][LANGS.indexOf(lang)] : o.c;
@@ -728,7 +966,7 @@ function label(i) {
   return title(i) || o.sr || o.i;
 }
 function areaLabel(i) {
-  const o = core.nodes[i];
+  const o = node(i);
   if (o.k === "group") return o.sr;                     // the act inside carries the name
   return (o.k === "area" && o.sr ? o.sr + "  " : "") + label(i);
 }
@@ -754,7 +992,8 @@ function loop(now) {
   }
   const pxScale = (H / 2) / Math.tan((camera.fov * Math.PI) / 360);
   for (const m of [rings, orbs]) { m.material.uniforms.uPixelScale.value = pxScale; }
-  for (const m of [wires, current, focusRibbons]) {
+  if (treeDirty) writeTreeLines();
+  for (const m of [wires, current, focusRibbons, treeLines]) {
     m.material.uniforms.uTime.value = now / 1000;
     m.material.uniforms.uViewport.value.set(W / 2, H / 2);
   }
@@ -782,6 +1021,7 @@ function loop(now) {
   composer.render(dt);
 }
 function updateOpenAct() {
+  if (mode === "tree") return;         // the skyline lives on the SR map
   // the largest act on screen whose articles are worth showing
   let best = -1, bestPx = ART_PX * 0.75;
   const cand = sel.i >= 0 && K[sel.i] === "act" ? [sel.i] : [];
@@ -848,9 +1088,11 @@ function showTip(px, py, h) {
     head = `${t.art} ${a[1]} ${label(h.i)}${hh ? " · " + hh : ""}`;
     line = t.decN(num(a[5]));
   } else {
-    const o = core.nodes[h.i];
-    head = K[h.i] === "act" ? label(h.i) + (title(h.i) ? " · " + title(h.i) : "") : areaLabel(h.i);
+    const o = node(h.i);
+    head = K[h.i] === "act" ? label(h.i) + (title(h.i) ? " · " + title(h.i) : "") :
+      K[h.i] === "bvart" ? `${label(h.i)} ${t.bv}${pickL(o.h) ? " · " + pickL(o.h) : ""}` : areaLabel(h.i);
     line = t.decN(num(NC[h.i]));
+    if (mode === "tree" && dependents[h.i] && dependents[h.i].length) line += ` · ${t.restN(num(dependents[h.i].length))}`;
     const nl = wOut[h.i].length + wIn[h.i].length, nc = jAdj[h.i].length;
     if (o.k === "act" && (nl || nc)) line += ` · ${t.lawWiring} ${nl} · ${t.practice} ${nc}`;
   }
@@ -881,6 +1123,10 @@ addEventListener("keydown", (e) => {
 
 // ---------- selection ----------
 function select(i, art = null, animate = true) {
+  if (i >= 0 && (art || !inLayout(i))) {      // an article, or an act outside the tree: the SR map shows it
+    if (mode === "tree" && LAY.sr && i < NCORE) setMode("sr", false);
+  }
+  if (i >= NCORE && mode !== "tree") setMode("tree", false);
   if (i < 0) {
     const was = !$("panel").hidden;
     sel = { i: -1, art: null }; $("panel").hidden = true; $("tools").classList.remove("raised");
@@ -926,10 +1172,10 @@ function crumbs() {
   path.forEach((j, n) => {
     if (n) el.append(Object.assign(document.createElement("span"), { textContent: "›" }));
     const b = document.createElement("button");
-    const o = core.nodes[j];
-    b.textContent = o.k === "area" || o.k === "group" ? o.sr : label(j);
+    const o = node(j);
+    b.textContent = o.k === "area" || o.k === "group" ? o.sr : o.k === "title" || o.k === "chapter" || o.k === "section" ? pickL(o.num).replace(/:$/, "") : label(j);
     b.title = label(j);
-    b.onclick = () => (j === 0 ? goHome() : select(j));
+    b.onclick = () => (j === 0 && mode === "sr" ? goHome() : select(j));
     el.append(b);
   });
   if (sel.art) {
@@ -1003,9 +1249,123 @@ function interdependencies(i) {
   }
   return html;
 }
+// The legal basis of an act, as its Ingress states it, and the acts resting on it.
+const LEVEL = (i) => (TN[i] ? TN[i].l : -1);
+function ensureIngress() {
+  if (ingress || ingressWait || !tree) return;
+  ingressWait = getJSON("data/ingress.json").then((d) => { ingress = d; ingressWait = null; refreshPanel(); }).catch(() => { ingressWait = null; });
+}
+function artNames(eids) { return eids.map((e) => e.replace(/^art_/, "").replace(/_/g, "")); }
+function basisSections(i) {
+  if (!tree || !TN[i]) return "";
+  if (TN[i].l === 4) {                 // a cantonal constitution
+    const art51 = idIndex.get("BV:art_51");
+    const acts = kids[i] && mode === "tree" ? kids[i] : (LAY.tree.kids[i] || []);
+    const list = acts.slice().sort((a, b) => NC[b] - NC[a]);
+    return `<section><h3><i class="sw tree"></i>${esc(t.basisHead)}</h3><ul class="list"><li><button class="k link" data-sel="${art51}"><i class="sw tree"></i>${esc(t.art)} 51 ${esc(t.bv)}</button><span class="d">${esc(t.kvBasis)}</span></li></ul><p class="note">${esc(t.kvBasisNote)}</p></section>`
+      + (list.length ? `<section><h3><i class="sw tree"></i>${esc(t.kvActs)} · ${num(list.length)}</h3><ul class="list">${list.slice(0, 50).map((c) =>
+        `<li><button class="k link" data-sel="${c}">${esc(label(c))}</button><span class="v">${num(NC[c])}</span><span class="d">${esc(title(c))}</span></li>`).join("")}</ul>${list.length > 50 ? `<p class="note">+ ${num(list.length - 50)}</p>` : ""}</section>` : "");
+  }
+  if (TN[i].l === 5) {                 // a cantonal act: its place, not its basis
+    const kv = LAY.tree.P[i];
+    return `<section><h3><i class="sw tree"></i>${esc(t.basisHead)}</h3><ul class="list"><li><button class="k link" data-sel="${kv}"><i class="sw tree2"></i>${esc(label(kv))}</button><span class="d">${esc(title(kv))}</span></li></ul><p class="note">${esc(t.cantonalPlace(TN[i].ct))}</p></section>`;
+  }
+  ensureIngress();
+  const bs = basisOf[i] || [], deps = dependents[i] || [];
+  const ing = ingress ? ingress[TK[i]] : null;
+  let html = `<section><h3><i class="sw tree"></i>${esc(t.basisHead)}</h3>`;
+  if (TN[i].by) html += `<p class="note">${esc(t.enactedBy)}: ${esc(ing && ing[0] ? ing[0] : t["by_" + TN[i].by] || TN[i].by)}</p>`;
+  if (bs.length) {
+    html += `<ul class="list">${bs.map((b) => {
+      const isBV = K[b.j] === "bvart" || b.j === LAY.tree.root || K[b.j] === "abv";
+      const names = artNames(b.eids);
+      let head;
+      if (K[b.j] === "abv") head = t.abv;
+      else if (isBV) head = names.length ? `${t.art} ${names.join(", ")} ${t.bv}` : t.bvFull;
+      else head = `${names.length ? t.art + " " + names.join(", ") + " " : ""}${label(b.j)}`;
+      const tags = [b.prim ? t.basisPlace : "", b.how === "exec" ? t.basisExec : "", b.via === "aBV→BV" ? t.basisAbv : "",
+        b.found ? "" : t.basisNotFound].filter(Boolean).join(" · ");
+      const target = isBV && names.length ? idIndex.get("BV:" + b.eids[0]) ?? b.j : b.j;
+      return `<li><button class="k link" data-sel="${target}"><i class="sw ${b.prim ? "tree" : "tree2"}"></i>${esc(head)}</button><span class="v">${esc(tags)}</span>${b.clause ? `<span class="d">«${esc(b.clause)}»</span>` : ""}</li>`;
+    }).join("")}</ul>`;
+  } else html += `<p class="note">${esc(t.noBasis)}</p>`;
+  if (ing && ing[1]) html += `<details class="ingress"><summary>${esc(t.ingress)}</summary><blockquote lang="de">${esc(ing[1])}</blockquote></details>`;
+  html += "</section>";
+  if (deps.length) html += delegationNorms(i, deps) + dependentsSection(deps, t.restHead);
+  return html;
+}
+// The provisions of this act that other acts name as their basis (in effect its delegation norms).
+function artKey(e) {
+  const m = e.match(/(disp_[^/]+\/)?art_(\d+)(?:_([a-z]))?(?:_([a-z]+))?/);
+  return m ? (m[1] ? 1e7 : 0) + +m[2] * 1000 + (m[3] ? (m[3].charCodeAt(0) - 96) * 30 : 0) + (m[4] ? m[4].length : 0) : 1e9;
+}
+function delegationNorms(i, deps) {
+  const by = new Map();
+  for (const d of deps) for (const e of d.eids || []) { if (!by.has(e)) by.set(e, new Set()); by.get(e).add(d.i); }
+  if (!by.size) return "";
+  const keys = [...by.keys()].sort((a, b) => artKey(a) - artKey(b));
+  return `<section><h3><i class="sw tree"></i>${esc(t.delegHead)} · ${num(keys.length)}</h3><ul class="list">${keys.slice(0, 60).map((e) => {
+    const name = (e.startsWith("disp_") ? "SchlT/ÜB " : "") + e.replace(/^.*art_/, "").replace(/_/g, "");
+    const acts = [...by.get(e)].sort((a, b) => NC[b] - NC[a]);
+    return `<li><button class="k link" data-sel="${i}" data-art="${esc(e)}">${esc(t.art)} ${esc(name)}</button><span class="v">${num(acts.length)}</span><span class="d">${acts.slice(0, 8).map((j) => `<button class="link" data-sel="${j}">${esc(label(j))}</button>`).join(", ")}${acts.length > 8 ? " …" : ""}</span></li>`;
+  }).join("")}</ul>${keys.length > 60 ? `<p class="note">+ ${num(keys.length - 60)}</p>` : ""}</section>`;
+}
+function dependentsSection(deps, head) {
+  const by = new Map();
+  for (const d of deps) { const l = LEVEL(d.i); if (!by.has(l)) by.set(l, []); by.get(l).push(d); }
+  let html = `<section><h3><i class="sw tree"></i>${esc(head)} · ${num(deps.length)}</h3>`;
+  for (const l of [...by.keys()].sort()) {
+    const list = by.get(l).sort((a, b) => NC[b.i] - NC[a.i]);
+    html += `<p class="note">${esc(t["lv" + l] || "")}</p><ul class="list">${list.slice(0, 40).map((d) => {
+      const names = artNames(d.eids || []);
+      return `<li><button class="k link" data-sel="${d.i}"><i class="sw ${d.prim ? "tree" : "tree2"}"></i>${esc(label(d.i))}</button><span class="v">${names.length ? esc(t.art + " " + names.slice(0, 4).join(", ") + (names.length > 4 ? " …" : "")) : ""}</span><span class="d">${esc(title(d.i))}</span></li>`;
+    }).join("")}</ul>${list.length > 40 ? `<p class="note">+ ${num(list.length - 40)}</p>` : ""}`;
+  }
+  return html + "</section>";
+}
+function treePanel(i) {                // the Constitution's own nodes and the two sectors
+  const o = node(i);
+  let eyebrow = t.bvFull, h2 = label(i), sub = "", html = "";
+  const chain = [];
+  let j = P[i];
+  while (j >= 0 && j !== ROOT) { chain.unshift(pickL(node(j).num).replace(/:$/, "")); j = P[j]; }
+  if (chain.length) eyebrow += " · " + chain.join(" · ");
+  if (o.k === "bvart") {
+    h2 = `${t.art} ${o.n} ${t.bv}`;
+    sub = pickL(o.h);
+    html += countBlock(o.dec || 0, t.citeArt, null, null);
+    if (o.rep) html += `<p class="note"><span class="pill">${esc(t.repealed)}</span></p>`;
+    const deps = dependents[i] || [];
+    const kvs = kids[i].filter((c) => LV(c) === 4);
+    if (kvs.length) html += `<section><h3><i class="sw tree"></i>${esc(t.lv4)} · ${num(kvs.length)}</h3><p class="note">${esc(t.kvBasisNote)}</p><ul class="list">${kvs.map((c) =>
+      `<li><button class="k link" data-sel="${c}">${esc(label(c))}</button><span class="v">${num(NC[c])}</span><span class="d">${esc(title(c))}</span></li>`).join("")}</ul></section>`;
+    html += deps.length ? dependentsSection(deps, t.restHeadArt) : kvs.length ? "" : `<p class="note">${esc(t.noRest)}</p>`;
+    const bv = LAY.tree.root, ob = node(bv);
+    html += `<section><button class="link" data-sel="${bv}" data-art="${esc(o.i.slice(3))}">${esc(t.toSkyline)}</button></section>`;
+    if (ob.e) html += `<section><a class="link" href="${esc(ob.e + "/" + lang + "#" + o.i.slice(3))}" target="_blank" rel="noopener">${esc(t.official)} ↗</a></section>`;
+  } else if (o.k === "abv" || o.k === "tgroup") {
+    eyebrow = t.viewTree;
+    html += `<p class="note">${esc(o.k === "abv" ? t.abvNote : o.i === "TREE:int" ? t.tgIntlNote : t.tgNoneNote)}</p>`;
+    const ch = kids[i].slice().sort((a, b) => NC[b] - NC[a]);
+    if (o.k === "abv") html += dependentsSection(dependents[i] || [], t.restHead);
+    else html += `<section><ul class="list">${ch.slice(0, 60).map((c) => `<li><button class="k link" data-sel="${c}">${esc(label(c))}</button><span class="v">${num(NC[c])}</span><span class="d">${esc(title(c))}</span></li>`).join("")}</ul>${ch.length > 60 ? `<p class="note">+ ${num(ch.length - 60)}</p>` : ""}</section>`;
+  } else {                             // title, chapter, section of the Constitution
+    const arts = subtree(i).filter((a) => K[a] === "bvart");
+    const rest = arts.reduce((s, a) => s + (dependents[a] || []).length, 0);
+    html += `<section><div class="big"><b>${num(arts.length)}</b><span>${esc(t.bvArticles)}</span></div><p class="note">${esc(t.restInside(num(rest)))}</p></section>`;
+    html += `<section><ul class="list">${kids[i].map((c) => `<li><button class="k link" data-sel="${c}">${esc(K[c] === "bvart" ? `${label(c)} · ${pickL(node(c).h)}` : label(c))}</button><span class="v">${K[c] === "bvart" ? num((dependents[c] || []).length) : ""}</span></li>`).join("")}</ul></section>`;
+  }
+  return { eyebrow, h2, sub, html };
+}
 function refreshPanel() {
   if (sel.i < 0 || $("panel").hidden) return;
-  const i = sel.i, o = core.nodes[i], hue = HK[i];
+  const i = sel.i, o = node(i), hue = HK[i];
+  if (i >= NCORE) {
+    const p = treePanel(i);
+    $("phead").innerHTML = `<p class="eyebrow">${esc(p.eyebrow)}</p><h2>${esc(p.h2)}</h2>${p.sub ? `<p class="sub">${esc(p.sub)}</p>` : ""}`;
+    $("pbody").innerHTML = p.html; $("pbody").scrollTop = 0; crumbs();
+    return;
+  }
   const head = $("phead"), body = $("pbody");
   let eyebrow = "", h2 = "", sub = "", html = "";
   const tt = title(i), tl = titleLang(i), rec = actRec(i);
@@ -1053,8 +1413,10 @@ function refreshPanel() {
       const j = idIndex.get("SR " + o.sr);
       if (j !== undefined) html += `<p class="note">${esc(t.successor)}: <button class="link" data-sel="${j}">${esc(label(j))}</button></p>`;
     }
+    if (mode === "tree") html += basisSections(i);
     if (o.ys) html += `<section><h3>${esc(t.perYear)}</h3>${spark(o.y0, o.ys, hue)}</section>`;
     html += interdependencies(i);
+    if (mode !== "tree") html += basisSections(i);
     if (rec && rec.arts) {
       const top = rec.arts.filter((a) => a[5]).sort((a, b) => b[5] - a[5]).slice(0, 10);
       const max = top.length ? top[0][5] : 1;
@@ -1073,7 +1435,7 @@ function refreshPanel() {
     if (o.nt) html += `<p class="note">${esc(t.noText(num(o.nt)))}</p>`;
     if (o.e) html += `<section><a class="link" href="${esc(o.e + (o.c ? "" : "/" + lang))}" target="_blank" rel="noopener">${esc(o.c ? t.cantonal : t.official)} ↗</a></section>`;
   } else if (o.k === "bucket") {
-    const p = core.nodes[P[i]];
+    const p = node(P[i]);
     eyebrow = t.cantonalAct; h2 = t.bucket;
     html += countBlock(o.n, t.citeAct, null, null);
     html += `<p class="note">${esc(t.bucketNote(num(o.codes), CANTON[p.c] ? CANTON[p.c][LANGS.indexOf(lang)] : p.c))}</p>`;
@@ -1085,7 +1447,7 @@ function refreshPanel() {
     const ch = kids[i].slice().sort((a, b) => NC[b] - NC[a]).slice(0, 14);
     const max = ch.length ? Math.max(NC[ch[0]], 1) : 1;
     html += `<section><h3>${esc(t.children)}</h3><ul class="list">${ch.map((j) => {
-      const oj = core.nodes[j];
+      const oj = node(j);
       const name = oj.k === "act" ? `${label(j)}${title(j) ? " · " + title(j) : ""}` : (oj.sr ? oj.sr + " " : "") + label(j);
       return `<li><button class="k link" data-sel="${j}">${esc(name)}</button><span class="v">${num(NC[j])}</span><span class="bar"><i style="width:${(100 * NC[j] / max).toFixed(1)}%"></i></span></li>`;
     }).join("")}</ul></section>`;
@@ -1120,7 +1482,7 @@ $("close").onclick = () => select(-1);
 function writeHash() {
   let h = "";
   if (sel.i >= 0) {
-    h = ids[sel.i].replace(/ /g, "_").replace(/@/g, "~").replace(/\*/g, "x");
+    h = ids[sel.i].replace(/ /g, "_").replace(/@/g, "~").replace(/\*/g, "x").replace(/^(BV|TREE):/, "$1.").replace(/\//g, "~~");
     if (sel.art) h += "--" + sel.art.replace(/\//g, "~");
   }
   try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) { /* sandboxed */ }
@@ -1128,8 +1490,9 @@ function writeHash() {
 function decodeHash() {
   const h = decodeURIComponent((location.hash || "").slice(1));
   if (!h) return null;
-  const [node, art] = h.split("--");
-  const i = idIndex.get(node.replace(/_/g, " ").replace(/~/g, "@").replace(/ x$/, " *"));
+  const [nd, art] = h.split("--");
+  const id = /^(BV|TREE)\./.test(nd) ? nd.replace(/^(BV|TREE)\./, "$1:").replace(/~~/g, "/") : nd.replace(/_/g, " ").replace(/~/g, "@").replace(/ x$/, " *");
+  const i = idIndex.get(id);
   return i === undefined ? null : { i, art: art ? art.replace(/~/g, "/") : null };
 }
 
@@ -1188,7 +1551,7 @@ function search(q) {
   const words = lq.split(/\s+/).filter((w) => w.length > 1);
   const ali = core.alias[nq];
   if (ali !== undefined) out.push({ i: ali, score: 900 });
-  for (let i = 1; i < N; i++) {
+  for (let i = 1; i < NCORE; i++) {
     const o = core.nodes[i];
     if (o.k === "bucket") continue;
     let s = 0;
@@ -1215,7 +1578,7 @@ function showResults() {
   box.hidden = false;
   if (!results.length) { box.innerHTML = `<div class="empty">${esc(t.none)}</div>`; return; }
   box.innerHTML = results.map((r, n) => {
-    const o = core.nodes[r.i];
+    const o = node(r.i);
     const head = r.topic || (r.artNum ? `${t.art} ${r.artNum} ${label(r.i)}` : (o.k === "area" ? `${o.sr} ${label(r.i)}` : label(r.i)));
     const subl = r.topic ? `${label(r.i)} · ${title(r.i)}`
       : o.k === "act" ? [o.sr ? `${t.sr} ${o.sr}` : (o.c || ""), title(r.i)].filter(Boolean).join(" · ") : (o.k === "area" || o.k === "group" ? t.area : "");
@@ -1228,6 +1591,11 @@ function choose(n) {
   $("results").hidden = true;
   $("search").blur();
   if (r.art) { select(r.i, r.art); return; }
+  if (r.artNum && mode === "tree" && LAY.tree && r.i === LAY.tree.root) {      // "Art. 122 BV": the article in the tree
+    const m = r.artNum.match(/^(\d+)([a-z]?)(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?$/);
+    const j = m ? idIndex.get("BV:art_" + [m[1], m[2], m[3]].filter(Boolean).join("_")) : undefined;
+    if (j !== undefined) { select(j); return; }
+  }
   if (r.artNum && PK[r.i] >= 0) {
     ensurePack(PK[r.i])?.then(() => {
       const rec = actRec(r.i);
@@ -1269,6 +1637,8 @@ $("tilt").onclick = () => {
   flyTo(w.x, w.z, viewDist(), nextView(sph.phi), true, controls.target.y);
   setTimeout(() => { $("tilt").textContent = tiltLabel(); }, 2500);
 };
+$("mtree").onclick = () => setMode("tree");
+$("msr").onclick = () => setMode("sr");
 $("lwire").onclick = () => { showWire = !showWire; $("lwire").setAttribute("aria-pressed", showWire); edgesDirty = true; };
 $("lcurrent").onclick = () => { showCurrent = !showCurrent; $("lcurrent").setAttribute("aria-pressed", showCurrent); edgesDirty = true; };
 $("periodbtn").onclick = () => {
@@ -1320,7 +1690,12 @@ function applyLang() {
   $("home").textContent = t.home; $("periodbtn").textContent = t.time; $("methodbtn").textContent = t.method;
   $("tilt").textContent = core ? tiltLabel() : t.view3d; $("play").textContent = playing ? t.pause : t.play;
   $("l-from").textContent = t.from; $("l-to").textContent = t.to; $("periodnote").textContent = t.periodNote;
-  $("introtext").textContent = t.intro; $("introok").textContent = t.introOk; $("introtitle").textContent = t.name;
+  $("introtext").textContent = mode === "tree" ? t.introTree : t.intro; $("introok").textContent = t.introOk; $("introtitle").textContent = t.name;
+  $("mtree").textContent = t.viewTree; $("msr").textContent = t.viewSR;
+  $("mtree").setAttribute("aria-pressed", mode === "tree"); $("msr").setAttribute("aria-pressed", mode === "sr");
+  $("mtree").hidden = $("msr").hidden = !LAY.tree;
+  $("ltree").hidden = mode !== "tree";
+  $("ltreetext").textContent = t.basisLink;
   $("ik1").textContent = t.lawWiring; $("ik2").textContent = t.practice; $("ik3").textContent = t.bothShort;
   $("layershead").textContent = t.layers;
   $("lwiren").textContent = core.xedges && core.xedges.length ? num(core.xedges.length) : "";
@@ -1330,13 +1705,14 @@ function applyLang() {
   $("lwire").title = t.lawWiringNote; $("lcurrent").title = t.practiceNote;
   $("lboth").textContent = t.both;
 }
-function buildLegend() {
+function buildLegend() {               // colour = SR area in both views; in the tree the areas are not places
   const el = $("legend");
-  const ch = idIndex.get("CH");
-  const items = kids[ch].map((j) => [j, HK[j], label(j)]);
+  const ch = idIndex.get("CH"), srk = LAY.sr.kids;
+  const items = srk[ch].map((j) => [j, HK[j], label(j)]);
   items.push([idIndex.get("KT"), "k", t.KT]);
-  el.innerHTML = items.map(([j, h, l]) => `<button data-sel="${j}" title="${esc(l)}"><i style="background: rgb(${(HUE[h] || HUE.n).map((c) => Math.round(255 * c)).join(",")})"></i><span>${esc(core.nodes[j].sr ? core.nodes[j].sr + " " : "")}${esc(l)}</span></button>`).join("");
-  el.onclick = (e) => { const b = e.target.closest("[data-sel]"); if (b) select(+b.dataset.sel); };
+  if (mode === "tree") items.unshift([-1, "bv", t.bvFull]);
+  el.innerHTML = items.map(([j, h, l]) => `<button data-sel="${j}" title="${esc(l)}"${mode === "tree" ? " disabled" : ""}><i style="background: rgb(${(HUE[h] || HUE.n).map((c) => Math.round(255 * c)).join(",")})"></i><span>${esc(j >= 0 && core.nodes[j].sr ? core.nodes[j].sr + " " : "")}${esc(l)}</span></button>`).join("");
+  el.onclick = (e) => { const b = e.target.closest("[data-sel]"); if (b && mode === "sr") select(+b.dataset.sel); };
 }
 
 // ---------- intro ----------
@@ -1347,7 +1723,7 @@ $("introok").onclick = closeIntro;
 // ---------- method ----------
 async function openMethod() {
   const { methodHTML } = await import("./method.js");
-  $("mbox").innerHTML = methodHTML(core.method, lang, t, num, esc);
+  $("mbox").innerHTML = methodHTML(core.method, lang, t, num, esc, tree ? tree.method : null);
   $("method").hidden = false;
   $("mclose").onclick = closeMethod;
   $("mclose").focus();
@@ -1356,5 +1732,5 @@ function closeMethod() { $("method").hidden = true; $("methodbtn").focus(); }
 $("methodbtn").onclick = openMethod;
 $("method").addEventListener("click", (e) => { if (e.target.id === "method") closeMethod(); });
 
-window.__slm = { select, pick, home, updateLabels, rebuild: () => { buildEdges(); return buildMs; }, idx: (id) => idIndex.get(id), get dbg() { return { buildMs, lines: lastEntries.length, dotsAct, p: dots ? actRec(dotsAct).p : null, pxu: pxPerUnitAt(viewDist()), R: R[sel.i], pool: pool.length, fade: artFade, W, H }; }, get state() { return { sel, origin: origin.toArray(), dist: viewDist() }; }, get entries() { return lastEntries.map(([k, w]) => { const [a, b, l] = k.split("|").map(Number); return [ids[a], ids[b], l, w, Math.round(projectedPx(a)), Math.round(projectedPx(b))]; }); }, get meshes() { return { wires, current, focusRibbons, orbs, rings, camera, controls }; } };
+window.__slm = { select, pick, home, setMode, get mode() { return mode; }, updateLabels, rebuild: () => { buildEdges(); return buildMs; }, idx: (id) => idIndex.get(id), get dbg() { return { buildMs, lines: lastEntries.length, dotsAct, p: dots ? actRec(dotsAct).p : null, pxu: pxPerUnitAt(viewDist()), R: R[sel.i], pool: pool.length, fade: artFade, W, H }; }, get state() { return { sel, origin: origin.toArray(), dist: viewDist() }; }, get entries() { return lastEntries.map(([k, w]) => { const [a, b, l] = k.split("|").map(Number); return [ids[a], ids[b], l, w, Math.round(projectedPx(a)), Math.round(projectedPx(b))]; }); }, get meshes() { return { wires, current, focusRibbons, orbs, rings, camera, controls }; } };
 boot().catch((e) => { $("loading").textContent = "Error: " + e.message; console.error(e); });
