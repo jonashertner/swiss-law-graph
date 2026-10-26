@@ -35,6 +35,14 @@ contradictions and lacunae. Owner: Jonas Hertner (also owner of opencaselaw.ch).
   (`fetch_fedlex_basis.py`, ~6 min; SPARQL by ELI URI, cached in build/fedlex_xml_urls.json).
   Only a footnote that *is* an SR reference marks a basis ("SR …", "[BS …]"); editorial notes
   ("Der Titel wurde … PublG (SR 170.512) angepasst") let the clause run on.
+- `data/cantonal_basis.json` — all 26 cantonal collections in force (16,384 acts; `cantonal_basis.py`):
+  title, abbreviation, URL, adoption date, issuer, verbatim Ingress, floor, and every stated basis resolved
+  to `SR <n>` / `SR <n>@<year>` / `KV` (+ articles) / `CT:<n>` / `?` with the clause verbatim. Read by the
+  adapters in `pipeline/cantonal/` (contract: `SPEC.md`; raw caches in build/cantonal/raw, 705 MB):
+  `lexwork.py` (19 cantons, one API; PDF fallback for unconverted acts), `zh.py` (zh.ch per LS folder +
+  PDF), `ge.py`/`ne.py` (SIL), `vd.py` (BLV API; "majeur" acts only on the map), `ju.py` (RSJU), `ti.py`
+  and `sz.py` via LexFind (www3.ti.ch unreachable from the sandbox; sz.ch answered 403 — not circumvented).
+  Cantonal Ingress text is official (Art. 5 URG), shown verbatim with a link to the canton's page.
 - Alias tables live in the opencaselaw repo: `docs/data/law_codes.json`,
   `docs/api/law_aliases.json` (public repo: clone `jonashertner/opencaselaw` next to this one).
 - Do NOT use `jonashertner/opencaselaw-data` (private telemetry; its cards forbid release).
@@ -50,13 +58,16 @@ python3 pipeline/02_validate.py                     # 20 s
 python3 pipeline/03_graph.py                        # 40 s
 python3 pipeline/04_hierarchy.py && (cd layout && npm ci && node pack.mjs)
 python3 pipeline/05_site.py                         # 40 s -> site/data (44 MB, not in git)
-python3 pipeline/07_tree.py                         # site/data/tree.json + ingress.json (Stufenbau)
+python3 pipeline/cantonal_basis.py                  # 10 s, offline: data/cantonal_basis.json
+python3 pipeline/07_tree.py                         # site/data/tree.json + ingress(_k).json (Stufenbau)
 python3 pipeline/06_artifact.py                     # site/artifact.html for claude.ai preview
 python3 -m http.server -d site 8765                 # local view: http://localhost:8765
 ```
 Fedlex fetchers (only when refreshing data): `fetch_fedlex_acts.py`, `fetch_fedlex_articles.py`,
 `fetch_fedlex_structure.py` (`--missing` adds new acts only), then step 1, then `fetch_fedlex_regimes.py`;
 `fetch_fedlex_xrefs.py` and `fetch_fedlex_basis.py` for the two legislative layers.
+Cantonal collections (only when refreshing): `python3 pipeline/cantonal/lexwork.py` (~15 min), `zh.py`
+(~15 min), `vd.py` (~30 min), `ge.py`, `ne.py`, `ju.py`, `ti.py`, `sz.py` (minutes each), then `cantonal_basis.py`.
 Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republish from
 `site/artifact.html` with root `site` and the files under `site/data`.
 
@@ -125,10 +136,39 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     Treaties appear only as the basis of a federal act (96); 79 acts have no basis in the tree.
 17. Cantonal floors (Art. 49 BV: federal law prevails, so they lie below every federal floor): the 26
     constitutions (SR 131.2, `pipeline/cantons.py`) hang from Art. 51 BV (a constitutional link, not
-    an Ingress; drawn down the central axis); each canton's acts (3,811, from decision citations,
-    cantonal texts not read; includes communal regulations such as BZO) under its constitution.
+    an Ingress; drawn down the central axis). Below, every act in force of the 26 official collections
+    (16,358 + 26 constitutions) on floors by the issuer its Ingress names: 5 parliament/people/
+    Landsgemeinde/intercantonal (5,946), 6 government + cantonal courts (7,801), 7 directorates,
+    offices, other bodies incl. communal bodies some cantons publish and church constitutions (2,611);
+    no issuer → from the title (marked). Parent = the nearest higher cantonal basis the Ingress names
+    (a KV article node `KV:<ct>:art_N`, or a cantonal act), then text order; only federal bases →
+    group "only federal law named"; nothing → "no basis named" (incl. 1,200 acts whose collection
+    publishes no Ingress: TG above all). A basis is identified by its footnote/inline collection
+    number, the name of a constitution, a fixed federal title (not inside "Einführungsgesetz zum …"),
+    type + date matched against the SR taxonomy titles (DE/FR/IT) or the canton's own acts (same type
+    and agreeing title words required; a federal act only when the text says "Bundes-/fédéral/
+    federale" or, without a cantonal act of that date, on ≥ 2 agreeing title words; ties → "?"), or an
+    abbreviation the canton states. Amendment dates ("Fassung gemäss Nachtrag vom …") are skipped.
+    23,423 bases: 3,564 KV, 11,667 cantonal, 6,242 federal in force, 164 earlier federal, 1,786
+    unresolved (7.6 %); 459 cite a federal law by its old date while the footnote gives today's SR
+    number (flag "old"). 20 name a KV article that does not exist. Spot checks (3 × 40 random bases):
+    no wrong target after the fixes. Decision codes → the act whose collection states that
+    abbreviation (any official language; a second code for the same act is merged, decisions counted
+    as the exact union): 1,207 codes, 497,161 decisions; 2,599 codes (142,706 decisions) have no act
+    in force (mostly repealed: pre-2011 procedure codes; communal BZO) → group "cited, not in the
+    collection". VD files law + arrêtés de mise en vigueur under one number: the main act keeps it
+    (`~1`, `~2` for the others). Cantonal spheres √(decisions + 120) (federal + 400) to fit.
     Step 1: "KV/ZH", "Cst/VD" → that canton's constitution in any court; "KV", "ConstC", "CstC" →
     the deciding canton's, excluded in federal courts (was: all "KV" → Bern; report B9).
+18. Tree layout fix (2026-10-26): `place()` added arc lengths (in units of C) as angles, so every
+    subtree wrapped around the circle ~C times: siblings were scattered. Angles = need / C now; each
+    child lies inside its parent's span (checked: 0 of 2,370 outside). Branches are drawn as a radial
+    elbow tree on the cone's surface (one trunk + arc per parent and floor, a drop per child; Bézier
+    in polar coordinates), not as chords through the cone.
+19. Light theme by default ("paper atlas": ink on #f3f1ec, premultiplied alpha, no bloom; colours
+    via `ink(c) = c^1.6·0.8`); the night-sky look stays one click away (☾). Tree overview: the
+    delegation tree alone; case-law/legislation arcs for the selected act, or all via a toggle.
+    Depth fade (atmospheric perspective) behind the point looked at.
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -162,6 +202,12 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
       deepest ancestor whose span on screen ≥ 12 px); panel: verbatim Ingress, bases with clauses,
       "provisions other acts rest on", dependents by floor; crumbs = delegation chain; search
       "Art. 117 BV" opens the article in the tree; articles switch to the SR view's skyline.
+- [x] Step 7′ cantonal law (`pipeline/cantonal/*.py`, `cantonal_basis.py`, decision 17): the panel of a
+      cantonal act shows issuer, floor, adoption date, every basis with its clause verbatim (lazily
+      loaded `ingress_k.json`, 7.7 MB), acts resting on it by floor with the delegation norm; KV panel:
+      Art. 51 BV, acts by floor, KV articles other acts rest on (§/Art. as the canton writes it), the
+      groups; search "PBG ZH" / "ZH PBG" / title words; deep links `#K.ZH_c700.1` (escape `_u _s _l _c`).
+      Canton codes ring the outer rim; floor names right of the cone (left when the panel is open).
 - [x] Step 5 partly: counts cross-checked with the opencaselaw MCP (BGE 143 IV 241 in-degree;
       Art. 41 OR — the MCP undercounts, see report D1); desktop + phone screenshots via Playwright.
 
@@ -181,13 +227,15 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
   ("which provisions of other acts name this article") needs article-precise targets, which the
   footnotes do not give (they name the act).
 - A guided tour (3–4 stops) for first-time visitors.
-- Cantonal law: read cantonal Ingresses (cantonal portals / LexFind) to place cantonal acts under
-  the article of their constitution or of the federal act they implement; cantonal titles.
+- Cantonal law: article-level targets for bases naming a cantonal act's article (today the act);
+  read the 1,786 unresolved mentions by hand per canton; TI/SZ from their own portals when reachable;
+  communal law (BZO …) is out of scope of the cantonal collections.
 - The 13 dangling bases and 79 acts without a basis are Phase-2 material (lacunae, outdated Ingress).
 - Phase 2 (simplification, contradictions, lacunae) builds on `fedlex_structure.json.gz` and the
   article co-citation graph.
 
 ## Open questions for Jonas
 - Public at launch, or private preview first? (Preview above is private.)
-- Cantonal acts: 639 now carry an official title; the rest need a cantonal abbreviation table
-  (opencaselaw issue #74: abbreviations collide across cantons → key as `ZH_PBG`).
+- TI and SZ come via LexFind (Institute of Federalism, academic service): only Ingress text (official,
+  Art. 5 URG) and metadata are republished, links go to ti.ch / sz.ch. Acceptable for the public page?
+- VD shows only the BLV's "majeur" acts (895 of 2,747); the 1,852 "mineur" decrees are left out.

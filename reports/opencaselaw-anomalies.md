@@ -199,6 +199,44 @@ Tests: `tests/test_law_code_language_pairing.py` (5).
 `find_citations("bge_143 IV 241", incoming, min_confidence 0.5)`: 9,086 live; the snapshot gives
 8,925 direct + 48 via the BGer twin (A1) → 8,949 after merging. The difference is the live graph's growth.
 
+## E. Cantonal law collections (found while reading all 26 collections, 2026-10-26)
+
+### E1. `scrapers/cantonal_laws/zh.py` enumerates at most 150 ZH acts, page 1 twice — ZH has 944 in force
+The zh.ch listing endpoint (`…/lawcollectionsearch_312548694.zhweb-zhlex-ls.zhweb-cache.json`) answers
+`"numberOfResults": 150` without a filter: it caps the result, it does not count the collection. The scraper
+starts at `page=0`, sends no `page` parameter for it, and the endpoint treats that as page 1 (checked live:
+identical 15 numbers `101, 111.1, 111.2 …`); it then stops when 150 rows were seen. So one run yields at most
+~135 distinct acts of 944. Fix (what `swiss-law-graph/pipeline/cantonal/zh.py` does): query each LS folder
+with `fileNumber=1..14` (each below 150), start at `page=1`. LexFind's active ZH set has the same 944 numbers.
+Whether the LexFind fallback in `cantonal_laws.db` covers the gap is not checked here.
+
+### E2. Cantonal language variants are not paired — 119 code pairs
+Same problem as D1, for cantonal acts: bilingual cantons' acts are cited under two codes, counted apart.
+`FR CPJA` (3,179 decisions) = `FR VRG` (865) = BDLF 150.1; `BE VRPG` (11,801) = `BE LPJA` (810) = BSG 155.21;
+`VS LPJA` = `VS VVRG` = RS/VS 172.6; also variant spellings (`VD LPA` 56,664, `LPA/VD` 10, `LPAVD` 8).
+The LexWork header of each act carries the abbreviation in every published language (`<h2 class='abbreviation'>`
+per language in `show_as_json`), which gives the pairs exactly. On the map the union is counted (distinct
+decisions: FR 150.1 → 4,035, not 4,044).
+
+### E3. 2,599 cantonal codes in decisions have no act in force in the canton's collection — 142,706 decisions
+Mostly repealed acts: the cantonal procedure codes before 2011 (`TI CPC` 8,255, `VD CPC` 7,361, `TI CPP`
+6,681, `VD CPP`, `GR ZPO`, `NE CPP` …), `VD LJPA` (2009), `TI PAMM`, `NE LPJA` (replaced by the LPA of 18 March
+2025), `GE LIASI` (replaced 2025); communal regulations (`ZH BZO` 845); codes the canton itself never states.
+A lookup by abbreviation against today's collection must not resolve these to a current act; like federal
+law (B4), cantonal codes need the decision date. Full list: `site/data/tree.json`, nodes with `"cited": 1`.
+
+### E4. VD: one systematic number, several acts — 176 numbers
+The BLV files a law's "Arrêté de mise en vigueur", convocation and credit decrees under the law's own number:
+173.36 = LPA-VD + 2 arrêtés de mise en vigueur; 101.01 = the Constitution + 5 decrees. A table keyed on
+(canton, sr_number) keeps one of them — in our first run, the arrêté instead of the LPA-VD. Key on the act
+id (BLV `id`), or keep the "majeur" act (the BLV's own `importance` field) under the number.
+
+### E5. Federal footnotes in cantonal Ingresses that point past a repealed law — 459 bases
+A cantonal Ingress cites a federal law by its old date while the footnote gives today's SR number of its
+successor ("Bundesgesetz über Lebensmittel … vom 9. Oktober 1992", footnote SR 817.0 = LMG of 20 June 2014).
+The canton's text is outdated, not opencaselaw; listed here because a citation resolver that trusts the
+footnote alone lands on the successor. Flagged `"old"` in `data/cantonal_basis.json`.
+
 ---
 
 ## C. Not an error, but worth documenting in the dataset card

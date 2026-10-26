@@ -42,13 +42,14 @@ radius ~ sqrt(citing decisions + 400), so that an act no decision cites stays vi
 Output: site/data/tree.json (nodes, positions, bases) and site/data/ingress.json
 (the verbatim Ingress of each act, loaded when the reader opens one).
 """
+import csv
 import gzip
 import json
 import math
 
 import duckdb
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 from artnum import LATIN, expand_range, sort_key, split
@@ -131,7 +132,8 @@ def main() -> None:
     cidx = {n["i"]: k for k, n in enumerate(core["nodes"])}
     art_n = {a: n for a, n in duckdb.sql(
         f"select art, decisions from '{ROOT}/build/graph/articles.parquet' where act_id = 'SR 101'").fetchall()}
-    struct = json.load(gzip.open(ROOT / "data/fedlex_structure.json.gz"))["acts"]["101"]
+    struct_all = json.load(gzip.open(ROOT / "data/fedlex_structure.json.gz"))["acts"]
+    struct = struct_all["101"]
 
     # ---- members: federal acts in force (SR not 0.x), on the map, with a readable text
     members, excluded = {}, defaultdict(int)
@@ -172,18 +174,89 @@ def main() -> None:
 
     stats = defaultdict(int)
     act_node = {sr: add(f"SR {sr}", "act", None, cidx[f"SR {sr}"], levels[sr][0]) for sr in sorted(members, key=sort_srkey)}
-    # cantonal floors
-    kv_node = {}
-    for ct, sr in CANTON_CONSTITUTION.items():
-        if f"SR {sr}" in cidx:
-            kv_node[ct] = add(f"SR {sr}", "act", bvart["art_51"], cidx[f"SR {sr}"], 4, {"ct": ct})
-    cantonal = defaultdict(list)
+    # ---- cantonal law: every act in force in the 26 official collections
+    # (data/cantonal_basis.json, from pipeline/cantonal/*.py and cantonal_basis.py)
+    cb = json.load(open(ROOT / "data/cantonal_basis.json"))
+    kv_node, kv_art, kgroup, kact, kinfo = {}, defaultdict(dict), {}, {}, {}
+    kvst = {ct: {a["id"]: a for a in struct_all.get(sr, {}).get("articles", []) if not a.get("rep")}
+            for ct, sr in CANTON_CONSTITUTION.items()}
+    kv_order = {ct: {a["id"]: k for k, a in enumerate(struct_all.get(sr, {}).get("articles", []))}
+                for ct, sr in CANTON_CONSTITUTION.items()}
+    ct_order = sorted(CANTON_CONSTITUTION, key=lambda c: sort_srkey(CANTON_CONSTITUTION[c]))
+    for ct in ct_order:
+        sr = CANTON_CONSTITUTION[ct]
+        col = cb["cantons"].get(ct, {})
+        kvrec = col.get("acts", {}).get(col.get("kv") or "", {})
+        kv_node[ct] = add(f"SR {sr}", "act", bvart["art_51"], cidx.get(f"SR {sr}", -1), 4,
+                          {"ct": ct, **({"ksr": col["kv"], "u": kvrec.get("url")} if kvrec else {})})
+        if kvrec:
+            kinfo[kv_node[ct]] = kvrec
+        for g in ("fed", "none", "cited"):          # acts naming only federal law; no basis; cited, not found
+            kgroup[(ct, g)] = add(f"KG:{ct}:{g}", "tgroup", kv_node[ct], -1, "kvart", {"ct": ct})
+        for ksr, rec in col.get("acts", {}).items():
+            if ksr == col.get("kv"):
+                continue
+            fl = rec["floor"] if rec["floor"] in (5, 6, 7) else 7
+            kact[(ct, ksr)] = add(f"K:{ct}:{ksr}", "act", None, -1, fl,
+                                  {"ct": ct, "ksr": ksr, "t": rec.get("title"), "ab": rec.get("abbr"), "u": rec.get("url"),
+                                   "fb": rec.get("floor_by"), "ad": rec.get("adopted")})
+            kinfo[kact[(ct, ksr)]] = rec
+    stats["cantons_read"] = sum(1 for ct in ct_order if cb["cantons"].get(ct))
+    stats["cantonal_acts"] = len(kact)
+
+    def abbr_keys(ab, ct):
+        out = set()
+        for part in re.split(r"\s*[,;]\s*", ab or ""):
+            k = re.sub(r"[\s.\-/()]", "", part).lower()
+            if len(k) < 2:
+                continue
+            out.add(k)
+            for v in (k.removesuffix(ct.lower()), k.removeprefix(ct.lower())):
+                if len(v) >= 2:
+                    out.add(v)                       # "LPA-VD", "Cst-GE": the code without its canton
+        return out
+    kidx = defaultdict(lambda: defaultdict(set))
+    for (ct, ksr), t in kact.items():
+        rec = kinfo[t]
+        for ab in [rec.get("abbr")] + [v.get("abbr") for v in (rec.get("i18n") or {}).values()]:
+            for k in abbr_keys(ab, ct):
+                kidx[ct][k].add(t)
+    # the codes decisions cite: the act whose own collection states that abbreviation, else a group
     for k, n in enumerate(core["nodes"]):
-        if n["k"] in ("act", "bucket") and n.get("c") in kv_node:
-            cantonal[n["c"]].append(add(n["i"], n["k"], kv_node[n["c"]], k, 5, {"ct": n["c"]}))
-    stats["cantonal_acts"] = sum(len(v) for v in cantonal.values())
-    tde = json.load(open(SITE / "titles.de.json"))
-    stats["cantonal_acts_with_title"] = sum(1 for v in cantonal.values() for t in v if tde[core_i[t]])
+        if n["k"] not in ("act", "bucket") or n.get("c") not in kv_node:
+            continue
+        ct = n["c"]
+        code = n["i"].split(" ", 1)[1] if " " in n["i"] else n["i"]
+        hits = set()
+        if n["k"] == "act":
+            for key in abbr_keys(code, ct):
+                hits |= kidx[ct].get(key, set())
+        if len(hits) == 1 and core_i[next(iter(hits))] < 0:
+            core_i[next(iter(hits))] = k
+            stats["cited_matched"] += 1
+            stats["cited_matched_decisions"] += n.get("n", 0)
+            continue
+        if len(hits) == 1:                     # a second code for the same act (CPJA = VRG, VRPG = LPJA)
+            t = next(iter(hits))
+            info[t].setdefault("al", []).append(k)
+            stats["cited_matched_second_code"] += 1
+            continue
+        stats["cited_ambiguous" if len(hits) > 1 else "cited_shared_code" if hits else "cited_unmatched"] += 1
+        stats["cited_unmatched_decisions"] += n.get("n", 0)
+        add(n["i"], n["k"], kgroup[(ct, "cited")], k, 7, {"ct": ct, "cited": 1})
+    # an act cited under several codes: the distinct decisions citing any of them (exact, not a sum)
+    multi = {t: [core["nodes"][core_i[t]]["i"]] + [core["nodes"][k]["i"] for k in info[t]["al"]]
+             for t in kact.values() if info[t].get("al") and core_i[t] >= 0}
+    if multi:
+        pairs = [(t, a) for t, codes in multi.items() for a in codes]
+        duckdb.sql("create or replace temp table mc(t int, act_id varchar)")
+        duckdb.executemany("insert into mc values (?, ?)", pairs)
+        for t, n_ in duckdb.sql(f"select mc.t, count(distinct r.decision_id) from mc join '{ROOT}/build/refs_valid.parquet' r "
+                                f"using (act_id) group by 1").fetchall():
+            info[t]["dn"] = n_
+        for t in multi:
+            info[t]["al"] = [[core["nodes"][k]["i"].split(" ", 1)[1], core["nodes"][k].get("n", 0)] for k in info[t]["al"]]
+            stats["cited_matched_decisions"] += info[t].get("dn", 0) - core["nodes"][core_i[t]].get("n", 0)
     treaty_node = {}
 
     # ---- bases: resolve targets and articles
@@ -311,16 +384,116 @@ def main() -> None:
             parent[me] = nob
             stats["cycle_broken"] += 1
 
+    # ---- cantonal bases: resolve to tree nodes; the parent is the nearest higher cantonal floor
+    def kv_article(ct, n):
+        e = eid_of(n)
+        if not e or e not in kvst[ct]:
+            return None
+        if e not in kv_art[ct]:
+            a = kvst[ct][e]
+            kv_art[ct][e] = add(f"KV:{ct}:{e}", "kvart", kv_node[ct], -1, "kvart", {"ct": ct, "n": n, "h": a.get("h") or {}})
+        return kv_art[ct][e]
+
+    def fed_eids(tgt, nums):
+        alist = acts[tgt].get("arts") or []
+        out = []
+        for n in nums:
+            block = None
+            if n.startswith(("SchlT ", "ÜB ")):
+                block, n = n.split(" ", 1)
+            e = eid_of(n.split("–")[0])
+            if block and e:
+                e = next((a for a in alist if a.startswith("disp_") and a.endswith("/" + e)), e)
+            if e:
+                out.append(e)
+        return out
+    kv_nodes = set(kv_node.values())
+
+    def kfloor(t):
+        return 4 if t in kv_nodes or kind[t] == "kvart" else lv[t]
+
+    def is_k(t):
+        return t in kv_nodes or kind[t] == "kvart" or ids[t].startswith("K:")
+    kresolved = {}
+    for (ct, ksr), me in kact.items():
+        out = []
+        for b in kinfo[me]["bases"]:
+            tgt, arts, clause = b[0], b[1], b[2]
+            via = "old" if len(b) > 3 and b[3] == "old" else "text"
+            stats["k_bases"] += 1
+            if tgt == "KV":
+                hit = [x for x in (kv_article(ct, n.split("–")[0]) for n in arts) if x]
+                found = int(len(hit) == len(arts))
+                if not found:
+                    stats["k_bases_kv_article_not_found"] += 1
+                stats["k_bases_kv"] += 1
+                out.append([hit[0] if hit else kv_node[ct], [ids[x].split(":")[-1] for x in hit], clause, "basis", via, found])
+            elif tgt.startswith("CT:"):
+                t2 = kact.get((ct, tgt[3:])) or (kv_node[ct] if tgt[3:] == cb["cantons"][ct].get("kv") else None)
+                if t2 is None or t2 == me:
+                    stats["k_bases_unresolved"] += 1
+                    out.append([-1, [], clause, "basis", "unresolved", 0])
+                    continue
+                stats["k_bases_cantonal"] += 1
+                out.append([t2, arts, clause, "basis", via, 1])
+            elif tgt == "SR 101":
+                eids = [eid_of(n) for n in arts if eid_of(n) in bvart]
+                stats["k_bases_federal"] += 1
+                out.append([bvart[eids[0]] if eids else root, eids, clause, "basis", via, int(len(eids) == len(arts))])
+            elif tgt.startswith("SR ") and "@" not in tgt and tgt[3:] in act_node:
+                stats["k_bases_federal"] += 1
+                out.append([act_node[tgt[3:]], fed_eids(tgt[3:], arts), clause, "basis", via, 1])
+            elif tgt.startswith("SR "):
+                stats["k_bases_federal_earlier" if "@" in tgt else "k_bases_federal_not_on_tree"] += 1
+                out.append([-1, [], clause, "basis", "earlier" if "@" in tgt else "absent", 0])
+            else:
+                stats["k_bases_unresolved"] += 1
+                out.append([-1, [], clause, "basis", "unresolved", 0])
+        best = None
+        for order, c in enumerate(out):
+            t = c[0]
+            if t < 0 or not is_k(t) or kfloor(t) > lv[me]:
+                continue
+            key = (kfloor(t) < lv[me], kfloor(t), -order)        # a higher floor, the nearest one, text order
+            if best is None or key > best[0]:
+                best = (key, order)
+        if best is not None:
+            parent[me] = out[best[1]][0]
+            stats["k_parent_same_floor"] += int(not best[0][0])
+        elif any(c[0] >= 0 for c in out):
+            parent[me] = kgroup[(ct, "fed")]
+            stats["k_only_federal_basis"] += 1
+        else:
+            parent[me] = kgroup[(ct, "none")]
+            stats["k_no_basis_in_ingress" if kinfo[me].get("ingress") else "k_no_ingress_published"] += 1
+        for k_, c in enumerate(out):
+            c.append(1 if best is not None and k_ == best[1] else 0)
+        kresolved[me] = out
+    for (ct, ksr), me in kact.items():                       # same-floor chains: a cycle goes to "no basis"
+        seen, j = set(), me
+        while j is not None and j >= 0 and j not in seen:
+            seen.add(j)
+            j = parent[j]
+        if j == me:
+            parent[me] = kgroup[(ct, "none")]
+            stats["k_cycle_broken"] += 1
+
     # ---- sizes
     def nof(t):
+        if info[t].get("dn"):
+            return info[t]["dn"]
         return core["nodes"][core_i[t]].get("n", 0) if core_i[t] >= 0 else 0
     radius = [0.0] * len(ids)
     for t in range(len(ids)):
-        if kind[t] == "act":     # sqrt(decisions + 400): an uncited ordinance stays visible
+        if kind[t] == "act" and lv[t] in (5, 6, 7):    # cantonal: sqrt(decisions + 120), room for 15,000 acts
+            radius[t] = 0.11 * math.sqrt(nof(t) + 120)
+        elif kind[t] == "act":   # sqrt(decisions + 400): an uncited ordinance stays visible
             radius[t] = 0.11 * math.sqrt(nof(t) + 400)
         elif kind[t] == "bvart":
             info[t]["dec"] = art_n.get(ids[t][3:], 0)
             radius[t] = 0.09 * math.sqrt(info[t]["dec"] + 30)
+        elif kind[t] == "kvart":
+            radius[t] = 1.1
         elif kind[t] in ("abv", "tgroup"):
             radius[t] = 0.9
         else:
@@ -331,7 +504,11 @@ def main() -> None:
         if p is not None and p >= 0:
             kids[p].append(t)
     for p, ch in kids.items():
-        if p == root:
+        if p in kv_nodes:                                                    # KV articles in order, then the groups
+            ch.sort(key=lambda t: (kind[t] == "tgroup", kv_order[info[p]["ct"]].get(ids[t].split(":")[-1], 0), t))
+        elif ids[p].startswith(("K:", "KV:", "KG:")):
+            ch.sort(key=lambda t: (kfloor(t), natkey(info[t].get("ksr") or ids[t])))
+        elif p == root:
             ch.sort(key=lambda t: (kind[t] in ("abv", "tgroup"), t))            # BV order, then the sectors
         elif kind[p] in ("title", "chapter", "section"):
             ch.sort()                                                            # document order
@@ -348,7 +525,8 @@ def main() -> None:
         return (2 * radius[t] + 0.5 + 0.12 * radius[t]) / max(ring(t), 1e-6)
 
     need = [0.0] * len(ids)
-    fed_kids = {p: [c for c in ch if lv[c] not in (4, 5)] for p, ch in kids.items()}
+    CANT = (4, "kvart", 5, 6, 7)
+    fed_kids = {p: [c for c in ch if lv[c] not in CANT] for p, ch in kids.items()}
 
     def calc(t):
         s = sum(calc(c) for c in fed_kids.get(t, []))
@@ -356,6 +534,7 @@ def main() -> None:
         return need[t]
     total = calc(root)
     C = total / (2 * math.pi * 0.985)
+    need = [x / C for x in need]          # arc lengths (in units of C) -> angles
     ang = [0.0] * len(ids)
 
     def place(t, a0):
@@ -368,46 +547,92 @@ def main() -> None:
         ang[t] = a0 + need[t] / 2
     place(root, -math.pi / 2)
 
-    # cantons: the full circle in SR order, each as wide as its acts need on the lowest ring
-    def arc(t):
-        return 2 * radius[t] + 0.5 + 0.12 * radius[t]
-    width = {ct: max(sum(arc(t) for t in cantonal[ct]), arc(kv_node[ct]) * LV_R[5] / LV_R[4], 30.0) for ct in kv_node}
-    r5 = max(LV_R[5] * C, sum(width.values()) / (2 * math.pi * 0.97))
-    ring_abs = {4: r5 * LV_R[4] / LV_R[5], 5: r5}
+    # cantons: the full circle in SR order; inside each, a radial tree from its constitution:
+    #   constitution (floor 4) -> its articles named as bases and the groups (just outside) ->
+    #   acts on floors 5-7, each as wide as what rests on it.
+    KR = {4: 1.0, "kvart": 1.07, 5: 1.3, 6: 1.58, 7: 1.86}
+    KY = {4: -0.3, "kvart": -0.34, 5: -0.62, 6: -0.94, 7: -1.26}
+    ckids = {p: [c for c in ch if lv[c] in CANT] for p, ch in kids.items()}
+
+    def karc(t):
+        return 2 * radius[t] + 0.3 + 0.1 * radius[t]
+
+    kneed = {}
+
+    def kcalc(t):
+        s_ = sum(kcalc(c) for c in ckids.get(t, []))
+        kneed[t] = max(karc(t) / KR[lv[t]], s_)
+        return kneed[t]
+    T = sum(kcalc(kv_node[ct]) for ct in ct_order)
+    gap = 0.004 * 2 * math.pi
+    Rk = max(T / (2 * math.pi * 0.99 - gap * len(ct_order)), 1.22 * LV_R[3] * C)
+
+    def kplace(t, a0):
+        ch = ckids.get(t, [])
+        s_ = sum(kneed[c] for c in ch) / Rk
+        a = a0 + (kneed[t] / Rk - s_) / 2
+        for c in ch:
+            kplace(c, a)
+            a += kneed[c] / Rk
+        ang[t] = a0 + kneed[t] / Rk / 2
+        need[t] = kneed[t] / Rk
     a = -math.pi / 2
-    for ct in kv_node:
-        span = width[ct] / r5 + 0.03 * 2 * math.pi / len(kv_node)
-        ang[kv_node[ct]] = a + span / 2
-        need[kv_node[ct]] = span
-        acts_ = sorted(cantonal[ct], key=lambda t: ids[t])
-        b = a + (span - sum(arc(t) for t in acts_) / r5) / 2
-        for t in acts_:
-            ang[t] = b + arc(t) / r5 / 2
-            need[t] = arc(t) / r5
-            b += arc(t) / r5
-        a += span
-    scale = 2 * math.pi / (a + math.pi / 2)                     # close the circle exactly
-    for ct in kv_node:
-        for t in [kv_node[ct], *cantonal[ct]]:
-            ang[t] = -math.pi / 2 + (ang[t] + math.pi / 2) * scale
-            need[t] *= scale
+    for ct in ct_order:
+        kplace(kv_node[ct], a + gap / 2)
+        a += kneed[kv_node[ct]] / Rk + gap
+    ring_abs = {L: KR[L] * Rk for L in KR}
 
     pos = []
     for t in range(len(ids)):
         L = lv[t]
-        r = ring_abs[L] if L in (4, 5) else ring(t) * C
-        y = LV_Y["apex"] if L == "apex" else LV_Y["crown"] if L in ("title", "chapter", "section", "bvart") else LV_Y[L]
-        pos.append([round(r * math.cos(ang[t]), 4), round(y * C, 4), round(r * math.sin(ang[t]), 4)])
-    pos[root] = [0.0, round(LV_Y["apex"] * C, 4), 0.0]
+        r = ring_abs[L] if L in CANT else ring(t) * C
+        y = LV_Y["apex"] if L == "apex" else LV_Y["crown"] if L in ("title", "chapter", "section", "bvart") else (
+            KY[L] if L in CANT else LV_Y[L])
+        pos.append([round(r * math.cos(ang[t]), 2), round(y * C, 2), round(r * math.sin(ang[t]), 2)])
+    pos[root] = [0.0, round(LV_Y["apex"] * C, 2), 0.0]
 
     # ---- output
+    # URLs of cantonal acts: one template per canton where the portal's links follow one ({} = number)
+    kurl = {}
+    for ct in ct_order:
+        us = [(info[t]["ksr"], info[t].get("u")) for (c_, _), t in kact.items() if c_ == ct and info[t].get("u")]
+        best_tpl = max({u.replace(k, "{}", 1) for k, u in us if k in u} or {""},
+                       key=lambda tp: sum(1 for k, u in us if tp and tp.replace("{}", k, 1) == u))
+        if best_tpl:
+            kurl[ct] = best_tpl
+            for (c_, _), t in kact.items():
+                if c_ == ct and info[t].get("u") == best_tpl.replace("{}", info[t]["ksr"], 1):
+                    del info[t]["u"]
+    for t in kact.values():
+        if info[t].get("fb") in ("Ingress", "interkantonal", "kommunal", "Kirche"):
+            del info[t]["fb"]                    # the floor follows from the Ingress; only "Titel"/"unbekannt" shown
+    method_k_urls = kurl
+    # article symbol of each canton's constitution as its own Ingresses write it ("§ 41 KV" in ZG, "Art. 38 KV" in ZH)
+    ksym = {}
+    for ct in ct_order:
+        c = Counter()
+        for (c_, _), t in kact.items():
+            if c_ == ct:
+                for b in kinfo[t]["bases"]:
+                    if b[0] == "KV" and b[1]:
+                        c["§" if "§" in b[2] else "Art."] += 1
+        ksym[ct] = c.most_common(1)[0][0] if c else "Art."
+    # the constitutions on Fedlex (guaranteed by the Federal Assembly, published in SR 131.2)
+    eli = {}
+    for r in csv.DictReader(open(ROOT / "data/sr_eli.csv", encoding="utf-8")):
+        if r["notation"] not in eli or (r.get("inForce") or "").endswith("/0"):
+            eli[r["notation"]] = r["act"]
+    for ct, t in kv_node.items():
+        e = eli.get(CANTON_CONSTITUTION[ct])
+        if e:
+            info[t]["e"] = e.replace("http://", "https://").replace("fedlex.data.admin.ch", "www.fedlex.admin.ch")
     out_nodes = []
     for t in range(len(ids)):
         o = {"i": ids[t], "k": kind[t], "p": parent[t] if parent[t] is not None else -1, "c": core_i[t],
              "x": pos[t][0], "y": pos[t][1], "z": pos[t][2], "r": round(radius[t], 4),
-             "w": round(need[t] * (ring_abs[lv[t]] if lv[t] in (4, 5) else ring(t) * C) if t != root
-                        else 2 * math.pi * LV_R["bvart"] * C, 3),   # arc width of its span
-             "l": lv[t] if isinstance(lv[t], int) else (0 if lv[t] == "apex" else -1)}
+             "w": round(need[t] * (ring_abs[lv[t]] if lv[t] in CANT else ring(t) * C) if t != root
+                        else 2 * math.pi * LV_R["bvart"] * C, 1),   # arc width of its span
+             "l": lv[t] if isinstance(lv[t], int) else (4.5 if lv[t] == "kvart" else 0 if lv[t] == "apex" else -1)}
         if info[t]:
             o.update({k: v for k, v in info[t].items() if v not in (None, {}, "", False)})
         if ids[t].startswith("SR ") and ids[t][3:] in levels:
@@ -417,31 +642,52 @@ def main() -> None:
     for sr, cands in resolved.items():
         if cands:
             bases_out[act_node[sr]] = [c[:6] + [c[6] if len(c) > 6 else 0] for c in cands]
+    kclauses = {}
+    for me, cands in kresolved.items():       # cantonal clauses travel with the Ingress (loaded on demand)
+        if cands:
+            bases_out[me] = [[c[0], c[1], "", *c[3:]] for c in cands]
+            kclauses[me] = [c[2] for c in cands]
     by_level = defaultdict(int)
     for sr in members:
         by_level[levels[sr][0]] += 1
     by_level[4] = len(kv_node)
-    by_level[5] = stats["cantonal_acts"]
+    for t in kact.values():
+        by_level[lv[t]] += 1
     method = {"run_date": basis["run_date"], "acts": len(members), "by_level": dict(by_level),
               "issuer_from_title": sum(1 for v in levels.values() if v[1] == "Titel"),
               "acts_with_stated_basis": sum(1 for r in members.values() if r.get("bases")),
               "treaties_as_basis": len(treaty_node), "C": round(C, 3),
               "excluded_cantonal_constitutions": excluded["cantonal_constitutions"],
-              "failed_texts": sum(1 for r in acts.values() if "error" in r), **stats}
+              "failed_texts": sum(1 for r in acts.values() if "error" in r), "Rk": round(Rk, 3), "kurl": method_k_urls, "ksym": ksym,
+              "cantonal": {"run_date": cb["run_date"], **cb["stats"],
+                           "by_canton": {ct: len(cb["cantons"].get(ct, {}).get("acts", {})) for ct in ct_order},
+                           "src": dict(sorted(defaultdict(int, {k: sum(1 for r in kinfo.values() if r.get("src") == k)
+                                                                 for k in {r.get("src") for r in kinfo.values()}}).items()))},
+              **stats}
     # the floors of the Stufenbau (drawn as glass plates): [height, radius, key]
     plates = [[round(LV_Y["crown"] * C, 3), round((LV_R["bvart"] + 0.025) * C, 3), "lvBV"],
               [round(LV_Y[1] * C, 3), round((LV_R[1] + 0.03) * C, 3), "lv1"],
               [round(LV_Y[2] * C, 3), round((LV_R[2] + 0.03) * C, 3), "lv2"],
               [round(LV_Y[3] * C, 3), round((LV_R[3] + 0.03) * C, 3), "lv3"],
-              [round(LV_Y[4] * C, 3), round(ring_abs[4] + 0.03 * C, 3), "lv4"],
-              [round(LV_Y[5] * C, 3), round(ring_abs[5] + 0.03 * C, 3), "lv5"]]
+              [round(KY[4] * C, 3), round(ring_abs["kvart"] + 0.02 * Rk, 3), "lv4"],
+              [round(KY[5] * C, 3), round(ring_abs[5] + 0.02 * Rk, 3), "lv5"],
+              [round(KY[6] * C, 3), round(ring_abs[6] + 0.02 * Rk, 3), "lv6"],
+              [round(KY[7] * C, 3), round(ring_abs[7] + 0.02 * Rk, 3), "lv7"]]
     json.dump({"nodes": out_nodes, "bases": bases_out, "root": root, "method": method, "plates": plates},
               open(SITE / "tree.json", "w"), ensure_ascii=False, separators=(",", ":"))
     json.dump({act_node[sr]: [issuer_of(r), r.get("ingress", "")] for sr, r in members.items()},
               open(SITE / "ingress.json", "w"), ensure_ascii=False, separators=(",", ":"))
+    json.dump({t: [r.get("issuer") or "", r.get("ingress") or "", kclauses.get(t, [])] for t, r in kinfo.items() if r.get("ingress")},
+              open(SITE / "ingress_k.json", "w"), ensure_ascii=False, separators=(",", ":"))
     print(json.dumps(method, ensure_ascii=False, indent=1))
     print(f"tree.json {(SITE / 'tree.json').stat().st_size / 1e6:.2f} MB, {len(out_nodes)} nodes; "
-          f"ingress.json {(SITE / 'ingress.json').stat().st_size / 1e6:.2f} MB")
+          f"ingress.json {(SITE / 'ingress.json').stat().st_size / 1e6:.2f} MB; "
+          f"ingress_k.json {(SITE / 'ingress_k.json').stat().st_size / 1e6:.2f} MB")
+
+
+def natkey(s: str):
+    """Order of a cantonal systematic number of any style: 155.611, VIII B/21/5/1, E 5 10.03."""
+    return tuple((0, int(x)) if x.isdigit() else (1, x) for x in re.findall(r"\d+|[A-Za-z]+", s or ""))
 
 
 def sort_srkey(sr: str):

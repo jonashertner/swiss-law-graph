@@ -5,6 +5,37 @@
 // deep zoom does not run out of float32 precision.
 import * as THREE from "three";
 
+// Two looks share one set of shaders: "light" (ink on paper, premultiplied alpha over the
+// page) and "dark" (light on a night sky, additive). THEME's uniforms are shared by every
+// material; setTheme() flips them and each material's blending.
+export const THEME = { light: { value: 1 }, paper: { value: new THREE.Vector3(0.953, 0.945, 0.925) },
+  fog: { value: new THREE.Vector3(1e9, 2e9, 0) } };   // depth fade: near, far (view-space depth), strength
+const MATS = [];
+function themed(mat) {
+  mat.uniforms.uLight = THEME.light; mat.uniforms.uPaper = THEME.paper; mat.uniforms.uFog = THEME.fog;
+  mat.userData.dark = { blending: mat.blending, blendSrc: mat.blendSrc, blendDst: mat.blendDst };
+  MATS.push(mat);
+  applyBlend(mat);
+  return mat;
+}
+function applyBlend(m) {
+  if (THEME.light.value > 0.5) { m.blending = THREE.CustomBlending; m.blendSrc = THREE.OneFactor; m.blendDst = THREE.OneMinusSrcAlphaFactor; }
+  else Object.assign(m, m.userData.dark);
+}
+export function setTheme(light, paper) {
+  THEME.light.value = light ? 1 : 0;
+  if (paper) THEME.paper.value.set(...paper);
+  for (const m of MATS) applyBlend(m);
+}
+export function setFog(near, far, strength) { THEME.fog.value.set(near, far, strength); }
+// GLSL: the paper colour and the ink a display colour becomes on it (deeper, more saturated).
+const INK = /* glsl */ `
+  uniform float uLight; uniform vec3 uPaper; uniform vec3 uFog;
+  vec3 ink(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.6)) * 0.8; }
+  // atmospheric perspective: what lies behind the focus recedes (the far side of the tree)
+  float fogA(float depth) { return 1.0 - uFog.z * smoothstep(uFog.x, uFog.y, depth); }
+  const vec3 NIGHT = vec3(0.06, 0.08, 0.11);`;
+
 const QUAD = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]);
 const QUAD_INDEX = [0, 1, 2, 0, 2, 3];
 
@@ -22,11 +53,11 @@ const SPHERE_VERT = /* glsl */ `
   attribute vec3 iCenter; attribute float iRadius; attribute vec3 iColor; attribute vec4 iState;
   varying vec3 vCenter; varying float vRadius; varying vec3 vPos; varying vec3 vColor; varying vec4 vState;
   varying float vPix;
-  uniform float uPixelScale;
+  uniform float uPixelScale; uniform float uMinPx;
   void main() {
     vec4 c = modelViewMatrix * vec4(iCenter, 1.0);
     float d = length(c.xyz);
-    float r = iRadius;
+    float r = max(iRadius, uMinPx * max(-c.z, 1e-9) / uPixelScale);   // never smaller than uMinPx on screen
     float grow = d > r * 1.0001 ? d / sqrt(max(d * d - r * r, 1e-20)) : 1e4;
     vec3 p = c.xyz + vec3(position.xy * r * min(grow, 40.0), 0.0);
     vCenter = c.xyz; vRadius = r; vPos = p; vColor = iColor; vState = iState;
@@ -53,21 +84,24 @@ const RAYCAST = /* glsl */ `
 // over a faint fill. The plane is the ground plan; case law arcs above it, legislation below.
 export function makeShells(n) {
   const geo = instancedQuad(n, [["iCenter", 3], ["iRadius", 1], ["iColor", 3], ["iState", 4]]);
-  const mat = new THREE.ShaderMaterial({
+  const mat = themed(new THREE.ShaderMaterial({
     uniforms: { uPixelScale: { value: 500 }, uTime: { value: 0 } },
     vertexShader: /* glsl */ `
       attribute vec3 iCenter; attribute float iRadius; attribute vec3 iColor; attribute vec4 iState;
-      varying vec2 vUv; varying vec3 vColor; varying vec4 vState; varying float vPix;
+      varying vec2 vUv; varying vec3 vColor; varying vec4 vState; varying float vPix; varying float vDepth;
       uniform float uPixelScale;
       void main() {
         vec4 c = modelViewMatrix * vec4(iCenter, 1.0);
         vPix = iRadius / max(length(c.xyz), 1e-9) * uPixelScale;      // apparent radius in pixels
         vUv = position.xy * 1.02;
         vColor = iColor; vState = iState;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(iCenter + vec3(vUv.x, 0.0, vUv.y) * iRadius, 1.0);
+        vec4 mv = modelViewMatrix * vec4(iCenter + vec3(vUv.x, 0.0, vUv.y) * iRadius, 1.0);
+        vDepth = -mv.z;
+        gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
-      varying vec2 vUv; varying vec3 vColor; varying vec4 vState; varying float vPix;
+      varying vec2 vUv; varying vec3 vColor; varying vec4 vState; varying float vPix; varying float vDepth;
+      ${INK}
       void main() {
         float d = length(vUv);
         float aa = max(fwidth(d), 1e-5);
@@ -76,14 +110,20 @@ export function makeShells(n) {
         float fill = step(d, 1.0) * 0.022;
         float tiny = smoothstep(2.0, 7.0, vPix);
         float big = 1.0 - smoothstep(2500.0, 9000.0, vPix) * 0.85;                  // enormous discs recede
-        float a = vState.x * vState.y * tiny * (rim * 0.75 + inner * 0.16 + fill * big);
+        if (uLight > 0.5) {         // paper: an ink outline over a faint wash; nesting deepens the wash
+          float a = vState.x * vState.y * tiny * (rim * 0.5 + inner * 0.04 + fill * 1.7 * big) * fogA(vDepth);
+          if (a < 0.002) discard;
+          gl_FragColor = vec4(ink(vColor) * a, a);
+          return;
+        }
+        float a = vState.x * vState.y * tiny * (rim * 0.75 + inner * 0.16 + fill * big) * fogA(vDepth);
         if (a < 0.002) discard;
         gl_FragColor = vec4(vColor * a, a);
       }`,
     extensions: { derivatives: true },
     transparent: true, depthWrite: false, depthTest: true, side: THREE.DoubleSide,
     blending: THREE.AdditiveBlending,
-  });
+  }));
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 1;
@@ -93,14 +133,15 @@ export function makeShells(n) {
 // Acts: solid luminous orbs with correct depth.
 export function makeOrbs(n) {
   const geo = instancedQuad(n, [["iCenter", 3], ["iRadius", 1], ["iColor", 3], ["iState", 4]]);
-  const mat = new THREE.ShaderMaterial({
-    uniforms: { uPixelScale: { value: 500 }, uTime: { value: 0 } },
+  const mat = themed(new THREE.ShaderMaterial({
+    uniforms: { uPixelScale: { value: 500 }, uTime: { value: 0 }, uMinPx: { value: 0 } },
     vertexShader: SPHERE_VERT,
     fragmentShader: /* glsl */ `
       varying vec3 vCenter; varying float vRadius; varying vec3 vPos; varying vec3 vColor; varying vec4 vState;
       varying float vPix;
       uniform float uTime;
       uniform mat4 projectionMatrix;   // three.js declares it for the vertex stage only
+      ${INK}
       ${RAYCAST}
       void main() {
         if (dot(vCenter, vCenter) < vRadius * vRadius) discard;   // the eye is inside: show the articles
@@ -113,11 +154,23 @@ export function makeOrbs(n) {
         float facing = clamp(dot(n, v), 0.0, 1.0);
         float rim = pow(1.0 - facing, mix(2.2, 5.0, smoothstep(40.0, 500.0, vPix)));   // big spheres: thin rim
         float b = vState.y;
+        float open = vState.z;
+        if (uLight > 0.5) {          // paper: a matte body, deeper the more it is cited; selection = dark ring
+          vec3 body = mix(uPaper, ink(vColor), 0.5 + 0.5 * b);
+          float spec = pow(max(dot(n, normalize(l + v)), 0.0), 36.0);
+          vec3 c = body * (0.66 + 0.4 * diff) * (1.0 - 0.3 * rim) + vec3(0.3) * spec;
+          c = mix(c, NIGHT, clamp(vState.w * 2.4 * smoothstep(0.45, 0.8, 1.0 - facing), 0.0, 1.0));
+          float a = vState.x * smoothstep(0.35, 1.2, vPix) * mix(1.0, 0.05 + 0.3 * rim * rim, open);
+          a *= mix(1.0, fogA(-vCenter.z), 0.85);
+          gl_FragColor = vec4(c * a, a);
+          vec4 clip = projectionMatrix * vec4(hit, 1.0);
+          gl_FragDepthEXT = clamp((clip.z / clip.w) * 0.5 + 0.5, 0.0, 1.0);
+          return;
+        }
         vec3 col = vColor * (0.2 + 0.6 * diff) * (0.5 + 0.65 * b)        // lit body, brighter when cited more
                  + vColor * rim * (0.45 + 0.75 * b)                      // luminous rim
                  + vec3(1.0) * vState.w * (0.04 + 0.7 * rim * rim);     // selection / hover: a white rim
-        float open = vState.z;
-        float a = vState.x * smoothstep(0.35, 1.6, vPix) * mix(1.0, 0.04 + 0.3 * rim * rim, open);
+        float a = vState.x * smoothstep(0.35, 1.6, vPix) * mix(1.0, 0.04 + 0.3 * rim * rim, open) * mix(1.0, fogA(-vCenter.z), 0.85);
         gl_FragColor = vec4(col * a, a);
         vec4 clip = projectionMatrix * vec4(hit, 1.0);
         gl_FragDepthEXT = clamp((clip.z / clip.w) * 0.5 + 0.5, 0.0, 1.0);
@@ -125,7 +178,7 @@ export function makeOrbs(n) {
     extensions: { fragDepth: true },
     transparent: true, depthWrite: true, depthTest: true,
     blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
-  });
+  }));
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 2;
@@ -141,7 +194,7 @@ export function makeDots(positions, radii, colors, levels) {
   geo.attributes.iRadius.array.set(radii);
   geo.attributes.iColor.array.set(colors);
   geo.attributes.iState.array.set(levels);
-  const mat = new THREE.ShaderMaterial({
+  const mat = themed(new THREE.ShaderMaterial({
     uniforms: { uPixelScale: { value: 500 }, uFade: { value: 0 } },
     vertexShader: /* glsl */ `
       attribute vec3 iCenter; attribute float iRadius; attribute vec3 iColor; attribute vec4 iState;
@@ -159,6 +212,7 @@ export function makeDots(positions, radii, colors, levels) {
     fragmentShader: /* glsl */ `
       varying vec2 vUv; varying vec3 vColor; varying vec4 vState; varying float vPix;
       uniform float uFade;
+      ${INK}
       void main() {
         // state: x = citations share (0 = uncited), y = repealed, z = highlight, w = dim
         float d = length(vUv);
@@ -169,12 +223,17 @@ export function makeDots(positions, radii, colors, levels) {
         float body = vState.y > 0.5 ? ring * 0.6 : mix(core * 0.3, core * (0.55 + 0.45 * vState.x) + halo * (0.3 + 1.2 * vState.x), cited);
         body = max(body, vState.z * (ring * 1.6 + halo * 0.8));          // selected: bright ring and halo
         vec3 col = mix(vColor, vec3(1.0), 0.2 * vState.x + vState.z * 0.8);
+        if (uLight > 0.5) {
+          body = vState.y > 0.5 ? ring * 0.7 : mix(core * 0.35, core * (0.7 + 0.3 * vState.x) + halo * 0.25 * vState.x, cited);
+          body = max(body, vState.z * (ring * 1.6 + halo * 0.3));
+          col = mix(ink(vColor), NIGHT, vState.z * 0.85);
+        }
         float a = body * uFade * vState.w;
         if (a < 0.003) discard;
         gl_FragColor = vec4(col * a, a);
       }`,
     transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
-  });
+  }));
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 3;
@@ -195,16 +254,20 @@ export function makeStems(positions, colors) {
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   g.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
   g.setAttribute("aTop", new THREE.BufferAttribute(top, 1));
-  const mat = new THREE.ShaderMaterial({
+  const mat = themed(new THREE.ShaderMaterial({
     uniforms: { uFade: { value: 0 } },
     vertexShader: /* glsl */ `
       attribute vec3 aColor; attribute float aTop; varying vec3 vColor; varying float vTop; uniform float uFade;
       void main() { vColor = aColor; vTop = aTop; gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x, position.y * uFade, position.z, 1.0); }`,
     fragmentShader: /* glsl */ `
       varying vec3 vColor; varying float vTop; uniform float uFade;
-      void main() { float a = uFade * (0.08 + 0.32 * vTop); gl_FragColor = vec4(vColor * a, a); }`,
+      ${INK}
+      void main() {
+        float a = uFade * (0.08 + 0.32 * vTop);
+        gl_FragColor = uLight > 0.5 ? vec4(ink(vColor) * a * 1.3, a * 1.3) : vec4(vColor * a, a);
+      }`,
     transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
-  });
+  }));
   const m = new THREE.LineSegments(g, mat);
   m.frustumCulled = false;
   m.renderOrder = 3;
@@ -213,14 +276,16 @@ export function makeStems(positions, colors) {
 
 // Glowing ribbons along precomputed polylines; pulses travel from source to target.
 export function makeRibbons() {
-  const mat = new THREE.ShaderMaterial({
+  const mat = themed(new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uViewport: { value: new THREE.Vector2(1, 1) }, uGlobal: { value: 1 } },
     vertexShader: /* glsl */ `
       attribute vec3 aNext; attribute float aSide; attribute float aT; attribute float aWidth;
       attribute vec3 aColor; attribute float aAlpha; attribute float aFlow;
       varying float vSide; varying float vT; varying vec3 vColor; varying float vAlpha; varying float vFlow;
+      varying float vDepth;
       uniform vec2 uViewport;
       void main() {
+        vDepth = -(modelViewMatrix * vec4(position, 1.0)).z;
         vec4 a = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         vec4 b = projectionMatrix * modelViewMatrix * vec4(aNext, 1.0);
         vec2 sa = a.xy / max(a.w, 1e-9) * uViewport, sb = b.xy / max(b.w, 1e-9) * uViewport;
@@ -232,18 +297,21 @@ export function makeRibbons() {
       }`,
     fragmentShader: /* glsl */ `
       varying float vSide; varying float vT; varying vec3 vColor; varying float vAlpha; varying float vFlow;
+      varying float vDepth;
       uniform float uTime; uniform float uGlobal;
+      ${INK}
       void main() {
         float edge = 1.0 - smoothstep(0.15, 1.0, abs(vSide));
         // pulses travel from the citing act to the cited one (legislation) or both ways (practice)
         float p = fract(vT * 6.0 - uTime * 0.35 * sign(vFlow + 1e-6));
         float pulse = smoothstep(0.0, 0.05, p) * (1.0 - smoothstep(0.05, 0.28, p));
-        float a = vAlpha * uGlobal * edge * (0.55 + 1.6 * pulse * abs(vFlow));
+        float a = vAlpha * uGlobal * edge * (0.55 + 1.6 * pulse * abs(vFlow)) * fogA(vDepth);
+        if (uLight > 0.5) { a = min(a * 1.1, 0.95); gl_FragColor = vec4(ink(vColor) * a, a); return; }
         gl_FragColor = vec4(vColor * a, a);
       }`,
     transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,   // the strip is expanded in screen space; its winding says nothing
-  });
+  }));
   const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 4;

@@ -16,7 +16,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { makeShells, makeOrbs, makeDots, makeStems, makeRibbons, setRibbons, makeStars } from "./gl.js";
+import { makeShells, makeOrbs, makeDots, makeStems, makeRibbons, setRibbons, makeStars, setTheme, setFog } from "./gl.js";
 import { T, CANTON, LANGS } from "./i18n.js";
 
 // ---------- constants ----------
@@ -30,11 +30,20 @@ const HUE = {
   bv: [1.0, 0.86, 0.58],
 };
 const PLATE = [0.5, 0.58, 0.72];     // the floors of the Stufenbau
+const GRAPHITE = [0.56, 0.6, 0.66];  // tree branches on paper: one calm ink; the nodes carry the SR colours
 const BASIS2 = [1.0, 0.8, 0.5];     // a further stated basis (not the place in the tree)
 const SPAN_PX = 12;                 // tree: a node whose span on screen is narrower merges into its parent's links
 const WIRE = [1.0, 0.62, 0.25];   // legislation: amber, below the plane
 const CURRENT = [0.3, 0.82, 1.0]; // case law: cyan, above the plane
-const BOTH = [1.0, 0.97, 0.9];    // both layers: white
+const BOTH_DARK = [1.0, 0.97, 0.9];   // both layers: white on the night sky …
+const BOTH_LIGHT = [0.42, 0.3, 0.56];  // … a deep violet ink on paper
+let BOTH = BOTH_LIGHT;
+// The two looks (index.html carries the CSS tokens; gl.js the shader side).
+const PAPER = [0xf3 / 255, 0xf1 / 255, 0xec / 255], NIGHT_BG = [3 / 255, 6 / 255, 11 / 255];
+let theme = pickTheme();
+// CSS colour of a hue as the map draws it: ink on paper, light on the night sky.
+const ink = (c) => (theme === "light" ? Math.pow(c, 1.6) * 0.8 : c);
+const cssHue = (h, pastel) => `rgb(${(HUE[h] || h || HUE.n).map((c) => Math.round(theme === "light" ? 255 * ink(c) : pastel ? 150 + 105 * c : 255 * c)).join(",")})`;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -53,11 +62,16 @@ let jAdj = [], wOut = [], wIn = [];        // judicial adjacency; legislative ou
 let pairKind = new Map();                  // "a|b" -> 1 law, 2 practice, 3 both
 let sel = { i: -1, art: null }, hover = { i: -1, art: null };
 let period = null, showWire = true, showCurrent = true, edgeYears = null;
+let treeAll = false;      // tree: links of every act, not only the selection's (off: the tree alone reads best)
 const packs = new Map(), packWait = new Map();
 const origin = new THREE.Vector3();
 let W = innerWidth, H = innerHeight, dpr = Math.min(devicePixelRatio || 1, 2);
 const num = (n) => fmt.format(n || 0);
 
+function pickTheme() {
+  try { const s = localStorage.getItem("slm-theme"); if (s === "light" || s === "dark") return s; } catch (e) { /* storage unavailable */ }
+  return "light";
+}
 function pickMode() {
   try { const s = localStorage.getItem("slm-mode"); if (s === "sr" || s === "tree") return s; } catch (e) { /* storage unavailable */ }
   return "tree";
@@ -77,7 +91,6 @@ renderer.setPixelRatio(dpr);
 renderer.setSize(W, H);
 // The shaders write display colours directly; no linear-to-sRGB step at the end.
 renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-renderer.setClearColor(new THREE.Color().setRGB(3 / 255, 6 / 255, 11 / 255, THREE.LinearSRGBColorSpace), 1);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 10000);
 const controls = new OrbitControls(camera, canvas);
@@ -101,6 +114,19 @@ composer.addPass(new OutputPass());
 
 const stars = makeStars();
 scene.add(stars);
+function applyTheme() {
+  const light = theme === "light";
+  document.documentElement.dataset.look = theme;      // not data-theme: the host sets that one
+  setTheme(light, PAPER);
+  renderer.setClearColor(new THREE.Color().setRGB(...(light ? PAPER : NIGHT_BG), THREE.LinearSRGBColorSpace), 1);
+  bloom.enabled = !light;           // a glow belongs to the night sky; on paper it only blurs
+  stars.visible = !light;
+  BOTH = light ? BOTH_LIGHT : BOTH_DARK;
+  $("theme").textContent = light ? "☾" : "☀";
+  $("theme").setAttribute("aria-label", light ? t.themeDark : t.themeLight);
+  $("theme").title = light ? t.themeDark : t.themeLight;
+  edgesDirty = true; treeDirty = true;
+}
 let rings, orbs, wires, current, focusRibbons, treeLines, dots = null, stems = null, dotsAct = -1, artH = null, artFade = 0;
 
 // ---------- data ----------
@@ -131,7 +157,7 @@ async function boot() {
   LAY.sr = sr;
   P = sr.P;
   for (let i = 0; i < NCORE; i++) HK[i] = hueKey(nodes[i], i);
-  for (let i = NCORE; i < N; i++) HK[i] = "bv";
+  for (let i = NCORE; i < N; i++) HK[i] = node(i).ct ? "k" : "bv";     // the BV's own nodes gold; cantonal law brown
   if (tree) buildTreeLayout(tmap); else mode = "sr";
   jAdj = Array.from({ length: N }, () => []);
   for (const [a, b, n, l] of core.edges) {
@@ -176,6 +202,7 @@ function buildTreeLayout(tmap) {
     L.X[i] = o.x; L.Z[i] = o.z; L.CY[i] = o.y; L.R[i] = o.r; L.SPAN[i] = o.w;
     L.P[i] = o.p >= 0 ? tmap[o.p] : -1;
     TN[i] = o; TK[i] = k;
+    if (!idIndex.has(o.i)) idIndex.set(o.i, i);      // "K:GE:E 5 10" also finds the cited act "GE LPA"
   });
   for (let i = 0; i < N; i++) if (L.P[i] >= 0) L.kids[L.P[i]].push(i);
   L.root = tmap[tree.root];
@@ -189,14 +216,15 @@ function buildTreeLayout(tmap) {
   basisOf = Array.from({ length: N }, () => []); dependents = Array.from({ length: N }, () => []);
   for (const [k, list] of Object.entries(tree.bases)) {
     const i = tmap[+k];
-    for (const [tk, eids, clause, how, via, found, prim] of list) {
-      const j = tmap[tk];
-      basisOf[i].push({ j, eids, clause, how, via, found, prim });
+    list.forEach(([tk, eids, clause, how, via, found, prim], k) => {
+      const j = tk >= 0 ? tmap[tk] : -1;           // -1: named in the Ingress, not identified
+      basisOf[i].push({ j, eids, clause, how, via, found, prim, k });
+      if (j < 0) return;
       // a basis in the Constitution names articles: each of them carries the act
       const arts = K[j] === "bvart" || j === L.root ? eids.map((e) => idIndex.get("BV:" + e)).filter((x) => x !== undefined) : [];
       if (arts.length) arts.forEach((a, n) => dependents[a].push({ i, eids, prim: prim && n === 0 }));
       else dependents[j].push({ i, eids, prim });
-    }
+    });
   }
 }
 const node = (i) => (i < NCORE ? core.nodes[i] : XN[i - NCORE]);
@@ -416,12 +444,41 @@ function interpolateZoom(p0, p1) {   // van Wijk & Nuij smooth zoom (d3-interpol
   i.duration = Math.abs(S) * 1000;
   return i;
 }
+// Tree: the camera distance and target height at which every floor, apex to the lowest
+// cantonal floor, fits between the search bar and the tools (found numerically).
+function fitTree(phi) {
+  const pts = [[0, CY[ROOT] + R[ROOT] * 2, 0]];
+  for (const [y, r] of tree.plates) for (let a = 0; a < 32; a++) pts.push([r * Math.cos(a * Math.PI / 16), y, r * Math.sin(a * Math.PI / 16)]);
+  const theta = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)).theta;
+  const cam = camera.clone(), q = new THREE.Vector3(), tgt = new THREE.Vector3();
+  const phone = W <= 760, top = 1 - 2 * (phone ? 120 : 92) / H, bot = -1 + 2 * (phone ? 150 : 70) / H;
+  const left = phone ? -0.94 : -1 + 2 * 390 / W, right = phone ? 0.94 : 1 - 2 * 250 / W;   // legend left, floor names right
+  const bounds = (d, ty) => {
+    tgt.set(0, ty, 0);
+    cam.position.setFromSphericalCoords(d, phi, theta).add(tgt);
+    cam.lookAt(tgt); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of pts) { q.set(p[0], p[1], p[2]).project(cam); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+    return [x0, x1, y0, y1];
+  };
+  let ty = (CY[ROOT] + Math.min(...tree.plates.map((p) => p[0]))) / 2, d = 1;
+  for (let it = 0; it < 6; it++) {
+    let lo = 1e-3, hi = 1e7;
+    for (let k = 0; k < 60; k++) {
+      const m = Math.sqrt(lo * hi), [x0, x1, y0, y1] = bounds(m, ty);
+      if (x1 - x0 <= right - left && y1 - y0 <= top - bot) hi = m; else lo = m;
+    }
+    d = hi;
+    const [, , y0, y1] = bounds(d, ty);
+    ty += ((y0 + y1) / 2 - (top + bot) / 2) * d * Math.tan((camera.fov * Math.PI) / 360) / Math.max(Math.sin(phi), 0.2);
+  }
+  return [d, ty];
+}
 function home(animate = true) {
-  if (mode === "tree") {               // the whole cone, seen from above at an angle
-    const ys = tree.plates.map((pl) => pl[0]), rmax = Math.max(...tree.plates.map((pl) => pl[1]));
-    const ytop = CY[ROOT] + R[ROOT], ybot = Math.min(...ys), phi = W <= 760 ? 0.7 : 1.2;
-    const extent = 0.86 * Math.max(rmax * (W <= 760 ? 1 : 0.8), 0.5 * ((ytop - ybot) * Math.sin(phi) + 2 * rmax * Math.cos(phi)));
-    flyTo(0, 0, distanceToFit(extent), phi, animate, (ytop + ybot) / 2);
+  if (mode === "tree") {               // the whole tree, apex to the cantonal floors, seen at an angle
+    const phi = W <= 760 ? 0.42 : 0.62;     // near the axis the cone reads as a radial tree; tilt shows the floors
+    const [d, ty] = fitTree(phi);
+    flyTo(0, 0, d, phi, animate, ty);
     return;
   }
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
@@ -469,15 +526,23 @@ function controlPointsTree(a, b, lift) {
   const n = pts.length - 1, p0 = pts[0], pn = pts[n];
   return pts.map((p, k) => k === 0 || k === n ? p : p.map((v, d) => BETA * v + (1 - BETA) * (p0[d] + (k / n) * (pn[d] - p0[d]))));
 }
-// Tree links (place in the tree): a radial elbow from parent to child, as in a radial dendrogram.
-function radialLink(p, c, samples = 14) {
+// Tree links (place in the tree): a radial elbow from parent to child, as in a radial
+// dendrogram. The Bézier runs in polar coordinates (angle, radius, height), like d3.linkRadial:
+// the sideways part follows the ring instead of cutting a chord through the cone.
+function radialLink(p, c, samples = 16) {
   const r0 = Math.hypot(X[p], Z[p]), r1 = Math.hypot(X[c], Z[c]), rm = (r0 + r1) / 2;
-  const a1 = Math.atan2(Z[c], X[c]), a0 = r0 > 1e-6 ? Math.atan2(Z[p], X[p]) : a1;
-  const q = [[X[p], CY[p], Z[p]], [rm * Math.cos(a0), CY[p], rm * Math.sin(a0)], [rm * Math.cos(a1), CY[c], rm * Math.sin(a1)], [X[c], CY[c], Z[c]]];
+  const a1 = Math.atan2(Z[c], X[c]);
+  let a0 = r0 > 1e-6 ? Math.atan2(Z[p], X[p]) : a1;
+  if (a0 - a1 > Math.PI) a0 -= 2 * Math.PI; else if (a1 - a0 > Math.PI) a0 += 2 * Math.PI;
+  const q = [[a0, r0, CY[p]], [a0, rm, CY[p]], [a1, rm, CY[c]], [a1, r1, CY[c]]];
   const out = new Float32Array(samples * 3);
   for (let s = 0; s < samples; s++) {
     const u = s / (samples - 1), w = [(1 - u) ** 3, 3 * u * (1 - u) ** 2, 3 * u * u * (1 - u), u ** 3];
-    for (let d = 0; d < 3; d++) out[s * 3 + d] = w[0] * q[0][d] + w[1] * q[1][d] + w[2] * q[2][d] + w[3] * q[3][d] - (d === 0 ? origin.x : d === 1 ? origin.y : origin.z);
+    const a = w[0] * q[0][0] + w[1] * q[1][0] + w[2] * q[2][0] + w[3] * q[3][0];
+    const r = w[0] * q[0][1] + w[1] * q[1][1] + w[2] * q[2][1] + w[3] * q[3][1];
+    out[s * 3] = r * Math.cos(a) - origin.x;
+    out[s * 3 + 1] = w[0] * q[0][2] + w[1] * q[1][2] + w[2] * q[2][2] + w[3] * q[3][2] - origin.y;
+    out[s * 3 + 2] = r * Math.sin(a) - origin.z;
   }
   return out;
 }
@@ -494,25 +559,71 @@ function axisLink(p, c, samples = 18) {
 }
 const LV = (i) => (TN[i] ? TN[i].l : -1);
 let treeDirty = true;
+// Tree branches as a radial elbow tree drawn on the cone's surface: from each parent a trunk
+// runs outward and down to an arc that spans its children on one floor; from the arc a short
+// drop reaches each child. One arc per parent and floor instead of one curve per child, so
+// a BV article visibly embraces the acts that rest on it and no branch crosses another.
+const polarPt = (a, r, y) => [r * Math.cos(a) - origin.x, y - origin.y, r * Math.sin(a) - origin.z];
+const angOf = (i) => Math.atan2(Z[i], X[i]), radOf = (i) => Math.hypot(X[i], Z[i]);
+function wrapNear(a, ref) { while (a - ref > Math.PI) a -= 2 * Math.PI; while (ref - a > Math.PI) a += 2 * Math.PI; return a; }
+function flat(list) { const out = new Float32Array(list.length * 3); list.forEach((q, k) => out.set(q, k * 3)); return out; }
+function arcPts(a0, a1, r, y) {
+  const n = Math.max(2, Math.min(180, Math.ceil(Math.abs(a1 - a0) / 0.015) + 1)), out = [];
+  for (let k = 0; k < n; k++) out.push(polarPt(a0 + (a1 - a0) * k / (n - 1), r, y));
+  return out;
+}
+function combOf(p, group) {             // geometry shared by a parent's children on one floor
+  const rp = radOf(p), yp = CY[p], ap = rp > 1e-6 ? angOf(p) : angOf(group[0]);
+  const rc = Math.min(...group.map(radOf)), yc = CY[group[0]];
+  return { rp, yp, ap, ra: rp + (rc - rp) * 0.5, ya: yp + (yc - yp) * 0.5 };
+}
+function branchPath(i) {                // the single path parent → trunk → arc → drop → i
+  const p = P[i], g = combOf(p, [i]), a = wrapNear(angOf(i), g.ap);
+  return flat([polarPt(g.ap, g.rp, g.yp), polarPt(g.ap, g.ra, g.ya), ...arcPts(g.ap, a, g.ra, g.ya).slice(1), polarPt(a, radOf(i), CY[i])]);
+}
 function writeTreeLines() {
   treeDirty = false;
   if (mode !== "tree") return;
   const lines = [], chain = new Set();
   if (sel.i >= 0) { let j = sel.i; while (j >= 0) { chain.add(j); j = P[j]; } for (const d of subtree(sel.i)) chain.add(d); }
-  const size = LAY.tree.size, top = Math.log10(size[ROOT] + 1);
+  const size = LAY.tree.size, top = Math.log10(size[ROOT] + 1), light = theme === "light";
+  const groups = new Map();             // parent -> height -> children
   for (const i of orbIndex) {
     const p = P[i];
     if (p < 0) continue;
-    const on = chain.has(i) && chain.has(p);
-    const crown = K[i] !== "act";
-    const w = Math.log10(size[i] + 1) / top;          // a branch is as strong as what hangs from it
-    const lv = LV(i);
-    if (lv === 4) {                                     // constitutional link, not an Ingress: the taproot
+    if (LV(i) === 4) {                  // constitutional link, not an Ingress: the taproot
+      const on = chain.has(i) && chain.has(p), w = Math.log10(size[i] + 1) / top;
       lines.push({ pts: axisLink(p, i), width: on ? 2.6 : 1.1 + 2.6 * w, color: HUE.bv, alpha: on ? 0.95 : related ? 0.05 : 0.22 + 0.4 * w, flow: on ? 0.6 : 0.2 });
       continue;
     }
-    lines.push({ pts: radialLink(p, i), width: on ? (lv === 5 ? 1.1 : 2.4) : lv === 5 ? 0.6 : 0.7 + 3.6 * w, color: crown ? HUE.bv : HUE[HK[i]] || HUE.n,
-      alpha: on ? (lv === 5 ? 0.3 : 0.9) : related ? 0.04 : lv === 5 ? 0.12 : 0.16 + 0.5 * w, flow: on ? 0.6 : related || lv === 5 ? 0 : 0.18 });   // pulses run downwards: delegation
+    if (!groups.has(p)) groups.set(p, new Map());
+    const byY = groups.get(p), key = CY[i].toFixed(2);
+    if (!byY.has(key)) byY.set(key, []);
+    byY.get(key).push(i);
+  }
+  const dim = related ? 0.18 : 1;
+  for (const [p, byY] of groups) for (const group of byY.values()) {
+    const g = combOf(p, group), crown = K[group[0]] !== "act";
+    const as = group.map((c) => wrapNear(angOf(c), g.ap));
+    const amin = Math.min(g.ap, ...as), amax = Math.max(g.ap, ...as);
+    const w = Math.log10(group.reduce((s, c) => s + size[c], 0) + 1) / top;
+    const lv = LV(group[0]), canton = lv >= 5;
+    const kc = TN[p] && TN[p].ct;
+    const col = crown ? (kc ? HUE.k : HUE.bv) : light ? GRAPHITE : HUE[HK[p]] || HUE.n;
+    const a0 = (canton ? 0.22 : 0.34 + 0.4 * w) * dim;
+    lines.push({ pts: flat([polarPt(g.ap, g.rp, g.yp), polarPt(g.ap, g.ra, g.ya)]), width: 0.8 + 3.4 * w, color: col, alpha: a0, flow: related ? 0 : 0.15 });
+    if (amax - amin > 1e-4) lines.push({ pts: flat(arcPts(amin, amax, g.ra, g.ya)), width: 0.6 + 2 * w, color: col, alpha: a0 * 0.9, flow: 0 });
+    group.forEach((c, k) => {
+      lines.push({ pts: flat([polarPt(as[k], g.ra, g.ya), polarPt(as[k], radOf(c), CY[c])]), width: canton ? 0.45 : 0.6,
+        color: crown ? (kc ? HUE.k : HUE.bv) : light ? GRAPHITE : HUE[HK[c]] || HUE.n, alpha: (canton ? 0.16 : 0.26) * dim, flow: 0 });
+    });
+  }
+  for (const i of chain) {              // the selection's chain of delegation, and what rests on it
+    const p = P[i];
+    if (p < 0 || !chain.has(p) || LV(i) === 4) continue;
+    const lv = LV(i);
+    lines.push({ pts: branchPath(i), width: lv >= 5 ? 1.2 : 2.4, color: K[i] !== "act" ? HUE.bv : HUE[HK[i]] || HUE.n,
+      alpha: lv >= 5 ? 0.5 : 0.95, flow: 0.6 });   // pulses run downwards: delegation
   }
   if (sel.i >= 0) {                    // further bases of the selection, and acts naming it as a further basis
     for (const b of basisOf[sel.i] || []) if (!b.prim) lines.push({ pts: radialLink(b.j, sel.i), width: 1.5, color: BASIS2, alpha: 0.8, flow: 0.5 });
@@ -589,7 +700,8 @@ function buildEdges() {
     const key = layer === 1 ? fa + "|" + fb + "|1" : (fa < fb ? fa + "|" + fb : fb + "|" + fa) + "|2";
     agg.set(key, (agg.get(key) || 0) + w);
   };
-  const inFocus = (a, b) => !sel.art && (!focus || focus.has(a) || focus.has(b));   // an article: only its own links
+  const quiet = isTree && !focus && !treeAll;                 // tree overview: the delegation tree alone
+  const inFocus = (a, b) => !quiet && !sel.art && (!focus || focus.has(a) || focus.has(b));   // an article: only its own links
   if (showCurrent) core.edges.forEach(([a, b, n], k) => {
     if (!inFocus(a, b)) return;
     let w = n;
@@ -822,7 +934,8 @@ function updateLabels() {
   if (mode === "tree") for (const i of orbIndex) {
     const px = camD(i), k = K[i];
     if (k === "act") { if (px > 3.5) cand.push([i, px]); }
-    else if (k === "bvart") { if (px > 3 && spanPx(i) > 22) cand.push([i, px * 0.8]); }
+    else if (k === "bvart" || k === "kvart") { if (px > 3 && spanPx(i) > 22) cand.push([i, px * 0.8]); }
+    else if (k === "tgroup" && ids[i].startsWith("KG:")) { if (spanPx(i) > 320) cand.push([i, 20]); }   // a canton's groups: close up only
     else if (k === "title" || k === "chapter" || k === "section") { const sp = spanPx(i); if (sp > (k === "title" ? 90 : 160)) cand.push([i, sp * 0.1]); }
     else if (spanPx(i) > 50) cand.push([i, 25]);
   }
@@ -865,23 +978,63 @@ function updateLabels() {
     el.style.transform = `translate(${sx.toFixed(1)}px, ${(sy - 4).toFixed(1)}px) translate(-50%, -100%)`;
     el.style.fontSize = size.toFixed(1) + "px";
     el.dataset.kind = isOrb && K[i] === "act" ? "act" : K[i];
-    el.style.setProperty("--hue", `rgb(${(HUE[HK[i]] || HUE.n).map((c) => Math.round(150 + 105 * c)).join(",")})`);
+    el.style.setProperty("--hue", cssHue(HK[i], true));
     el.classList.toggle("on", i === sel.i);
     el.classList.remove("edge");
     el.hidden = false;
   }
-  // tree: the name of each floor, on its rim nearest the eye
+  // tree: the name of each floor beside its rim, at the floor's outline on the screen's left
+  // (like the storeys of a building section); on its near rim when that edge is off screen
   if (mode === "tree") {
     const ca = Math.atan2(camera.position.z + origin.z, camera.position.x + origin.x);
+    let lastY = -1e9;                              // floors close together on screen: keep their names apart
     for (const [y, r, key] of tree.plates) {
-      const [sx, sy, sz] = toScreen(r * Math.cos(ca), y, r * Math.sin(ca));
-      if (sz > 1 || sx < 60 || sx > W - 60 || sy < 70 || sy > H - 30) continue;
-      const el = labelEl(k++);
+      const a = toScreen(r * Math.cos(ca + Math.PI / 2), y, r * Math.sin(ca + Math.PI / 2));
+      const b = toScreen(r * Math.cos(ca - Math.PI / 2), y, r * Math.sin(ca - Math.PI / 2));
+      const right = $("panel").hidden;               // the panel covers the right edge when open
+      const [lx, ly, lz] = (a[0] > b[0]) === right ? a : b;
       const nn = key === "lvBV" ? null : tree.method.by_level[key.slice(2)];
-      el.textContent = t[key] + (nn ? ` · ${num(nn)}` : "");
-      el.style.transform = `translate(${sx.toFixed(1)}px, ${(sy + 6).toFixed(1)}px) translate(-50%, 0)`;
-      el.style.fontSize = "11.5px";
+      const el = labelEl(k++);
+      const [head, sub] = t[key].split(" · ");
+      el.innerHTML = `<b>${esc(sub || head)}</b><span>${esc(sub ? head : "")}${nn ? (sub ? " · " : "") + num(nn) : ""}</span>`;
+      el.style.fontSize = "";
       el.dataset.kind = "plate";
+      el.classList.remove("on", "edge");
+      if (lz <= 1 && (right ? lx < W - 200 : lx > 240) && ly > 70 && ly < H - 30) {
+        const yy = Math.max(ly, lastY + 34);
+        lastY = yy;
+        const wEst = Math.max((sub || head).length * 7.6, ((sub ? head : "").length + 8) * 7.3);   // keep it on screen
+        const xx = right ? Math.min(lx + 16 + (yy - ly) * 0.25, W - 10 - wEst) : lx - 16;
+        fits(right ? [xx, yy - 17, xx + wEst, yy + 17] : [xx - wEst, yy - 17, xx, yy + 17]);   // canton names keep clear
+        el.style.transform = right ? `translate(${xx.toFixed(1)}px, ${yy.toFixed(1)}px) translate(0, -50%)`
+          : `translate(${(lx - 16).toFixed(1)}px, ${yy.toFixed(1)}px) translate(-100%, -50%)`;
+        el.style.textAlign = right ? "left" : "right";
+        el.hidden = false;
+        continue;
+      }
+      el.style.textAlign = "center";
+      if (W <= 760) { el.hidden = true; continue; }   // a phone: names over the tree would hide it
+      const [sx, sy, sz] = toScreen(r * Math.cos(ca), y, r * Math.sin(ca));
+      if (sz > 1 || sx < 60 || sx > W - 60 || sy < 70 || sy > H - 30) { el.hidden = true; continue; }
+      el.style.transform = `translate(${sx.toFixed(1)}px, ${(sy + 6).toFixed(1)}px) translate(-50%, 0)`;
+      el.hidden = false;
+    }
+  }
+  // tree: each canton's name at the outer rim of its sector (its code where the sector is narrow)
+  if (mode === "tree" && W > 760) {
+    const rim = tree.plates[tree.plates.length - 1];
+    for (const i of orbIndex) {
+      if (!TN[i] || TN[i].l !== 4) continue;
+      const a = Math.atan2(Z[i], X[i]), [sx, sy, sz] = toScreen(rim[1] * 1.04 * Math.cos(a), rim[0], rim[1] * 1.04 * Math.sin(a));
+      if (sz > 1 || sx < 30 || sx > W - 30 || sy < 70 || sy > H - 20) continue;
+      const wide = spanPx(i) > 150, text = wide ? cantonName(TN[i].ct) : TN[i].ct;
+      const w = text.length * 7.5 + 6, box = [sx - w / 2, sy - 9, sx + w / 2, sy + 9];
+      if (!fits(box)) continue;
+      const el = labelEl(k++);
+      el.textContent = text;
+      el.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%)`;
+      el.style.fontSize = "";
+      el.dataset.kind = "kt";
       el.classList.remove("on", "edge");
       el.hidden = false;
     }
@@ -950,6 +1103,15 @@ function updateLabels() {
 }
 function label(i) {
   const o = node(i);
+  if (o.k === "kvart") return `${ksym(o.ct)} ${o.n} ${kvShort(o.ct)}`;
+  if (o.k === "tgroup" && o.i.startsWith("KG:")) return `${t["kg_" + o.i.split(":")[2]]} · ${o.ct}`;
+  if (TN[i] && TN[i].l === 4 && i >= NCORE) return kvShort(TN[i].ct);
+  if (o.k === "act" && o.ct && i >= NCORE) {     // a cantonal act read from its collection
+    const ab = o.ab ? o.ab.split(/\s*,\s*/).pop() : "";
+    if (ab && ab.length <= 16) return ab;
+    const tt = o.t || "";
+    return tt.length > 42 ? tt.slice(0, 40).replace(/\s+\S*$/, "") + " …" : tt || `${o.ct} ${o.ksr}`;
+  }
   if (o.k === "bvart") return `${t.art} ${o.n}`;
   if (o.k === "title" || o.k === "chapter" || o.k === "section") return `${pickL(o.num).replace(/:$/, "")} ${pickL(o.h)}`.trim();
   if (o.k === "abv") return t.abv;
@@ -970,7 +1132,21 @@ function areaLabel(i) {
   if (o.k === "group") return o.sr;                     // the act inside carries the name
   return (o.k === "area" && o.sr ? o.sr + "  " : "") + label(i);
 }
-function title(i) { const v = titles[i]; return v == null ? "" : typeof v === "string" ? v : v[0]; }
+function title(i) {
+  if (TN[i] && TN[i].t) return TN[i].t;          // cantonal acts: the official title from the canton's collection
+  const v = titles[i]; return v == null ? "" : typeof v === "string" ? v : v[0];
+}
+const cantonName = (ct) => (CANTON[ct] ? CANTON[ct][LANGS.indexOf(lang)] : ct);
+const kvShort = (ct) => `${t.kvShort} ${ct}`;
+const ksym = (ct) => (tree && tree.method.ksym && tree.method.ksym[ct]) || t.art;
+const ctLang = (ct) => (["FR", "GE", "VD", "NE", "JU", "VS"].includes(ct) ? "fr" : ct === "TI" ? "it" : "de");
+function kUrl(i) {                               // the act on the canton's own portal
+  const o = TN[i];
+  if (!o) return "";
+  if (o.u) return o.u;
+  const tpl = tree.method.kurl && tree.method.kurl[o.ct];
+  return tpl && o.ksr ? tpl.replace("{}", o.ksr) : "";
+}
 function titleLang(i) { const v = titles[i]; return v && typeof v !== "string" ? v[1] : null; }
 
 // ---------- loop ----------
@@ -992,6 +1168,11 @@ function loop(now) {
   }
   const pxScale = (H / 2) / Math.tan((camera.fov * Math.PI) / 360);
   for (const m of [rings, orbs]) { m.material.uniforms.uPixelScale.value = pxScale; }
+  orbs.material.uniforms.uMinPx.value = mode === "tree" ? 2.4 : 1.1;     // every act stays a visible dot
+  {                                    // depth fade around the point looked at: the far side recedes
+    const d = camera.position.distanceTo(controls.target);
+    if (mode === "tree") setFog(d * 0.92, d * 1.75, 0.8); else setFog(d * 1.2, d * 3.5, 0.45);
+  }
   if (treeDirty) writeTreeLines();
   for (const m of [wires, current, focusRibbons, treeLines]) {
     m.material.uniforms.uTime.value = now / 1000;
@@ -1189,7 +1370,7 @@ function crumbs() {
 function spark(y0, ys, hue) {
   if (!ys || !ys.length) return "";
   const max = Math.max(...ys), n = ys.length, w = 360, h = 64, pad = 14, bw = w / Math.max(n, 1);
-  const col = `rgb(${(HUE[hue] || HUE.n).map((c) => Math.round(255 * c)).join(",")})`;
+  const col = cssHue(hue);
   let bars = "";
   ys.forEach((v, j) => {
     if (!v) return;
@@ -1255,21 +1436,71 @@ function ensureIngress() {
   if (ingress || ingressWait || !tree) return;
   ingressWait = getJSON("data/ingress.json").then((d) => { ingress = d; ingressWait = null; refreshPanel(); }).catch(() => { ingressWait = null; });
 }
-function artNames(eids) { return eids.map((e) => e.replace(/^art_/, "").replace(/_/g, "")); }
+let ingressK = null, ingressKWait = null;     // cantonal Ingresses and the clauses of their bases (7 MB: on demand)
+function ensureIngressK() {
+  if (ingressK || ingressKWait || !tree) return;
+  ingressKWait = getJSON("data/ingress_k.json").then((d) => { ingressK = d; ingressKWait = null; refreshPanel(); }).catch(() => { ingressKWait = null; });
+}
+const listRow = (c, v, d) => `<li><button class="k link" data-sel="${c}">${esc(label(c))}</button><span class="v">${v ?? ""}</span>${d ? `<span class="d">${esc(d)}</span>` : ""}</li>`;
+// A cantonal constitution: Art. 51 BV above it, below it the articles other acts rest on and the groups.
+function kvSections(i) {
+  const ct = TN[i].ct, art51 = idIndex.get("BV:art_51"), L = LAY.tree;
+  const ch = L.kids[i] || [], arts = ch.filter((c) => K[c] === "kvart"), groups = ch.filter((c) => K[c] === "tgroup");
+  const under = (c) => subtree(c).filter((j) => K[j] === "act" && j !== c).length;
+  const byFloor = [5, 6, 7].map((l) => [l, subtree(i).filter((j) => LV(j) === l && !TN[j].cited).length]);
+  let html = `<section><h3><i class="sw tree"></i>${esc(t.basisHead)}</h3><ul class="list"><li><button class="k link" data-sel="${art51}"><i class="sw tree"></i>${esc(t.art)} 51 ${esc(t.bv)}</button><span class="d">${esc(t.kvBasis)}</span></li></ul><p class="note">${esc(t.kvBasisNote)}</p></section>`;
+  html += `<section><h3>${esc(t.kvFloors)}</h3><dl class="facts">${byFloor.map(([l, n]) => `<dt>${esc(t["lv" + l].split(" · ")[1] || t["lv" + l])}</dt><dd class="mono">${num(n)}</dd>`).join("")}</dl></section>`;
+  if (arts.length) html += `<section><h3><i class="sw tree"></i>${esc(t.kvArts)} · ${num(arts.length)}</h3><ul class="list">${arts.slice().sort((a, b) => under(b) - under(a)).slice(0, 40).map((c) =>
+    listRow(c, num(under(c)), pickL(node(c).h))).join("")}</ul>${arts.length > 40 ? `<p class="note">+ ${num(arts.length - 40)}</p>` : ""}</section>`;
+  html += `<section><ul class="list">${groups.map((c) => listRow(c, num((L.kids[c] || []).length), t["kg_" + ids[c].split(":")[2] + "Note"])).join("")}</ul></section>`;
+  const e = TN[i].e;
+  if (e) html += `<section><a class="link" href="${esc(e + "/" + lang)}" target="_blank" rel="noopener">${esc(t.official)} ↗</a></section>`;
+  if (kUrl(i)) html += `<section><a class="link" href="${esc(kUrl(i))}" target="_blank" rel="noopener">${esc(t.cantonalColl(cantonName(ct)))} ↗</a></section>`;
+  return html;
+}
+// A cantonal act: who enacted it, on what it rests (verbatim clauses), what rests on it.
+function kActSections(i) {
+  ensureIngressK();
+  const o = TN[i], bs = basisOf[i] || [], deps = dependents[i] || [];
+  const rec = ingressK ? ingressK[TK[i]] : null;
+  let html = `<section><h3><i class="sw tree"></i>${esc(t.basisHead)}</h3>`;
+  const facts = [];
+  if (rec && rec[0]) facts.push([t.enactedBy, rec[0]]);
+  facts.push([t.floor, (t["lv" + o.l] || "").split(" · ")[1] || ""]);
+  if (o.ad) facts.push([t.adopted, o.ad.split("-").reverse().join(".")]);
+  html += `<dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+  if (o.fb === "Titel" || o.fb === "unbekannt") html += `<p class="note">${esc(o.fb === "Titel" ? t.floorByTitle : t.floorUnknown)}</p>`;
+  if (bs.length) {
+    html += `<ul class="list">${bs.map((b) => {
+      const clause = rec && rec[2] ? rec[2][b.k] || "" : "";
+      const tags = [b.prim ? t.basisPlace : "", b.via === "old" ? t.basisOld : "", b.via === "earlier" ? t.basisEarlier : "",
+        b.via === "absent" ? t.basisAbsent : "", b.j >= 0 && !b.found ? t.basisNotFound : ""].filter(Boolean).join(" · ");
+      if (b.j < 0) return `<li><span class="k"><i class="sw tree2"></i>${esc(b.via === "unresolved" ? t.basisUnresolved : b.via === "earlier" ? t.basisEarlierShort : t.basisAbsentShort)}</span><span class="v">${esc(tags)}</span>${clause ? `<span class="d">«${esc(clause)}»</span>` : ""}</li>`;
+      const isBV = K[b.j] === "bvart" || b.j === LAY.tree.root;
+      const names = artNames(b.eids);
+      const head = K[b.j] === "kvart" ? label(b.j) + (names.length > 1 ? ` (${names.join(", ")})` : "")
+        : isBV ? (names.length ? `${t.art} ${names.join(", ")} ${t.bv}` : t.bvFull)
+          : `${names.length ? (/§/.test(clause) ? "§" : t.art) + " " + names.slice(0, 6).join(", ") + (names.length > 6 ? " …" : "") + " " : ""}${label(b.j)}`;
+      const target = isBV && names.length ? idIndex.get("BV:" + b.eids[0]) ?? b.j : b.j;
+      return `<li><button class="k link" data-sel="${target}"><i class="sw ${b.prim ? "tree" : "tree2"}"></i>${esc(head)}</button><span class="v">${esc(tags)}</span>${clause ? `<span class="d">«${esc(clause)}»</span>` : ""}</li>`;
+    }).join("")}</ul>`;
+    if (P[i] >= 0 && K[P[i]] === "tgroup") html += `<p class="note">${esc(t.kgFedPlace)}</p>`;
+  } else html += `<p class="note">${esc(!rec && ingressKWait ? t.loading : rec && rec[1] ? t.kNoBasis : t.kNoIngress)}</p>`;
+  if (rec && rec[1]) html += `<details class="ingress"><summary>${esc(t.ingressK)}</summary><blockquote lang="${ctLang(o.ct)}">${esc(rec[1])}</blockquote></details>`;
+  html += "</section>";
+  if (deps.length) html += dependentsSection(deps, t.restHead);
+  const u = kUrl(i);
+  if (u) html += `<section><a class="link" href="${esc(u)}" target="_blank" rel="noopener">${esc(t.cantonalColl(cantonName(o.ct)))} ↗</a></section>`;
+  return html;
+}
+function artNames(eids) { return eids.map((e) => (e.startsWith("disp_") ? t.finalProv + " " : "") + e.replace(/^.*art_/, "").replace(/_/g, "")); }
 function basisSections(i) {
   if (!tree || !TN[i]) return "";
-  if (TN[i].l === 4) {                 // a cantonal constitution
-    const art51 = idIndex.get("BV:art_51");
-    const acts = kids[i] && mode === "tree" ? kids[i] : (LAY.tree.kids[i] || []);
-    const list = acts.slice().sort((a, b) => NC[b] - NC[a]);
-    return `<section><h3><i class="sw tree"></i>${esc(t.basisHead)}</h3><ul class="list"><li><button class="k link" data-sel="${art51}"><i class="sw tree"></i>${esc(t.art)} 51 ${esc(t.bv)}</button><span class="d">${esc(t.kvBasis)}</span></li></ul><p class="note">${esc(t.kvBasisNote)}</p></section>`
-      + (list.length ? `<section><h3><i class="sw tree"></i>${esc(t.kvActs)} · ${num(list.length)}</h3><ul class="list">${list.slice(0, 50).map((c) =>
-        `<li><button class="k link" data-sel="${c}">${esc(label(c))}</button><span class="v">${num(NC[c])}</span><span class="d">${esc(title(c))}</span></li>`).join("")}</ul>${list.length > 50 ? `<p class="note">+ ${num(list.length - 50)}</p>` : ""}</section>` : "");
+  if (TN[i].l === 4) return kvSections(i);        // a cantonal constitution
+  if (TN[i].cited) {                               // cited in decisions, no act in force under that code
+    return `<section><h3><i class="sw tree"></i>${esc(t.basisHead)}</h3><p class="note">${esc(t.kg_citedNote)}</p></section>`;
   }
-  if (TN[i].l === 5) {                 // a cantonal act: its place, not its basis
-    const kv = LAY.tree.P[i];
-    return `<section><h3><i class="sw tree"></i>${esc(t.basisHead)}</h3><ul class="list"><li><button class="k link" data-sel="${kv}"><i class="sw tree2"></i>${esc(label(kv))}</button><span class="d">${esc(title(kv))}</span></li></ul><p class="note">${esc(t.cantonalPlace(TN[i].ct))}</p></section>`;
-  }
+  if (TN[i].ct) return kActSections(i);            // a cantonal act read from its collection
   ensureIngress();
   const bs = basisOf[i] || [], deps = dependents[i] || [];
   const ing = ingress ? ingress[TK[i]] : null;
@@ -1323,9 +1554,29 @@ function dependentsSection(deps, head) {
   }
   return html + "</section>";
 }
-function treePanel(i) {                // the Constitution's own nodes and the two sectors
+function treePanel(i) {                // the Constitution's own nodes, the sectors, and cantonal law
   const o = node(i);
   let eyebrow = t.bvFull, h2 = label(i), sub = "", html = "";
+  if (o.ct) {
+    const ctn = cantonName(o.ct);
+    if (o.k === "kvart") {
+      const kv = LAY.tree.P[i];
+      eyebrow = `${t.cantonalAct} · ${ctn}`; sub = pickL(o.h);
+      html += dependentsSection(dependents[i] || [], t.restHeadArt);
+      const e = TN[kv] && TN[kv].e;
+      if (e) html += `<section><a class="link" href="${esc(e + "/" + lang + "#" + o.i.split(":")[2])}" target="_blank" rel="noopener">${esc(t.official)} ↗</a></section>`;
+    } else if (o.k === "tgroup") {
+      eyebrow = `${t.cantonalAct} · ${ctn}`;
+      const g = o.i.split(":")[2], ch = (LAY.tree.kids[i] || []).slice().sort((a, b) => NC[b] - NC[a] || label(a).localeCompare(label(b)));
+      html += `<p class="note">${esc(t["kg_" + g + "Note"])}</p><section><div class="big"><b>${num(ch.length)}</b><span>${esc(t.acts)}</span></div><ul class="list">${ch.slice(0, 80).map((c) =>
+        listRow(c, NC[c] ? num(NC[c]) : "", title(c))).join("")}</ul>${ch.length > 80 ? `<p class="note">+ ${num(ch.length - 80)}</p>` : ""}</section>`;
+    } else {                           // an act of the canton's collection, or its constitution
+      eyebrow = `${t.cantonalAct} · ${ctn}${o.ksr ? " · " + o.ksr : ""}`;
+      sub = o.k === "act" && o.l !== 4 ? o.t || "" : "";
+      html += o.l === 4 ? kvSections(i) : kActSections(i);
+    }
+    return { eyebrow, h2, sub, html };
+  }
   const chain = [];
   let j = P[i];
   while (j >= 0 && j !== ROOT) { chain.unshift(pickL(node(j).num).replace(/:$/, "")); j = P[j]; }
@@ -1403,11 +1654,13 @@ function refreshPanel() {
       html += `<section><a class="link" href="${esc(o.e + anchor)}" target="_blank" rel="noopener">${esc(t.official)} ↗</a></section>`;
     }
   } else if (o.k === "act") {
-    eyebrow = o.c ? `${t.cantonalAct} · ${CANTON[o.c] ? CANTON[o.c][LANGS.indexOf(lang)] : o.c}` : `${t.sr} ${o.sr}${o.reg ? (o.reg === "a" ? " · " + t.edition : " · " + t.earlier) : ""}`;
+    eyebrow = o.c ? `${t.cantonalAct} · ${cantonName(o.c)}${TN[i] && TN[i].ksr ? " · " + TN[i].ksr : ""}` : `${t.sr} ${o.sr}${o.reg ? (o.reg === "a" ? " · " + t.edition : " · " + t.earlier) : ""}`;
     h2 = label(i);
     sub = tt + (tl ? ` [${tl.toUpperCase()}]` : "");
-    html += countBlock(o.n, t.citeAct, o, null);
-    if (o.c && !tt) html += `<p class="note">${esc(t.cantonalNoTitle)}</p>`;
+    const tn = TN[i] && TN[i].dn ? TN[i] : null;     // a cantonal act cited under two codes (CPJA = VRG)
+    html += countBlock(tn ? tn.dn : o.n, t.citeAct, tn ? null : o, null);
+    if (tn) html += `<p class="note">${esc(t.alsoCited(label(i), num(o.n), TN[i].al.map(([c, n]) => `${c} (${num(n)})`).join(", ")))}</p>`;
+    if (o.c && !tt) html += `<p class="note">${esc(TN[i] && TN[i].cited ? t.kg_citedNote : t.cantonalNoTitle)}</p>`;
     if (o.from || o.to) html += `<dl class="facts"><dt>${esc(t.inForce)}</dt><dd class="mono">${esc(o.from || "")} – ${esc(o.to || "")}</dd></dl>`;
     if (o.reg && o.reg !== "a") {
       const j = idIndex.get("SR " + o.sr);
@@ -1433,7 +1686,8 @@ function refreshPanel() {
       html += "</section>";
     }
     if (o.nt) html += `<p class="note">${esc(t.noText(num(o.nt)))}</p>`;
-    if (o.e) html += `<section><a class="link" href="${esc(o.e + (o.c ? "" : "/" + lang))}" target="_blank" rel="noopener">${esc(o.c ? t.cantonal : t.official)} ↗</a></section>`;
+    if (o.c && TN[i] && kUrl(i)) html += `<section><a class="link" href="${esc(kUrl(i))}" target="_blank" rel="noopener">${esc(t.cantonalColl(cantonName(o.c)))} ↗</a></section>`;
+    else if (o.e) html += `<section><a class="link" href="${esc(o.e + (o.c ? "" : "/" + lang))}" target="_blank" rel="noopener">${esc(o.c ? t.cantonal : t.official)} ↗</a></section>`;
   } else if (o.k === "bucket") {
     const p = node(P[i]);
     eyebrow = t.cantonalAct; h2 = t.bucket;
@@ -1482,7 +1736,10 @@ $("close").onclick = () => select(-1);
 function writeHash() {
   let h = "";
   if (sel.i >= 0) {
-    h = ids[sel.i].replace(/ /g, "_").replace(/@/g, "~").replace(/\*/g, "x").replace(/^(BV|TREE):/, "$1.").replace(/\//g, "~~");
+    const id = ids[sel.i], km = id.match(/^(K|KV|KG):(.*)$/);
+    // cantonal ids keep every character: "_" escapes ("K:GL:VIII B/21/5/1" -> "K.GL_cVIII_sB_l21_l5_l1")
+    h = km ? km[1] + "." + km[2].replace(/_/g, "_u").replace(/ /g, "_s").replace(/\//g, "_l").replace(/:/g, "_c").replace(/[^A-Za-z0-9._~-]/g, (c) => "_x" + c.charCodeAt(0).toString(16) + "_")
+      : id.replace(/ /g, "_").replace(/@/g, "~").replace(/\*/g, "x").replace(/^(BV|TREE):/, "$1.").replace(/\//g, "~~");
     if (sel.art) h += "--" + sel.art.replace(/\//g, "~");
   }
   try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) { /* sandboxed */ }
@@ -1491,7 +1748,9 @@ function decodeHash() {
   const h = decodeURIComponent((location.hash || "").slice(1));
   if (!h) return null;
   const [nd, art] = h.split("--");
-  const id = /^(BV|TREE)\./.test(nd) ? nd.replace(/^(BV|TREE)\./, "$1:").replace(/~~/g, "/") : nd.replace(/_/g, " ").replace(/~/g, "@").replace(/ x$/, " *");
+  const km = nd.match(/^(K|KV|KG)\.(.*)$/);
+  const id = km ? km[1] + ":" + km[2].replace(/_x([0-9a-f]+)_/g, (m, c) => String.fromCharCode(parseInt(c, 16))).replace(/_c/g, ":").replace(/_l/g, "/").replace(/_s/g, " ").replace(/_u/g, "_")
+    : /^(BV|TREE)\./.test(nd) ? nd.replace(/^(BV|TREE)\./, "$1:").replace(/~~/g, "/") : nd.replace(/_/g, " ").replace(/~/g, "@").replace(/ x$/, " *");
   const i = idIndex.get(id);
   return i === undefined ? null : { i, art: art ? art.replace(/~/g, "/") : null };
 }
@@ -1549,6 +1808,11 @@ function search(q) {
   }
   const nq = norm(q), lq = q.toLowerCase();
   const words = lq.split(/\s+/).filter((w) => w.length > 1);
+  // "ZH PBG" / "PBG ZH": an abbreviation inside one canton
+  const cq = q.match(/^([A-Za-z]{2})\s+(.+)$/) || q.match(/^(.+?)\s+([A-Za-z]{2})$/);
+  const qct = cq ? (CANTON[cq[1].toUpperCase()] ? cq[1].toUpperCase() : CANTON[cq[2].toUpperCase()] ? cq[2].toUpperCase() : null) : null;
+  const rest = qct ? norm(cq[1].toUpperCase() === qct ? cq[2] : cq[1]) : nq;
+  const restWords = qct ? (cq[1].toUpperCase() === qct ? cq[2] : cq[1]).toLowerCase().split(/\s+/).filter((w) => w.length > 1) : words;
   const ali = core.alias[nq];
   if (ali !== undefined) out.push({ i: ali, score: 900 });
   for (let i = 1; i < NCORE; i++) {
@@ -1556,13 +1820,26 @@ function search(q) {
     if (o.k === "bucket") continue;
     let s = 0;
     if (o.sr && (o.sr === q || (q.length >= 2 && /^[\d.]+$/.test(q) && o.sr.startsWith(q)))) s = o.sr === q ? 800 : 300 - o.sr.length;
-    if (o.a) for (const v of Object.values(o.a)) { const nv = norm(v); if (nv === nq) s = Math.max(s, 850); else if (nq.length >= 2 && nv.startsWith(nq)) s = Math.max(s, 400); }
+    if (o.a) for (const v of Object.values(o.a)) {
+      const nv = norm(v);
+      if (nv === nq || (qct && o.c === qct && nv === rest)) s = Math.max(s, 850); else if (nq.length >= 2 && nv.startsWith(nq)) s = Math.max(s, 400);
+    }
     if (!s && words.length) {
       const tt = (title(i) || "").toLowerCase();
       if (tt && words.every((w) => tt.includes(w))) s = 200 - Math.min(tt.length / 4, 60);
       else if (o.k === "canton" && label(i).toLowerCase().startsWith(lq)) s = 600;
     }
     if (s) out.push({ i, score: s + Math.log10(NC[i] + 1) * 12 });
+  }
+  // cantonal acts of the official collections: abbreviation ("PBG", "ZH PBG", "PBG ZH"), number, title words
+  if (tree && (rest.length >= 2 || restWords.length)) for (let i = NCORE; i < N; i++) {
+    const o = XN[i - NCORE];
+    if (!o.ct || (o.k !== "act" && o.k !== "kvart") || (qct && o.ct !== qct)) continue;
+    let s = 0;
+    if (o.ab) for (const a of o.ab.split(/\s*,\s*/)) { const na = norm(a); if (na === rest) s = Math.max(s, qct ? 820 : 640); }
+    if (!s && o.ksr && (o.ksr === q || norm(o.ksr) === rest)) s = 600;
+    if (!s && restWords.length && o.t) { const tt = fold(o.t); if (restWords.every((w) => tt.includes(fold(w)))) s = 180 - Math.min(o.t.length / 4, 60) + (qct ? 120 : 0); }
+    if (s) out.push({ i, score: s - LV(i) });
   }
   ensureTopics();
   if (!m) out.push(...topicMatches(q));
@@ -1581,7 +1858,7 @@ function showResults() {
     const o = node(r.i);
     const head = r.topic || (r.artNum ? `${t.art} ${r.artNum} ${label(r.i)}` : (o.k === "area" ? `${o.sr} ${label(r.i)}` : label(r.i)));
     const subl = r.topic ? `${label(r.i)} · ${title(r.i)}`
-      : o.k === "act" ? [o.sr ? `${t.sr} ${o.sr}` : (o.c || ""), title(r.i)].filter(Boolean).join(" · ") : (o.k === "area" || o.k === "group" ? t.area : "");
+      : o.k === "act" ? [o.sr ? `${t.sr} ${o.sr}` : o.ct ? `${o.ct} ${o.ksr || ""}`.trim() : (o.c || ""), title(r.i)].filter(Boolean).join(" · ") : (o.k === "area" || o.k === "group" ? t.area : "");
     return `<button role="option" aria-selected="${n === 0}" data-n="${n}"><span class="t">${esc(head)}</span><span class="s">${esc(subl)}</span><span class="n">${r.artNum ? "" : num(r.topic ? r.n : NC[r.i])}</span></button>`;
   }).join("");
 }
@@ -1637,9 +1914,15 @@ $("tilt").onclick = () => {
   flyTo(w.x, w.z, viewDist(), nextView(sph.phi), true, controls.target.y);
   setTimeout(() => { $("tilt").textContent = tiltLabel(); }, 2500);
 };
+$("theme").onclick = () => {
+  theme = theme === "light" ? "dark" : "light";
+  try { localStorage.setItem("slm-theme", theme); } catch (e) { /* storage unavailable */ }
+  applyTheme(); buildLegend(); refreshPanel(); updateLabels();
+};
 $("mtree").onclick = () => setMode("tree");
 $("msr").onclick = () => setMode("sr");
 $("lwire").onclick = () => { showWire = !showWire; $("lwire").setAttribute("aria-pressed", showWire); edgesDirty = true; };
+$("lall").onclick = () => { treeAll = !treeAll; $("lall").setAttribute("aria-pressed", treeAll); edgesDirty = true; };
 $("lcurrent").onclick = () => { showCurrent = !showCurrent; $("lcurrent").setAttribute("aria-pressed", showCurrent); edgesDirty = true; };
 $("periodbtn").onclick = () => {
   const box = $("period"), on = box.hidden;
@@ -1695,6 +1978,7 @@ function applyLang() {
   $("mtree").setAttribute("aria-pressed", mode === "tree"); $("msr").setAttribute("aria-pressed", mode === "sr");
   $("mtree").hidden = $("msr").hidden = !LAY.tree;
   $("ltree").hidden = mode !== "tree";
+  $("lall").hidden = mode !== "tree"; $("lalltext").textContent = t.treeAll;
   $("ltreetext").textContent = t.basisLink;
   $("ik1").textContent = t.lawWiring; $("ik2").textContent = t.practice; $("ik3").textContent = t.bothShort;
   $("layershead").textContent = t.layers;
@@ -1711,7 +1995,7 @@ function buildLegend() {               // colour = SR area in both views; in the
   const items = srk[ch].map((j) => [j, HK[j], label(j)]);
   items.push([idIndex.get("KT"), "k", t.KT]);
   if (mode === "tree") items.unshift([-1, "bv", t.bvFull]);
-  el.innerHTML = items.map(([j, h, l]) => `<button data-sel="${j}" title="${esc(l)}"${mode === "tree" ? " disabled" : ""}><i style="background: rgb(${(HUE[h] || HUE.n).map((c) => Math.round(255 * c)).join(",")})"></i><span>${esc(j >= 0 && core.nodes[j].sr ? core.nodes[j].sr + " " : "")}${esc(l)}</span></button>`).join("");
+  el.innerHTML = items.map(([j, h, l]) => `<button data-sel="${j}" title="${esc(l)}"${mode === "tree" ? " disabled" : ""}><i style="background: ${cssHue(h)}"></i><span>${esc(j >= 0 && core.nodes[j].sr ? core.nodes[j].sr + " " : "")}${esc(l)}</span></button>`).join("");
   el.onclick = (e) => { const b = e.target.closest("[data-sel]"); if (b && mode === "sr") select(+b.dataset.sel); };
 }
 
@@ -1733,4 +2017,5 @@ $("methodbtn").onclick = openMethod;
 $("method").addEventListener("click", (e) => { if (e.target.id === "method") closeMethod(); });
 
 window.__slm = { select, pick, home, setMode, get mode() { return mode; }, updateLabels, rebuild: () => { buildEdges(); return buildMs; }, idx: (id) => idIndex.get(id), get dbg() { return { buildMs, lines: lastEntries.length, dotsAct, p: dots ? actRec(dotsAct).p : null, pxu: pxPerUnitAt(viewDist()), R: R[sel.i], pool: pool.length, fade: artFade, W, H }; }, get state() { return { sel, origin: origin.toArray(), dist: viewDist() }; }, get entries() { return lastEntries.map(([k, w]) => { const [a, b, l] = k.split("|").map(Number); return [ids[a], ids[b], l, w, Math.round(projectedPx(a)), Math.round(projectedPx(b))]; }); }, get meshes() { return { wires, current, focusRibbons, orbs, rings, camera, controls }; } };
+applyTheme();
 boot().catch((e) => { $("loading").textContent = "Error: " + e.message; console.error(e); });
