@@ -24,6 +24,11 @@ contradictions and lacunae. Owner: Jonas Hertner (also owner of opencaselaw.ch).
 - `data/fedlex_regime_articles.json` — article numbers of each earlier act from its earliest and last
   published text (mostly PDF/A, parsed by bold "Art." headings) (`fetch_fedlex_regimes.py`, needs
   `build/act_nodes.json` from step 1). 171/230 earlier acts have a text.
+- `data/fedlex_xrefs.json` — legislative cross-references: for every act in force plus every cited
+  act (5,145), the current consolidated DE XML read once; an SR-number footnote (not inside an
+  article heading, not an AS amendment note) or an `eli/cc` link names another act
+  (`fetch_fedlex_xrefs.py`, ~50 min). 28,075 references, 12,167 act pairs, 0 texts failed.
+  Drafting rules put the footnote at the first mention only: 76 % of pairs have weight 1.
 - Alias tables live in the opencaselaw repo: `docs/data/law_codes.json`,
   `docs/api/law_aliases.json` (public repo: clone `jonashertner/opencaselaw` next to this one).
 - Do NOT use `jonashertner/opencaselaw-data` (private telemetry; its cards forbid release).
@@ -94,6 +99,12 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     before 2025-01-01 (KlV climate ordinance from then on: ambiguous, excluded).
 14. Counting unit on the map: a decision counts once per act / article; areas count distinct
     decisions citing any act inside (not the sum of their acts).
+15. Two layers of links between acts, never mixed: case law (co-citation, decision 9) arcs above the
+    SR plane, blue; legislation (`fedlex_xrefs.json`, directed, weight = provisions of the referring
+    act that name the other) arcs below it, gold; a pair in both is white. 11,693 legislative pairs
+    join two acts on the map (474 name an SR number without a node); 507 pairs are in both layers.
+    Lines follow the SR tree (Holten bundling, β = 0.75) and merge into the visible areas from afar.
+    Legislation is today's text only (no time series); case law has per-year counts (`ey.json`).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -110,6 +121,17 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
       "Mietrecht" → OR Achter Titel: Die Miete; lazily loaded `topics.<lang>.json`), DE/FR/IT/EN, method panel, period filter,
       dark mode, phone layout (bottom sheet), deep links `#SR_220--art_41`. Articles loaded per
       shard (168 shards, ≤ 1.8 MB raw).
+- [x] Step 4′ 3D (`site/index.html` + `main.js`, `gl.js`, `i18n.js`, `method.js`; three.js 0.160.0 from
+      jsDelivr via import map). The SR plan is the floor: containers are flat glowing discs, acts are
+      ray-traced sphere impostors standing on it (11,000 spheres = 11,000 quads; floating origin for
+      float32 depth). Display-referred colours: `renderer.outputColorSpace = Linear` (sRGB output
+      lifted every dark tone). Ribbons are screen-space strips (double-sided: their winding is
+      arbitrary). Zooming into an act dissolves its sphere into its articles, which rise as a skyline
+      (height ∝ √ citing decisions). Selection = focus + context; pointing at a partner in the panel
+      lights that link; off-screen partners get edge chips. Views: top / tilted / side (side shows
+      both hemispheres). Rebuilds of the bundles are skipped unless the set of open containers
+      changes. The 2D Canvas version survives as `site/flat.html` + `app.js`.
+      `06_artifact.py` inlines the modules (each its own scope) for the claude.ai Artifact.
 - [x] Step 5 partly: counts cross-checked with the opencaselaw MCP (BGE 143 IV 241 in-degree;
       Art. 41 OR — the MCP undercounts, see report D1); desktop + phone screenshots via Playwright.
 
@@ -122,8 +144,13 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
 - Jonas to review the preview on desktop and phone; decide public vs private.
 - Decision search (by docket / BGE citation) and a decision panel with its own cites/cited-by.
 - PageRank as an optional authority measure (in-degree today).
-- Time slider polish (animation over years); EN titles exist for 471 SR entries only (fallback DE).
-- Canvas content is not screen-reader accessible; the panel, search and method dialog are.
+- EN titles exist for 471 SR entries only (fallback DE).
+- WebGL content is not screen-reader accessible; the panel, search and method dialog are.
+- Real-device check of the 3D page (GPU phones): headless software rendering is all that was tested.
+- Legislation layer: article-level refs exist in the packs (`x`) for the article panel; the reverse
+  ("which provisions of other acts name this article") needs article-precise targets, which the
+  footnotes do not give (they name the act).
+- A guided tour (3–4 stops) for first-time visitors.
 - Phase 2 (simplification, contradictions, lacunae) builds on `fedlex_structure.json.gz` and the
   article co-citation graph.
 

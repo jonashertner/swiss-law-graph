@@ -2,12 +2,15 @@
 
 core.json   every circle of the map (domain, area, group, act, canton, bucket)
             with position, exact counts, titles DE/FR/IT/EN, links, per-year
-            counts of acts, act co-citation edges, search aliases and the
-            numbers of the method panel.
+            counts of acts, act co-citation edges [a, b, n, lift], legislative
+            cross-references `xedges` [from, to, provisions], search aliases and
+            the numbers of the method panel.
+ey.json     per co-citation edge (same order as core.edges): [first year,
+            decisions per year], loaded with the time slider.
 p/<n>.json  articles of a few acts each, loaded when the reader zooms in:
             grid position, citing decisions, years, headings, the act's
-            structure, most-cited decisions, article co-citation edges,
-            the act's "not found in the text" bucket.
+            structure, most-cited decisions, article co-citation edges, the acts
+            each article's text names (`x`), the act's "not found in the text" bucket.
 
 Article grid: articles keep their order in the official text (Art. 1 top
 left, reading order), each top-level unit of the act (book, part, title)
@@ -261,10 +264,56 @@ def main() -> None:
                     o["e"] = kt[3]
         out_nodes.append(o)
 
-    # Act co-citation edges.
-    act_edges = [[index[x], index[y], n, round(l, 2)]
-                 for x, y, n, l in c.sql(f"select x, y, n, lift from '{G}/act_edges.parquet'").fetchall()
-                 if x in index and y in index]
+    # Act co-citation edges, and per edge the decisions citing both acts by year
+    # (ey.json, aligned with core.edges, loaded only when the time slider opens).
+    pair_years = defaultdict(list)
+    for x, y, yr, n in c.sql(f"select x, y, yr, n from '{G}/act_edge_years.parquet' order by x, y, yr").fetchall():
+        pair_years[(x, y)].append((yr, n))
+    act_edges, edge_years = [], []
+    for x, y, n, l in c.sql(f"select x, y, n, lift from '{G}/act_edges.parquet' order by x, y").fetchall():
+        if x not in index or y not in index:
+            continue
+        act_edges.append([index[x], index[y], n, round(l, 2)])
+        ys = pair_years.get((x, y))
+        if ys:
+            dense = [0] * (ys[-1][0] - ys[0][0] + 1)
+            for yy, nn in ys:
+                dense[yy - ys[0][0]] = nn
+            edge_years.append([ys[0][0], dense])
+        else:
+            edge_years.append(None)
+
+    # Legislative cross-references (pipeline/fetch_fedlex_xrefs.py): act A's current
+    # text names act B's SR number in a footnote or links to it. Weight = number of
+    # A's provisions that do so. Only pairs whose two acts are on the map are drawn.
+    xedges, art_x, xstats = [], defaultdict(set), None
+    xpath = ROOT / "data" / "fedlex_xrefs.json"
+    if xpath.exists():
+        xr = json.load(open(xpath))
+        prov = defaultdict(set)
+        xstats = {"run_date": xr["run_date"], "acts_read": 0, "acts_failed": 0, "references": 0,
+                  "act_pairs": 0, "act_pairs_on_map": 0, "acts_on_map_with_refs": 0}
+        all_pairs = set()
+        for sr, rec in xr["acts"].items():
+            if rec.get("refs") is None:
+                xstats["acts_failed"] += 1
+                continue
+            xstats["acts_read"] += 1
+            xstats["references"] += len(rec["refs"])
+            src = f"SR {sr}"
+            for eid, tgt in rec["refs"]:
+                if tgt == sr:
+                    continue
+                all_pairs.add((sr, tgt))
+                dst = f"SR {tgt}"
+                if src in index and dst in index:
+                    prov[(src, dst)].add(eid)
+                    if eid.startswith("art_"):
+                        art_x[(src, eid)].add(index[dst])
+        xstats["act_pairs"] = len(all_pairs)
+        xstats["act_pairs_on_map"] = len(prov)
+        xstats["acts_on_map_with_refs"] = len({s for s, _ in prov})
+        xedges = sorted([index[s], index[d], len(e)] for (s, d), e in prov.items())
 
     # --- Articles. ---
     arts = defaultdict(list)
@@ -376,6 +425,9 @@ def main() -> None:
                 e = aedges.get((aid, key))
                 if e:
                     extra["e"] = sorted(e, key=lambda z: -z[4] * math.log(z[5]))[:12]
+                x = art_x.get((aid, key))
+                if x:
+                    extra["x"] = sorted(x)
                 if extra:
                     a.append(extra)
                 rec["arts"].append(a)
@@ -474,6 +526,8 @@ def main() -> None:
         "citations": {k: v for k, v in rep["citations"].items() if k != "co_citation"},
         "co_citation": rep["citations"]["co_citation"],
         "act_edges": len(act_edges),
+        "xrefs": xstats,
+        "xedges": len(xedges),
     }
     # Titles go to one file per language (a phone loads one): the title in that
     # language, else [title, language] from the first of de/fr/it that has one.
@@ -489,9 +543,10 @@ def main() -> None:
         json.dump(col, open(SITE / f"titles.{lang}.json", "w"), ensure_ascii=False, separators=(",", ":"))
     for o in out_nodes:
         o.pop("t", None)
-    core = {"nodes": out_nodes, "edges": act_edges, "alias": alias, "method": method,
+    core = {"nodes": out_nodes, "edges": act_edges, "xedges": xedges, "alias": alias, "method": method,
             "packs": len(packs)}
     json.dump(core, open(SITE / "core.json", "w"), ensure_ascii=False, separators=(",", ":"))
+    json.dump(edge_years, open(SITE / "ey.json", "w"), separators=(",", ":"))
     sizes = sorted((f.stat().st_size for f in (SITE / "p").glob("*.json")), reverse=True)
     print(f"core.json {(SITE / 'core.json').stat().st_size / 1e6:.2f} MB, {len(out_nodes)} nodes, "
           f"{len(act_edges)} act edges; {len(packs)} packs, largest {sizes[0] / 1e6:.2f} MB, "

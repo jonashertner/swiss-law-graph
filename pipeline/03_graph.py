@@ -121,8 +121,8 @@ def main() -> None:
                   from px join nx nx1 on nx1.k = px.x join nx nx2 on nx2.k = px.y
                   where px.n * {n_total}::double / (nx1.n * nx2.n) >= {MIN_LIFT}""")
         c.sql(f"""create table {name} as with both_ as (
-                    select x, y, n, lift, row_number() over (partition by x order by n * ln(lift) desc, n desc) rx,
-                           row_number() over (partition by y order by n * ln(lift) desc, n desc) ry from sx)
+                    select x, y, n, lift, row_number() over (partition by x order by n * ln(lift) desc, n desc, y) rx,
+                           row_number() over (partition by y order by n * ln(lift) desc, n desc, x) ry from sx)
                   select x, y, n, lift from both_ where rx <= {TOP_K} or ry <= {TOP_K}""")
         print(name, c.sql(f"select count(*) from px").fetchall()[0][0], "pairs >= min;",
               c.sql(f"select count(*) from sx").fetchall()[0][0], "with lift >=", MIN_LIFT, ";",
@@ -133,8 +133,16 @@ def main() -> None:
     c.sql("create table artk as select act_id || '|' || art k, decision_id from artd")
     cocite("artk", "k", MIN_ART, "art_edges")
 
+    # Years of each kept act link: decisions citing both acts, by decision year.
+    c.sql("""create table act_edge_years as
+             select e.x, e.y, year(m.dt) yr, count(*) n
+             from act_edges e
+             join ad a on a.act_id = e.x
+             join ad b on b.act_id = e.y and b.decision_id = a.decision_id
+             join meta m on m.decision_id = a.decision_id
+             where m.dt is not null group by 1, 2, 3""")
     for t in ("acts", "act_years", "act_nf", "articles", "art_years", "top_decisions", "decisions",
-              "act_edges", "art_edges"):
+              "act_edges", "art_edges", "act_edge_years"):
         c.sql(f"copy {t} to '{OUT}/{t}.parquet' (compression zstd)")
     rep["decisions_in_corpus"] = c.sql("select count(*) from meta").fetchall()[0][0]
     rep["decisions_citing_a_resolved_act"] = c.sql("select count(distinct decision_id) from ad").fetchall()[0][0]

@@ -20,6 +20,11 @@ Ordered by impact. Each item says how the map handles it meanwhile.
 the two ids: the pairs receive 2,733,265 citations on the BGE side and 159,374 on the BGer side.
 *Suggested fix:* expose a canonical id (or a `same_as` link) and attach statute references once.
 *Map:* merged onto the BGE id; citation pairs deduplicated after the merge.
+*Live service:* the MCP already collapses duplicate representations in search results (the nightly
+representation manifest, ~140k rows: GE procedure/decision numbers, VD dual scrapes, SH twin courts;
+and the BGE dual-id fold `bge_` / `bge_BGE_`, `tests/test_bge_twin_fold.py`). Both are link-only and
+do not reach the CC0 export, which carries no `bge_BGE_` ids. Whether the manifest also links the
+BGE/BGer docket pairs of A1 was not checked.
 
 ### A2. Other duplicate records — 185
 Same label, same date, same canton, two ids: `be_weitere` ↔ `be_direktionen` 173
@@ -164,6 +169,12 @@ snapshot's 724). Asked for Art. 41 OR, a German-speaking user gets about a third
 the union is 10,503 decisions (10,424 after merging BGE/BGer duplicates and adding the other
 alias spellings). This is the pairing problem `law_codes.json` itself warns about ("_why").
 Worth checking `find_leading_cases(law_code=…)` and every other tool that filters by `law_code`.
+*Status:* fixed on opencaselaw branch `claude/law-code-language-pairing` (commit e178afe; not merged,
+not deployed). `_law_code_variants` expands a code to its language variants from `law_codes.json`
+(federal entries only; cantonal homonyms such as LPA, StG, VRP stay alone) and is applied in
+`analyze_legal_trend` (which now also reports `law_codes_counted`), `find_leading_cases`, its statute
+fallback and the graph statute search. A decision citing both OR and CO counts once.
+Tests: `tests/test_law_code_language_pairing.py` (5).
 
 ### D2. The future-dated decision shows in `get_statistics`
 `by_year` contains `"2027": 1` — the `fr_gerichte_605 2025 140` record of A3.
