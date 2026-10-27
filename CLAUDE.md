@@ -78,6 +78,13 @@ after 08 has written atlas.json; then 08 again) for the time view: adoption, ent
 federal act and treaty on the site (`data/fedlex_dates.json`, 5,111 SR numbers).
 Cantonal collections (only when refreshing): `python3 pipeline/cantonal/lexwork.py` (~15 min), `zh.py`
 (~15 min), `vd.py` (~30 min), `ge.py`, `ne.py`, `ju.py`, `ti.py`, `sz.py` (minutes each), then `cantonal_basis.py`.
+Law repository (decision 36; only when refreshing — fetches ~2 h, conversion ~2 h on 4 cores, assembly ~20 min):
+`python3 pipeline/lawgit/fedlex_versions.py` (version list, SPARQL) → `fedlex_fetch.py` (XML of every version since 2021,
+build/lawgit/xml, ~38,000 files) → `lexwork_fetch.py` (19 cantons, every version since 2021) → `vd_fetch.py` (BLV) →
+`convert.py [ch] [kt] [vd] [sil]` (Markdown + word check per file, build/lawgit/md, check_*.json; `sil` = GE/NE from the
+cantonal caches build/cantonal/raw/{GE,NE}/htm) → `build_repo.py <dir>` (fresh git repository via fast-import: main + future)
+→ push to `jonashertner/swisslawgit` (the name Jonas chose; not `swisslaw`, which is swisslaw.io). Converters: `akn2md.py`
+(Fedlex), `lexwork2md.py`, `vd2md.py`, `sil2md.py` (GE/NE Word-HTML); README/indexes `readme.py`.
 Preview (private): the public site (decision 28) at https://claude.ai/artifact/XBRDshccV9KQwnf8qdaqo9 and,
 since 2026-10-27 (Jonas: "replace the 3D preview too"), also at the former 3D preview
 https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republish both from `docs/index.html` without its
@@ -558,6 +565,41 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     tree 2,122 acts, 3,254 bases, 69 without a basis in the tree (58 name none), 15 dangling; cantonal 24,384 bases;
     matrix 24,791 pairs in 1,466 cells (24,790 after decision 33); network 18,213 acts (4,332 in force without a link).
     The method page states the reading rules with the counts from method.json.
+
+36. The law as a git repository (2026-10-27, Jonas: "Full text in git. My name repo and jonashertner.com brand, federal 2021 to
+    today but also cantonal"; "swisslawgit shall be the name of the repo"; "let's also capture adopted laws only coming into
+    effect in future, as well as Vernehmlassungsvorlagen"; `pipeline/lawgit/`, repository `jonashertner/swisslawgit` — not
+    `swisslaw`, which is swisslaw.io). One Markdown file per act and language, one commit per version, dated 00:00 Zurich on the
+    day the version applies, author "swiss-law · jonashertner.com"; `main` = the law as it applied each day from 2021-01-01 to the
+    run, `future` = main plus the versions already published for a later day. Paths: `ch/<area>/<SR>/<lang>.md` (area = first
+    digit, treaties 0.1–0.9), `<ct>/<first char>/<number>/<lang>.md`, `beschlossen/as|bbl/<year>/<nr>/`, `vernehmlassung/<year>/<nr>/`.
+    Format: YAML front matter (number, title, short title, language, version, adoption, entry into force, source URL), `#### Art. N`
+    per article (GitHub anchors), one line per paragraph (`<sup>1</sup> …`) so diffs and blame are exact, lists `- a. …`,
+    footnotes `[^<article>-k]` after their article, tables as HTML. Every file is checked: the words of the source must all be in
+    the Markdown (multiset); results in build/lawgit/check_<jur>.json and the README.
+    Sources and results (run 2026-10-27): federal — Fedlex SPARQL consolidations with XML (12,197 versions of 5,923 acts since
+    2021, 37,274 files DE/FR/IT/RM/EN; on 2021-01-01 5,105 of the 5,106 acts then in force), 703 of 333,497,234 words missing
+    (spacing inside AS references); LexWork (19 cantons, every version since 2021, repealed acts included, informal corrections
+    as their own commits): 35,647 files, 343 of 68,800,929 words missing; 3,984 versions in the period exist only as PDF
+    (GR 1,075, VS 552, SH 429, NW 418, AI 389, UR 372 …; 667 current versions) — read by `pdf2md.py` from the cantons' born-digital
+    PDFs (layout rules: body size, raised small digits, page furniture by recurrence, marginal notes by the justified edge, article
+    lines in bold/italic/another font; footnotes keyed by page because some PDFs restart the numbering; check against the words the
+    reading kept), marked `text: pdf` with a notice; Vaud (BLV API, every version since 2021, "mineurs" included): 3,452 files,
+    22 of 5,910,511 missing; Geneva and Neuchâtel (SIL Word-HTML, text in force only; enters the history on the day its version
+    took effect — GE: the last entry into force in its change table, NE: "État au", else adoption — or on 2021-01-01): 1,687 acts,
+    13 of 4,374,100 missing (digits glued to words). Not in: ZH, JU (PDF only, next for pdf2md), TI, SZ (LexFind only), versions
+    before 2021 (Fedlex has them as PDF/Word only). Reading fixes found by the check: SG/AR outline numbers "(1.1)"
+    (number_discrete, editorial) left out; footnotes a LexWork version lists but no element calls → "Weitere Fussnoten" (BS);
+    NE annexes in WordSection2/3 and headings inside table cells; GE titles in a header table.
+    Adopted, not yet in force (`fedlex_pending.py`): AS acts published since 2020-07 with a later entry into force (3,573) appear
+    under `beschlossen/as/` from publication to their (last) entry into force; Referendumsvorlagen (BBl resource type 84, 329;
+    federal decrees on popular initiatives left out) under `beschlossen/bbl/` until their AS publication (matched by date of
+    adoption and title: 205) or, without one, the referendum deadline the text states — a law rejected at the ballot therefore
+    disappears at the deadline, not at the vote (vote results are not read yet). Amending acts render `<mod>` as the amended
+    element in bold + the new text. Cantonal acts not yet in force are LexWork/BLV future versions: in `future`, listed with their
+    dates in `beschlossen/README.md`. Vernehmlassungen: 611 opened since 2020-10 (610 with a Vernehmlassungsvorlage, draft
+    document type 11, PDF DE/FR/IT) under `vernehmlassung/` from opening; a commit at the deadline marks them closed. Only the
+    drafts, not the explanatory reports.
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
