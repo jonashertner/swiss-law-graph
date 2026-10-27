@@ -748,7 +748,7 @@ LEVEL = {0: "constitution", 4: "constitution", 1: "parliament", 5: "parliament",
          3: "administration", 7: "administration", 8: "treaty"}
 KINDS = {"a": "in_force", "o": "earlier", "x": "not_in_collection"}
 CAT_COLS = ["id", "kind", "jurisdiction", "number", "abbreviation", "title_de", "title_fr", "title_it", "title_en", "level",
-            "enacted_by", "adopted", "from_year", "until", "decisions", "source", "page"]
+            "enacted_by", "adopted", "from_year", "until", "decisions", "source"]
 
 
 def catalogue(out_nodes, names, born, died, meta_run):
@@ -774,11 +774,12 @@ def catalogue(out_nodes, names, born, died, meta_run):
                      **{f"title_{lg}": tit[lg] for lg in LANGS}, "level": LEVEL.get(n.get("f"), ""),
                      "enacted_by": "" if n.get("by") in ("Titel", "unbekannt") else n.get("by") or "", "adopted": n.get("ad") or "", "from_year": born[k] or "",
                      "until": until or (died.get(k) and str(died[k])) or "", "decisions": n.get("d") or 0,
-                     "source": n.get("u") or "", "page": f"{SITE}#de/{sid}"})
-    with open(OUT / "catalog.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=CAT_COLS)
-        w.writeheader()
-        w.writerows(rows)
+                     "source": n.get("u") or ""})
+    for name, kinds in (("catalog.csv", ("in_force",)), ("catalog-earlier.csv", ("earlier", "not_in_collection"))):
+        with open(OUT / name, "w", newline="", encoding="utf-8") as f:     # in force; the rest (each under 16 MB)
+            w = csv.DictWriter(f, fieldnames=CAT_COLS)
+            w.writeheader()
+            w.writerows(r for r in rows if r["kind"] in kinds)
     c = Counter(r["kind"] for r in rows)
     (OUT.parent / "llms.txt").write_text(f"""# Atlas des Schweizer Rechts / Atlas of Swiss Law
 
@@ -793,10 +794,11 @@ def catalogue(out_nodes, names, born, died, meta_run):
   `#<lang>/check` (gaps and dead references), `#<lang>/new`, `#<lang>/method` (how every number is computed).
 
 ## Data (static files, CC0)
-- {SITE}data/catalog.csv — one row per act: {", ".join(CAT_COLS)}.
-  kind: in_force | earlier (no longer in force; from_year/until its period) | not_in_collection (a code courts cite that no
-  collection holds). level: who enacted it (constitution, parliament, government, administration, treaty). decisions:
-  distinct published decisions referring to it. source: Fedlex or the canton's page. page: the act on this site.
+- {SITE}data/catalog.csv — one row per act in force ({c['in_force']:,}); {SITE}data/catalog-earlier.csv — the earlier acts
+  ({c['earlier']:,}) and the codes courts cite that no collection holds ({c['not_in_collection']:,}). Columns: {", ".join(CAT_COLS)}.
+  kind: in_force | earlier (no longer in force; from_year/until its period) | not_in_collection. level: who enacted it
+  (constitution, parliament, government, administration, treaty). decisions: distinct published decisions referring to it.
+  source: Fedlex or the canton's page. The act on this site: {SITE}#de/<id> (fr, it, en likewise).
 - {SITE}data/links.json — stated bases, co-citation and legislative cross-references between acts (indices into atlas.json).
 - {SITE}data/atlas.json — the tree the map draws (meta.fields names the columns of each node).
 - {SITE}feed.de.xml (also fr, it, en) — Atom feed of new federal acts in force and cantonal acts adopted.

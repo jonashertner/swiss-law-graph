@@ -11,10 +11,11 @@
   `#<lang>/check` (gaps and dead references), `#<lang>/new`, `#<lang>/method` (how every number is computed).
 
 ## Data (static files, CC0)
-- https://jonashertner.github.io/swiss-law-graph/data/catalog.csv — one row per act: id, kind, jurisdiction, number, abbreviation, title_de, title_fr, title_it, title_en, level, enacted_by, adopted, from_year, until, decisions, source, page.
-  kind: in_force | earlier (no longer in force; from_year/until its period) | not_in_collection (a code courts cite that no
-  collection holds). level: who enacted it (constitution, parliament, government, administration, treaty). decisions:
-  distinct published decisions referring to it. source: Fedlex or the canton's page. page: the act on this site.
+- https://jonashertner.github.io/swiss-law-graph/data/catalog.csv — one row per act in force (21,697); https://jonashertner.github.io/swiss-law-graph/data/catalog-earlier.csv — the earlier acts
+  (11,764) and the codes courts cite that no collection holds (2,723). Columns: id, kind, jurisdiction, number, abbreviation, title_de, title_fr, title_it, title_en, level, enacted_by, adopted, from_year, until, decisions, source.
+  kind: in_force | earlier (no longer in force; from_year/until its period) | not_in_collection. level: who enacted it
+  (constitution, parliament, government, administration, treaty). decisions: distinct published decisions referring to it.
+  source: Fedlex or the canton's page. The act on this site: https://jonashertner.github.io/swiss-law-graph/#de/<id> (fr, it, en likewise).
 - https://jonashertner.github.io/swiss-law-graph/data/links.json — stated bases, co-citation and legislative cross-references between acts (indices into atlas.json).
 - https://jonashertner.github.io/swiss-law-graph/data/atlas.json — the tree the map draws (meta.fields names the columns of each node).
 - https://jonashertner.github.io/swiss-law-graph/feed.de.xml (also fr, it, en) — Atom feed of new federal acts in force and cantonal acts adopted.
