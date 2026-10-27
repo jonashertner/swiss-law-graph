@@ -152,7 +152,8 @@ async function showMap(target) {
     const cur = TM.getFocus(), r = TM.itemRect(i);
     f = typeof cur === "number" && cur !== i && !isAct(cur) && isAncestor(cur, i) && r && r.lab ? cur : M.P[i];
     s = i;
-  } else { f = i; s = null; }
+  } else if (M.HG[i] && TV.TIME.on) { f = M.P[i]; s = i; }   // the bar of acts without an SR number: selected, not entered
+  else { f = i; s = null; }
   TM.setFocus(f);
   S.sel = s;
   TM.setSelection(s);
@@ -232,7 +233,8 @@ function renderLegend() {
   const vis = TM.visibleClasses();
   const cls = [0, 1, 2, 3, 4, 5, 6].filter((c) => c <= 4 ? true : vis.has(c));
   $("legend").innerHTML = cls.map((c) => `<button class="it" data-cls="${c}">${sw(c)}<span>${esc(t(c === 6 ? "levelUnknown" : "c" + c))}</span></button>`).join("")
-    + (TM.getMode() === "dec" ? `<span class="note">${esc(t("cantonFloor", String(TM.CANTON_FLOOR * 100).replace(".", t("dec"))))}</span>` : "");
+    + (TM.getMode() === "dec" ? `<span class="note">${esc(t("cantonFloor", String(TM.CANTON_FLOOR * 100).replace(".", t("dec"))))}</span>` :
+      TV.TIME.on ? `<span class="note">${esc(t("noSrScale"))}</span>` : "");
 }
 
 // tooltip
@@ -246,6 +248,9 @@ function tipHtml(id) {
     const c = M.cls[id], b = TV.TIME.on ? TV.bornOf(id) : 0;
     meta = `<i style="background:var(--c${c})"></i>${esc(t(c === 6 ? "levelUnknown" : "c" + c))} · ${esc(t("nDec", num(TV.decTo(id))))}` +
       (b ? ` · ${esc(t(TV.exists(id) ? "timeSince" : "timeNotYet", b))}` : "");
+  } else if (M.HG[id] && TV.TIME.on) {                // acts without an SR number: the gauge's numbers
+    const G = TM.gaugeOf(id);
+    meta = `${esc(num(G.n))} ${esc(t("gaugeIn", TV.TIME.year))} · ${esc(num(G.top))} ${esc(t("gaugeTop", G.topY))}`;
   } else {
     meta = esc(t("nActsInForce", num(M.val.acts[id])));
     if (M.DD[id]) meta += " · " + esc(t("nDec", num(M.DD[id])));
@@ -290,8 +295,10 @@ function syncHash() {
   if (h !== location.hash) history.replaceState(null, "", h);
 }
 let hashT = 0;
+let timeWas = false;
 TV.subscribe(() => {
-  if (S.view === "map") { TM.setTime(mapShare()); renderCrumbs(); }
+  if (S.view === "map") { TM.setTime(mapShare()); renderCrumbs(); if (TV.TIME.on !== timeWas) renderLegend(); }
+  timeWas = TV.TIME.on;
   if (!hashT) hashT = setTimeout(() => { hashT = 0; syncHash(); }, 400);   // at most every 400 ms, also while playing
 });
 

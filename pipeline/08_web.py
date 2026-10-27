@@ -168,14 +168,18 @@ def main():
         cur = (eli_in.get(base) or "").rstrip("/")     # the act in force: by its ELI, not the last act of the number
         fv = (next((v for v in fa if (v.get("eli") or "").rstrip("/") == cur), None) or hist.get(cur) or fa[-1]) if not at \
             else next((v for v in fa if (v.get("date") or "")[:len(at)] == at), fa[0])
-        title = {lg: plain((fv.get("title") or {}).get(lg)) or tax[base].get(lg) or tax[base].get("de", "") for lg in LANGS}
-        ab = {lg: ((cn.get("a") or {}).get(lg) or (fv.get("abbr") or {}).get(lg) or abbr_of(tax[base].get(lg)) or
-                   abbr_of(tax[base].get("de")) or "") for lg in LANGS}
+        # an earlier act takes its names from its own record only: the taxonomy describes the act now under the number
+        # (BV 1874 had shown "Federal Constitution of 18 April 1999" in English)
+        own = lambda d, lg: plain((d or {}).get(lg)) or plain((d or {}).get("de"))
+        title = {lg: own(fv.get("title"), lg) or ("" if kind == "o" else tax[base].get(lg) or tax[base].get("de", "")) for lg in LANGS}
+        ab = {lg: ((cn.get("a") or {}).get(lg) or (fv.get("abbr") or {}).get(lg) or ("" if kind == "o" else abbr_of(tax[base].get(lg)) or
+                   abbr_of(tax[base].get("de"))) or "") for lg in LANGS}
         if not ab["en"]:
             ab["en"] = ab["de"]
         if kind == "o":                       # an earlier act: "BV 1874", "aOR"; a cited number with no act in force: its last act
             y = at or (fv.get("date") or fv.get("in_force") or "0000")[:4]
-            ab = {lg: ("a" + (ab[lg] or base) if y == "a" else (ab[lg] or base) if y in (ab[lg] or "") else
+            # without an abbreviation of its own it is named by its title, not by a bare number ("641.71 1999")
+            ab = {lg: ("" if not ab[lg] and title[lg] else "a" + (ab[lg] or base) if y == "a" else (ab[lg] or base) if y in (ab[lg] or "") else
                        f"{ab[lg] or base} {y}" if y != "0000" else (ab[lg] or base)) for lg in LANGS}
         url = ((fv.get("eli") if kind == "o" and not at else None) or cn.get("e") or eli_in.get(base) or eli_any.get(base) or ""
                ).replace("https://fedlex.data.admin.ch/", "https://www.fedlex.admin.ch/")
@@ -693,6 +697,9 @@ def main():
         out = [[c2a.get(ci, -1), eid, h, n, (rest[0] if rest else -1)] for ci, eid, h, n, *rest in tp]   # in order: parents by index
         json.dump(out, open(OUT / f"find.{lg}.json", "w"), separators=(",", ":"), ensure_ascii=False)
 
+    # ---- the catalogue: every act on the site as one CSV row, for people and programs (and llms.txt to describe the data)
+    catalogue(out_nodes, names, born, died, meta_run=tree["method"].get("run_date") or "")
+
     # ---- the index and the names
     FED = "https://www.fedlex.admin.ch/eli/"
     for n in out_nodes:
@@ -735,6 +742,73 @@ def main():
               open(OUT / "method.json", "w"), separators=(",", ":"), ensure_ascii=False)
     size = sum(f.stat().st_size for f in OUT.rglob("*.json"))
     print(json.dumps(meta["counts"]), dict(stats), f"{size / 1e6:.1f} MB in docs/data")
+
+
+LEVEL = {0: "constitution", 4: "constitution", 1: "parliament", 5: "parliament", 2: "government", 6: "government",
+         3: "administration", 7: "administration", 8: "treaty"}
+KINDS = {"a": "in_force", "o": "earlier", "x": "not_in_collection"}
+CAT_COLS = ["id", "kind", "jurisdiction", "number", "abbreviation", "title_de", "title_fr", "title_it", "title_en", "level",
+            "enacted_by", "adopted", "from_year", "until", "decisions", "source", "page"]
+
+
+def catalogue(out_nodes, names, born, died, meta_run):
+    """docs/data/catalog.csv: one row per act the site holds (in force; earlier federal acts courts cite or Fedlex records;
+    codes courts cite that no collection holds), the columns llms.txt explains. kind "earlier" with from/until = an act
+    no longer in force; until is the day it ended (repeal, or the day after a temporary act lapsed)."""
+    import csv
+    rows = []
+    for k, n in enumerate(out_nodes):
+        kind = KINDS.get(n["k"])
+        if not kind:
+            continue
+        ct, code = n.get("ct") or "", n.get("s") or ""
+        sid = (f"{ct}/{code}" if ct else code) if n["k"] == "a" else f"{ct}/-{code}" if n["k"] == "x" else code
+        tit = {lg: names[lg]["t"][k] or names[lg]["l"][k] for lg in LANGS}
+        if tit["en"] == tit["de"]:                       # no English title (the site falls back to German): left empty here
+            tit["en"] = ""
+        ab = n.get("ab") or {}
+        until = n.get("rp") or ""
+        rows.append({"id": sid, "kind": kind, "jurisdiction": ct or ("INT" if code.startswith("0.") or n.get("f") == 8 else "CH"),
+                     "number": "" if n["k"] == "x" or code.startswith("@") else code.split("@")[0],
+                     "abbreviation": " | ".join(dict.fromkeys(v for v in ab.values() if v)) if isinstance(ab, dict) else ab,
+                     **{f"title_{lg}": tit[lg] for lg in LANGS}, "level": LEVEL.get(n.get("f"), ""),
+                     "enacted_by": "" if n.get("by") in ("Titel", "unbekannt") else n.get("by") or "", "adopted": n.get("ad") or "", "from_year": born[k] or "",
+                     "until": until or (died.get(k) and str(died[k])) or "", "decisions": n.get("d") or 0,
+                     "source": n.get("u") or "", "page": f"{SITE}#de/{sid}"})
+    with open(OUT / "catalog.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=CAT_COLS)
+        w.writeheader()
+        w.writerows(rows)
+    c = Counter(r["kind"] for r in rows)
+    (OUT.parent / "llms.txt").write_text(f"""# Atlas des Schweizer Rechts / Atlas of Swiss Law
+
+> Every federal and cantonal act of Switzerland in force ({c['in_force']:,} acts), the earlier federal acts ({c['earlier']:,}),
+> how each rests on another (the legal bases its preamble states), the cross-references between federal acts, and how often
+> courts cite each act and article (decisions from OpenCaseLaw). Data as of {meta_run}. By jonashertner.com. Not official:
+> Fedlex and the cantons' collections are authoritative.
+
+## Pages
+- {SITE} — the map (DE/FR/IT/EN). Links: `#<lang>/<id>` an act (`#de/220` the OR, `#de/ZH/700.1` a cantonal act,
+  `#de/220:art_41` an article), `#<lang>@<year>/…` the same in a past year, `#<lang>/net`, `#<lang>/cantons/<SR>`,
+  `#<lang>/check` (gaps and dead references), `#<lang>/new`, `#<lang>/method` (how every number is computed).
+
+## Data (static files, CC0)
+- {SITE}data/catalog.csv — one row per act: {", ".join(CAT_COLS)}.
+  kind: in_force | earlier (no longer in force; from_year/until its period) | not_in_collection (a code courts cite that no
+  collection holds). level: who enacted it (constitution, parliament, government, administration, treaty). decisions:
+  distinct published decisions referring to it. source: Fedlex or the canton's page. page: the act on this site.
+- {SITE}data/links.json — stated bases, co-citation and legislative cross-references between acts (indices into atlas.json).
+- {SITE}data/atlas.json — the tree the map draws (meta.fields names the columns of each node).
+- {SITE}feed.de.xml (also fr, it, en) — Atom feed of new federal acts in force and cantonal acts adopted.
+
+## Full text
+- https://github.com/jonashertner/swisslaw-git — the law itself as Markdown in git: every version since 2021, one commit
+  per version dated on the day it applies; index.csv / index.jsonl list every file; AGENTS.md explains layout and fields.
+
+## Code
+- https://github.com/jonashertner/swiss-law-graph — the pipeline (MIT); method and every decision in its CLAUDE.md.
+""", encoding="utf-8")
+    print(f"catalogue: {len(rows)} rows {dict(c)}")
 
 
 if __name__ == "__main__":

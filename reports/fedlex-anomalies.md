@@ -21,6 +21,21 @@ works around them as stated; nothing here is corrected silently.
    (`art_6_8`, `art_21_25`) with no text and no note; a reader cannot tell whether they are repealed or not yet in
    force. The map counts them as present (the JSFVV cites Art. 8 and 25).
 
+## Found while building the law repository (decision 36, 2026-10-27)
+
+5. **Two consultation drafts are empty files.** `eli/dl/proj/2023/20/cons_1/doc_2` (it) and
+   `eli/dl/proj/2023/103/cons_1/doc_1` (it): the filestore answers HTTP 200 with 0 bytes
+   (`…/it/pdf-a/fedlex-data-admin-ch-eli-dl-proj-2023-20-cons_1-doc_2-it-pdf-a.pdf`, likewise for 2023/103). Retried
+   2026-10-27, same result. The repository has these drafts in DE and FR only.
+6. **A consultation in the year 6020.** `eli/dl/proj/6020/55/cons_1` (Vorlage 1) — evidently a typing error for 2020 in
+   the identifier. Kept as Fedlex has it.
+7. **Metadata inside the act.** Some AS texts (e.g. `eli/oc/2022/325`) carry an `rdf:RDF` block (the issuing office,
+   the formats docx/html/xml) directly under `akomaNtoso`, outside `meta`; others embed SVG figures with their CSS
+   (`eli/oc/2026/24`, road signs). Neither is text of the act; the word check skips both.
+8. **An empty heading before the real one.** AS amending acts write `<heading/><heading>Übergangsbestimmung</heading>`
+   (`eli/oc/2022/776`, EnEV annexes); a reader taking the first heading loses the title. The converter joins all
+   headings of an element.
+
 ## Status lagging behind the dates
 
 See `reports/counts-check.md` and decision 33: 265 acts in force without a status, 29 marked in force although their

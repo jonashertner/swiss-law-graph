@@ -79,8 +79,18 @@ export function build(atlas) {
       }
     }
   }
+  // the time view's layout (hl): a group of acts without an SR number (hg, decision 32) has no place in the SR tree; drawn
+  // act by act it took a fifth of federal law. It gets HG_SHARE of its block instead, drawn as one gauge (counts stay exact)
+  M.val.hl = Float64Array.from(M.val.hist);
+  for (let i = 0; i < n; i++) {
+    if (!M.HG[i] || !(M.val.hist[i] > 0)) continue;
+    const p = M.P[i], v = ((M.val.hl[p] - M.val.hl[i]) * HG_SHARE) / (1 - HG_SHARE), dv = v - M.val.hl[i];
+    M.val.hl[i] = v;
+    for (let q = p; ; q = M.P[q]) { M.val.hl[q] += dv; if (!q) break; }
+  }
   M.root = 0;
 }
+export const HG_SHARE = 0.05;
 
 // The five colours: who made the rule (legend), plus "not in the collection" and "level not recorded"
 function classOf(i) {

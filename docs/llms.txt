@@ -1,0 +1,27 @@
+# Atlas des Schweizer Rechts / Atlas of Swiss Law
+
+> Every federal and cantonal act of Switzerland in force (21,697 acts), the earlier federal acts (11,764),
+> how each rests on another (the legal bases its preamble states), the cross-references between federal acts, and how often
+> courts cite each act and article (decisions from OpenCaseLaw). Data as of 2026-10-26. By jonashertner.com. Not official:
+> Fedlex and the cantons' collections are authoritative.
+
+## Pages
+- https://jonashertner.github.io/swiss-law-graph/ — the map (DE/FR/IT/EN). Links: `#<lang>/<id>` an act (`#de/220` the OR, `#de/ZH/700.1` a cantonal act,
+  `#de/220:art_41` an article), `#<lang>@<year>/…` the same in a past year, `#<lang>/net`, `#<lang>/cantons/<SR>`,
+  `#<lang>/check` (gaps and dead references), `#<lang>/new`, `#<lang>/method` (how every number is computed).
+
+## Data (static files, CC0)
+- https://jonashertner.github.io/swiss-law-graph/data/catalog.csv — one row per act: id, kind, jurisdiction, number, abbreviation, title_de, title_fr, title_it, title_en, level, enacted_by, adopted, from_year, until, decisions, source, page.
+  kind: in_force | earlier (no longer in force; from_year/until its period) | not_in_collection (a code courts cite that no
+  collection holds). level: who enacted it (constitution, parliament, government, administration, treaty). decisions:
+  distinct published decisions referring to it. source: Fedlex or the canton's page. page: the act on this site.
+- https://jonashertner.github.io/swiss-law-graph/data/links.json — stated bases, co-citation and legislative cross-references between acts (indices into atlas.json).
+- https://jonashertner.github.io/swiss-law-graph/data/atlas.json — the tree the map draws (meta.fields names the columns of each node).
+- https://jonashertner.github.io/swiss-law-graph/feed.de.xml (also fr, it, en) — Atom feed of new federal acts in force and cantonal acts adopted.
+
+## Full text
+- https://github.com/jonashertner/swisslaw-git — the law itself as Markdown in git: every version since 2021, one commit
+  per version dated on the day it applies; index.csv / index.jsonl list every file; AGENTS.md explains layout and fields.
+
+## Code
+- https://github.com/jonashertner/swiss-law-graph — the pipeline (MIT); method and every decision in its CLAUDE.md.

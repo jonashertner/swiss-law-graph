@@ -1,9 +1,10 @@
 // The panel beside the map: what an act, an article or a part of the collection is, what it rests
 // on, what rests on it, and how courts use it. Every number is the data's; every row is a link.
 import { t, cantonName, pick, lang } from "./i18n.js";
-import { M, KIND, kindOf, isAct, idOf, label, labelCt, title, srOf, urlOf, getJSON, loadLinks, loadYears, loadLaw } from "./data.js";
+import { M, KIND, kindOf, isAct, idOf, label, labelCt, title, srOf, urlOf, getJSON, loadLinks, loadYears, loadLaw, kids } from "./data.js";
 import { $, esc, num, date, sw, href, decUrl, ICON } from "./util.js";
-import { headingOf } from "./treemap.js";
+import { headingOf, gaugeOf } from "./treemap.js";
+import { TIME, exists } from "./time.js";
 import { dependents, jurisdiction, cantonOrder, normArt } from "./impact.js";
 
 const el = () => $("dossier");
@@ -127,7 +128,23 @@ function topActsBelow(i, cap = 12) {
   out.sort((a, b) => M.D[b] - M.D[a] || a - b);
   return out.slice(0, cap);
 }
+// acts without an SR number (decision 32): what the group is, how many applied in the year shown, and the acts
+function noSrHTML(i) {
+  const acts = Array.from(kids(i)).filter((c) => M.K[c] === KIND.o);
+  const span = (j) => `${(M.AD[j] || "").slice(0, 4)}–${(M.LE[j] || M.RP[j] || "").slice(0, 4)}`;
+  const byDate = (a, b) => (M.AD[a] || "").localeCompare(M.AD[b] || "") || a - b;
+  let stats = `<div class="stat"><b>${esc(num(acts.length))}</b><span>${esc(t("nRepealed"))}</span></div>`, list;
+  if (TIME.on) {
+    const G = gaugeOf(i), now = acts.filter((c) => exists(c)).sort((a, b) => (M.hcls[a] - M.hcls[b]) || byDate(a, b));
+    stats = `<div class="stat"><b>${esc(num(G.n))}</b><span>${esc(t("gaugeIn", TIME.year))}</span></div>` +
+      `<div class="stat"><b>${esc(num(G.top))}</b><span>${esc(t("gaugeTop", G.topY))}</span></div>` + stats;
+    list = section(t("gaugeIn", TIME.year), rowsHTML(now, (j) => actRow(j, span(j))), now.length);
+  } else list = section(t("noSrAll"), rowsHTML(acts.slice().sort(byDate), (j) => actRow(j, span(j))), acts.length);
+  return `<h1>${esc(label(i))}</h1><p class="lede">${esc(t(idOf(i).startsWith("int") ? "noSrNoteInt" : "noSrNote"))}</p>` +
+    `<div class="stat2">${stats}</div>` + list;
+}
 function groupHTML(i) {
+  if (M.HG[i]) return noSrHTML(i);
   const k = M.K[i], comp = M.comp.acts, o = i * 7, acts = M.val.acts[i];
   const kick = k === KIND.c ? `<span>SR ${esc(M.S[i])}</span>` : k === KIND.t ? `<span>${esc(M.S[i])}</span>` : "";
   const h1 = i === 0 ? t("title") : k === KIND.c ? M.L[i] : label(i);

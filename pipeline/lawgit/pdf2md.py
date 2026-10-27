@@ -32,10 +32,14 @@ ART = re.compile(rf"^((?:Art\.|Artikel|Article|Articolo|Art|§§?)\s*{NUM})(?![\
 LISTM = re.compile(r"^(?:[a-z]{1,2}\)|[a-z]{1,2}\.(?=\s)|\d{1,2}\.(?=\s)|\d{1,2}\)(?=\s)|[ivx]+\)|[–\-•·](?=\s)|\d+°)")
 ENACT = re.compile(r"(beschlie(?:ss|ß)t|verordnet|erl(?:ä|ae)sst|beschliessen|d(?:é|e)cr(?:è|e)te|arr(?:ê|e)te|d(?:é|e)cide|ordonne|"
                    r"decreta|risolve|ordina|delibera|decida|decreta|conclude|vereinbaren|schliessen)\s*:?\s*$", re.I)
+DATE_START = re.compile(r"^\d{1,2}\.\s?(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|"
+                        r"janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|gennaio|"
+                        r"febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b")   # "2. April 1911"
 HEAD = re.compile(r"^(?:\d+[a-z]?\.\s*(?:Kapitel|Abschnitt|Unterabschnitt|Titel|Teil|Buch)\b|(?:Kapitel|Abschnitt|Titel|Teil)\s+\d|"
                   r"(?:Chapitre|Section|Titre|Capitolo|Sezione|Titolo|Capo)\s+(?:\d|[IVXLC]+\b|premier|primo|unique))")
 FOOT = re.compile(r"^\s*(?:\d{1,3}\s?\)|\*+\)?|\d{1,3}(?=\s*[^\d\s.,:/–-]))")       # "1)", "12 Text", "*" — not "12.06.2003"
 TEMPLATE = re.compile(r"^(?:\s*(?:«\s*[$%][^»]*»|\d{1,4}\s*/\s*\d{1,4}|(?:AS|SR|BBl|RO|FF|RU)\s*…|\d{4}[-–]\.{3}))+\s*$")   # Fedlex template
+STAMP = re.compile(r"^Powered by TCPDF \(www\.tcpdf\.org\)$")      # the PDF library's mark on the last page (VS)
 CONJ = {"und", "oder", "bzw", "sowie", "resp", "et", "ou", "e", "o", "ed", "od", "u", "respektive", "beziehungsweise"}
 WORD = re.compile(r"[0-9A-Za-zÀ-ÿĀ-ž]+")
 BODY_FONT = ""
@@ -83,6 +87,7 @@ def read(path, number=""):
         pg["col"] = (min(lefts), max(rights) if rights else en.most_common(1)[0][0]) if lefts else None
         if pg["col"]:
             cols.setdefault(pg["no"] % 2, []).append(pg["col"])
+    nxt = 1
     for pg in pages:
         if pg["col"] is None:
             same = cols.get(pg["no"] % 2) or [c for v in cols.values() for c in v]
@@ -98,7 +103,7 @@ def read(path, number=""):
             ln["segs"] = segments(ln, S, L, R, just)
             for sg in ln["segs"]:
                 sg["page"] = pg["no"]
-        split_foot(S, pg)
+        nxt = split_foot(S, pg, nxt)
     return S, pages
 
 
@@ -118,6 +123,9 @@ def cluster(cs, S):
             lines.append({"top": c["top"], "size": c["size"], "cs": [c]})
     for ln in lines:
         ln["cs"].sort(key=lambda c: c["x0"])
+        glyphs = [c for c in ln["cs"] if c["text"].strip()]      # a space set over a letter (ZH justifies the line but leaves
+        ln["cs"] = [c for c in ln["cs"] if c["text"].strip() or not any(   # its last space where it stood: "Mär z", "un d")
+            min(c["x1"], g["x1"]) - max(c["x0"], g["x0"]) > 0.4 * max(c["x1"] - c["x0"], 0.1) for g in glyphs)]
         big = [c for c in ln["cs"] if c["text"].strip() and c["size"] >= 0.8 * ln["size"]]
         ln["size"] = Counter(round(c["size"], 1) for c in big).most_common(1)[0][0] if big else ln["size"]
         ln["text"] = "".join(c["text"] for c in ln["cs"]).strip()
@@ -140,9 +148,14 @@ def furniture(S, pages, number):
             t = re.sub(r"\s+", " ", ln["text"])
             at = ln["top"] < 0.12 * pg["h"] or ln["top"] > 0.9 * pg["h"]
             rest = re.sub(r"\s+", " ", t.replace(number, " ")).strip() if number else t
-            if TEMPLATE.match(t) or at and ((mask(t) in rec and mask(t)) or re.fullmatch(r"[-–—]?\s*\d{1,4}\s*[-–—]?", t)
+            flat = re.sub(r"\s+", "", t)
+            title = pg is pages[0] and ln["size"] >= 1.1 * S and not (nb and nb in flat)   # the act's title on the first page,
+            #                                                    though the running header repeats it (the header has the number)
+            if TEMPLATE.match(t) or STAMP.match(t) or at and ((mask(t) in rec and mask(t) and not title) or re.fullmatch(r"[-–—]?\s*\d{1,4}\s*[-–—]?", t)
                        or (nb and re.sub(r"\s+", "", t) == nb) or (number and number in t and re.fullmatch(r"\d{0,4}", rest))
-                       or (number and (t.startswith(number + " ") or t.endswith(" " + number))) or "(cid:" in t):
+                       or (number and (t.startswith(number + " ") or t.endswith(" " + number)))
+                       or (nb and (flat.startswith(nb) or flat.endswith(nb)) and not re.match(re.escape(nb) + r"[\d.]", flat))
+                       or "(cid:" in t):                  # "…an der ZHAW414.253.811": the number glued to the header
                 continue
             keep.append(ln)
         pg["lines"] = keep
@@ -234,8 +247,9 @@ def segments(ln, S, L, R, just=False):
     return out
 
 
-def split_foot(S, pg):
-    """The page's footnotes: the block of smaller print at the bottom that starts with a number."""
+def split_foot(S, pg, nxt=1):
+    """The page's footnotes: the block of smaller print at the bottom that starts with a number. Returns the number the
+    next page's notes would continue with (ZH prints its notes after the last article, 1 … n over one or more pages)."""
     keep = pg["lines"]
     tail = []                                            # short lines at the very bottom ("nGS 28–45") do not end the notes
     while keep and keep[-1]["top"] > 0.9 * pg["h"] and keep[-1]["size"] > 0.92 * S and len(keep[-1]["text"]) < 40:
@@ -253,9 +267,12 @@ def split_foot(S, pg):
             del keep[k + 1]
             continue
         k += 1
-    if len(keep) - k > 0.6 * len(keep) and len(keep) > 6:
+    nums = [int(m.group(1)) for ln in keep[k:] for m in [re.match(r"^\s*(\d{1,3})(?!\d)", ln["text"])] if m and FOOT.match(ln["text"])]
+    run = len(nums) >= 3 and nums[0] in (1, nxt) and nums == list(range(nums[0], nums[0] + len(nums)))
+    if len(keep) - k > 0.6 * len(keep) and len(keep) > 6 and not run:
         k = len(keep)                                    # a page in small print (a change table, an annex): text, not notes
     pg["body"], pg["foot"] = keep[:k] + tail, keep[k:]
+    return nums[-1] + 1 if run else nxt
 
 
 def text_of(sg, md=False):
@@ -313,7 +330,7 @@ def blocks(S, pages):
         pitch += [b - a for a, b in zip(ts, ts[1:]) if 0 < b - a < 3 * S]
     P = sorted(pitch)[len(pitch) // 2] if pitch else 1.2 * S
     out, marg = [], []
-    prev, enacted = None, False
+    prev, enacted, enum = None, False, 0                 # enum: the number of the last item "4. Das Haftungsgesetz …"
     for pg in pages:
         L, R = pg["col"]
         for ln in pg["body"]:
@@ -332,17 +349,24 @@ def blocks(S, pages):
                 if m and (s["lead"] >= len(m.group(1).replace(" ", "")) - 1 or s["bold"]):
                     # the number in bold; a rest in plain type is the article's text, not its heading (JU, SO)
                     kind = "art_inline" if m.group(2).strip() and not s["bold"] and \
-                        s["lead"] < len(m.group(1).replace(" ", "")) + 2 and m.group(2)[:1].isupper() else "art"
+                        s["lead"] < len(m.group(1).replace(" ", "")) + 2 and m.group(2)[:1].isupper() and \
+                        (s["x1"] >= R - 3 * S or re.search(r"[.:;!?]$", m.group(2).strip())) else "art"
+                    # a rest that ends the line short without a stop is the article's heading ("Art. 3   Egalité", VS)
                 elif m and not m.group(2).strip() and (centred or at_start):
                     kind = "art"                        # "Art. 1" alone on its line (AI: centred, regular)
                 elif at_start and re.match(r"^(?:§§?|Art\.|Artikel|Article|Articolo)\s*(?:\d+\s?[a-z]?(?:bis|ter|quater)?\.|premier|unique|primo)\s+(?:\d+[a-z]?\s+)?[A-ZÀ-Ý«]", t):
                     kind = "art_inline"                 # "§ 1. Der Staat …" (older SO acts: number and text on one line)
-                elif s["size"] > 1.12 * S or (enacted and ((s["bold"] and len(t) > 2) or (
+                elif s["size"] > 1.12 * S or (enacted and ((s["bold"] and len(t) > 2 and not t[:1].islower()) or (
                         s.get("other") and abs(s["size"] - S) < 0.6 and len(t) < 90 and not re.search(r"[.,;:]$", t)
                         and t[:1].isupper() and not LISTM.match(t)))):
                     kind = "title"
                 if kind == "text" and HEAD.match(t) and len(t) < 120 and not re.search(r"[.;,]$", t):
                     kind = "title"                      # "1. Kapitel: …", "2. Abschnitt: Landrat", "Chapitre premier"
+                me = None if DATE_START.match(t) else re.match(r"^(\d{1,2})\.\s?[A-ZÀ-Ý]", t)
+                if kind == "title" and me and int(me.group(1)) == enum + 1 and not HEAD.match(t):
+                    kind = "text"                       # the next item of a numbered list, not a heading (ZH annexes)
+                if me:
+                    enum = int(me.group(1))
                 if s["tail"]:
                     kind = "text"
                 if kind in ("art", "art_inline") or ENACT.search(t):
@@ -357,7 +381,7 @@ def blocks(S, pages):
                         new = None                      # the text of "§ 1. …" runs on: the usual paragraph rules
                     if new is None or not new:
                         first = s["runs"][0]
-                        listy = bool(LISTM.match(t)) and (prev["list"] or bool(re.search(r"[:;,.]$", prev["tail"])))
+                        listy = bool(LISTM.match(t)) and not DATE_START.match(t) and (prev["list"] or bool(re.search(r"[:;,.]$", prev["tail"])))
                         row = bool(re.match(r"^\d{1,5}\s+[A-ZÀ-Ý]", t)) and bool(re.search(r"(?:[–\-]|\d|\.)\s*$", prev["tail"]))
                         new = bool(first[1] and re.match(r"\d", first[0].strip() or "x")) or listy or row or s["tail"] \
                             or gap > 1.45 * P or centred or prev["centred"] \
@@ -392,10 +416,12 @@ class Writer:
         self.notes, self.lang = notes, lang
         self.lines, self.pending, self.scope, self.count, self.used, self.scopes = [], [], "t", {}, set(), set()
         self.calls, self.src = [], Counter()
-        # endnotes (SH "Fussnoten:", NW): at least three notes, all on the last two pages, numbered 1, 2, 3 … without a gap
+        # endnotes (SH "Fussnoten:", NW, ZH): at least three notes, numbered 1, 2, 3 … without a gap or repeat, on pages
+        # that follow one another
         nums = [int(k[1]) for k in notes if k[1].isdigit()]
-        last = max((k[0] for k in notes), default=0)
-        self.endnotes = len(nums) >= 3 and all(k[0] >= last - 1 for k in notes) and sorted(nums) == list(range(1, len(nums) + 1))
+        pgs = sorted({k[0] for k in notes})
+        self.endnotes = len(nums) >= 3 and len(nums) == len(notes) and sorted(nums) == list(range(1, len(nums) + 1)) \
+            and pgs[-1] - pgs[0] + 1 == len(pgs)
 
     def set_scope(self, s):
         s = re.sub(r"\W", "", s) or "a"
@@ -422,9 +448,9 @@ class Writer:
         for p in (page, page + 1, page - 1):
             if (p, n) in self.notes:
                 return (p, n)
-        if self.endnotes:
+        if self.endnotes:                                # by number, wherever they stand (ZH: before the annex)
             ks = [k for k in self.notes if k[1] == n]
-            return ks[0] if len(ks) == 1 and ks[0][0] >= page else None
+            return ks[0] if len(ks) == 1 else None
         return None
 
     def call(self, key):
@@ -450,13 +476,16 @@ class Writer:
             for j, (t, sup) in enumerate(runs):
                 if sup:
                     n = t.strip().rstrip(")").strip()
+                    comma = n.endswith(",") and n[:-1].strip().isdigit()      # "(vom 20. April 2015)¹,²": two calls
+                    n = n.rstrip(",").strip() if comma else n
                     nxt = runs[j + 1][0] if j + 1 < len(runs) else ""
                     prv = runs[j - 1][0] if j > 0 else ""
-                    key = self.find(n, s.get("page", 0)) if (i > 0 or j > 0 or parts) else None
+                    unit = n in ("2", "3") and re.search(r"(?:\b[kcdm]?m|CO|m³)\s?$", prv)   # m², km², CO₂ (set raised)
+                    key = self.find(n, s.get("page", 0)) if (i > 0 or j > 0 or parts) and not unit else None
                     parnum = (not t.strip().endswith(")") and not nxt.lstrip().startswith(")") and (not prv or prv.endswith(" "))
                               and re.match(r"\s*[A-ZÀ-Ý«(]", nxt or "") is not None)
                     if key and not parnum:
-                        parts.append(self.call(key))
+                        parts.append(self.call(key) + ("," if comma else ""))
                         if nxt.lstrip().startswith(")") and not t.strip().endswith(")"):
                             runs[j + 1] = (re.sub(r"^\s*\)", "", nxt, count=1), False)
                         continue
@@ -495,16 +524,18 @@ def convert_checked(path, front: dict, notice: str, lang: str = "de", number: st
     notes = footnotes(S, pages)
     bl = blocks(S, pages)
     w = Writer(notes, lang)
-    title, seen_art, after_art = "", False, False
+    title, seen_art, after_art, enacted = "", False, False, False
     titles = [b for b in bl if b["kind"] == "title"]
     big = max((b["segs"][0]["size"] for b in titles), default=S)
     for b in bl:
         txt = w.render(b["segs"])
         if not txt:
             continue
-        if b["kind"] == "title" and not title and not seen_art and not re.search(r"[.:]$", txt) and len(txt) < 400:
+        if b["kind"] == "title" and not title and not seen_art and not enacted and not HEAD.match(txt) \
+                and not re.search(r"[.:]$", txt) and len(txt) < 400:
             title = txt                                  # a call in the title stays in the heading
             continue
+        enacted = enacted or bool(b["kind"] == "text" and ENACT.search(re.sub(r"\[\^[^\]]+\]$", "", txt)))
         if b["kind"] in ("art", "art_inline"):
             seen_art = True
             w.flush()
@@ -542,8 +573,8 @@ def convert_checked(path, front: dict, notice: str, lang: str = "de", number: st
             w.lines.append(("## " if b["segs"][0]["size"] >= big - 0.1 and b["segs"][0]["size"] > S else "### ") + txt)
             continue
         w.blank()
-        if LISTM.match(txt) and not txt.startswith("<sup>"):
-            w.lines.append("- " + re.sub(r"^(\d+)\.(?=\s)", r"\1\\.", txt))
+        if LISTM.match(txt) and not txt.startswith("<sup>") and not DATE_START.match(txt):
+            w.lines.append("- " + re.sub(r"^(\d+)\.(?=\s)", r"\1\\.", re.sub(r"^[–\-•·]\s+", "", txt)))   # a dash item: the bullet is the dash
         else:
             w.lines.append(line_safe(txt))
     w.flush()

@@ -4,6 +4,8 @@
 // animates every tile from where it was to where it goes, so the eye can follow.
 import { M, kids, KIND, label as nodeLabel, shortLabel, isAct } from "./data.js";
 import { t, pick } from "./i18n.js";
+import { TIME, exists } from "./time.js";
+import { num } from "./util.js";
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const reduce = matchMedia("(prefers-reduced-motion: reduce)");
@@ -38,8 +40,10 @@ export function value(id) {
   if (!isStr(id)) return vals()[id];
   return (mode === "acts" ? OA.va : OA.vd).get(id) || 0;
 }
-// an act is a tile, except the open act while the map shows its inside
-const isLeaf = (id) => (isStr(id) ? id[0] === "A" : isAct(id) && !(OA && OA.i === id && (focus === id || isStr(focus))));
+// an act is a tile, except the open act while the map shows its inside; in the time view a group without SR numbers
+// is one gauge (decision 32: its acts have no place in the SR tree, so a mosaic of them says nothing)
+const isGauge = (id) => !isStr(id) && TSH && M.HG[id] === 1;
+const isLeaf = (id) => (isStr(id) ? id[0] === "A" : isGauge(id) || (isAct(id) && !(OA && OA.i === id && (focus === id || isStr(focus)))));
 export function parentOf(id) {
   if (!isStr(id)) return id > 0 ? M.P[id] : -1;
   if (!OA) return -1;
@@ -49,7 +53,26 @@ export function parentOf(id) {
 function clsOf(id) { return isStr(id) ? -1 : TSH ? M.hcls[id] : M.cls[id]; }
 // the time view's map holds every act that was ever in force: today's and the earlier federal acts (decision 32)
 const hist = () => TSH && mode === "acts";
-const vals = () => (hist() ? M.val.hist : M.val[mode]);
+const vals = () => (hist() ? M.val.hl : M.val[mode]);
+// a gauge: acts of the group in force in the year shown, by level, and the most there ever were (cached per group)
+const gauges = new Map();
+export function gaugeOf(id, y = TIME.year) {
+  let g = gauges.get(id);
+  if (!g) {
+    const acts = Array.from(kids(id)).filter((c) => M.K[c] === KIND.o), per = new Int32Array(TIME.y1 - TIME.y0 + 1);
+    for (let y2 = TIME.y0; y2 <= TIME.y1; y2++) for (const c of acts) if (exists(c, y2)) per[y2 - TIME.y0]++;
+    let top = 0, topY = TIME.y0;
+    per.forEach((v, k) => { if (v > top) { top = v; topY = TIME.y0 + k; } });
+    g = { acts, per, top, topY, y: null, by: null };
+    gauges.set(id, g);
+  }
+  if (g.y !== y) {
+    g.by = new Int32Array(7);
+    for (const c of g.acts) if (exists(c, y)) g.by[M.hcls[c] >= 0 ? M.hcls[c] : 6]++;
+    g.y = y; g.n = g.by.reduce((a, b) => a + b, 0);
+  }
+  return g;
+}
 
 // colours
 function readColours() {
@@ -190,6 +213,13 @@ function layout(f) {
       const tot = vals.reduce((a, b) => a + b, 0);
       vals = vals.map((v) => Math.max(v, tot * CANTON_FLOOR));
     }
+    const gk = order.findIndex(isGauge);
+    if (gk >= 0) {                                   // the gauge: a strip across the bottom of its block, tall enough for a line
+      const tot = vals.reduce((a, b) => a + b, 0), gh = Math.min(ih * 0.3, Math.max(18, (ih * vals[gk]) / (tot || 1)));
+      rects.push([order[gk], ix, iy + ih - gh, iw, gh]);
+      ih -= gh + 1;
+      order.splice(gk, 1); vals.splice(gk, 1);
+    }
     squarify(order, vals, ix, iy, ix + iw, iy + ih, rects);
     for (const [cid, cx, cy, cw, chh] of rects) {
       const c = { id: cid, x: cx, y: cy, w: cw, h: chh, d: d + 1, hdr: 0, leaf: false, parent: it, lab: 0, share: (cw * chh) / (iw * ih) };
@@ -203,7 +233,7 @@ function layout(f) {
 }
 // 0 = no label, 1 = short label, 2 = short label + title
 function leafLabelLevel(it) {
-  if (it.w < 30 || it.h < 17) return 0;
+  if (isGauge(it.id) || it.w < 30 || it.h < 17) return 0;      // a gauge writes its own text
   return it.w >= 96 && it.h >= 52 ? 2 : 1;
 }
 
@@ -254,6 +284,7 @@ function drawFill(it, r, alpha) {
   const w = x1 - x0, h = y1 - y0;
   if (w <= 0 || h <= 0 || !(it.leaf || it.small)) return;
   const id = it.id, g = w > 3 && h > 3 ? 1 : 0, s = shareOf(id);
+  if (isGauge(id)) { drawGauge(id, x0, y0, w - g, h - g, alpha); return; }
   ctx.globalAlpha = alpha * (hiCls >= 0 && !isStr(id) && (!it.leaf || clsOf(id) !== hiCls) ? 0.16 : 1);
   if (s === 0) {                                     // not yet there: an empty plot of its size
     ctx.fillStyle = COL.wash; ctx.fillRect(x0, y0, Math.max(0.5, w - g), Math.max(0.5, h - g));
@@ -264,6 +295,40 @@ function drawFill(it, r, alpha) {
   ctx.fillRect(x0, y0, Math.max(0.5, w - g), Math.max(0.5, h - g));
 }
 const shareOf = (id) => (!TSH ? 1 : isStr(id) ? (OA ? TSH[OA.i] : 1) : TSH[id]);
+// "Nicht mehr in Kraft, ohne SR-Nummer · 1'239 in Kraft 1945": a bar of the acts in force by level against the most
+// there ever were (the faint track); not to scale with the map (HG_SHARE of its block, stated in the legend)
+function drawGauge(id, x, y, w, h, alpha) {
+  if (w < 4 || h < 4) return;
+  const G = gaugeOf(id);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = COL.wash; ctx.fillRect(x, y, w, h);
+  const one = h < 40, pad = 6, bh = Math.max(4, Math.min(10, Math.round(h * 0.18)));
+  const name = labelOf(id), cnt = `${num(G.n)} ${t("gaugeIn", TIME.year)}`;
+  const f1 = font(620, w < 160 ? 11 : 12), f2 = font(440, w < 160 ? 10.5 : 11.5);
+  ctx.textBaseline = "alphabetic";
+  let bx = x + pad, by = y + h - pad - bh, bw = w - 2 * pad;
+  if (one) {                                         // a strip: the text left, the bar to its right
+    const room = Math.max(0, w * 0.62 - pad), alone = Math.max(0, w - 2 * pad - 28);
+    const s1 = [[`${name} · ${cnt}`, room], [`${t("noSrShort")} · ${cnt}`, room], [t("noSrShort"), alone], [cnt, alone]]
+      .find(([c, r]) => textW(c, f1) <= r)?.[0] || "";
+    ctx.font = f1; ctx.fillStyle = COL.ink; if (s1) ctx.fillText(s1, x + pad, y + Math.min(h - 4, 15));
+    const tx = s1 ? textW(s1, f1) + 2 * pad : 0;
+    bx = x + pad + tx; bw = w - 2 * pad - tx; by = y + Math.max(3, (h - bh) / 2);
+  } else {
+    const s1 = fit(name, f1, w - 2 * pad), s2 = fit(cnt, f2, w - 2 * pad);
+    ctx.font = f1; ctx.fillStyle = COL.ink; if (s1) ctx.fillText(s1, x + pad, y + 16);
+    ctx.font = f2; ctx.fillStyle = COL.ink2; if (s2 && h >= 52) ctx.fillText(s2, x + pad, y + 31);
+  }
+  if (bw < 12) return;
+  ctx.fillStyle = COL.rule; ctx.fillRect(bx, by, bw, bh);   // the track: the most in force in any year
+  let cx = bx;
+  for (const c of [0, 1, 2, 3, 4, 6]) {
+    const n = G.by[c];
+    if (!n) continue;
+    const cw = (bw * n) / (G.top || 1);
+    ctx.fillStyle = COL.fill[c]; ctx.fillRect(cx, by, cw, bh); cx += cw;
+  }
+}
 export function setTime(share) {
   const was = hist();
   TSH = share;
@@ -504,7 +569,7 @@ function activate(it) {
   const id = it.id;
   if (it.leaf) {
     const pid = parentOf(id);
-    if (it.lab || pid === focus) {
+    if (it.lab || pid === focus || isGauge(id)) {           // the gauge names itself: a click opens its list
       if (sel === id && !isStr(id) && M.PK[id] >= 0 && M.A[id] > 0) cb.focus(id);        // a second click opens its articles
       else cb.select(id);
     } else cb.focus(pid);

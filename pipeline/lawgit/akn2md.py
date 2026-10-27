@@ -161,10 +161,9 @@ class Doc:
         return ""
 
     def heading_text(self, el) -> str:
-        for ch in el:
-            if local(ch.tag) == "heading":
-                return self.inline_children(ch)
-        return ""
+        """Every heading of the element: the AS writes an empty one before the real one ("<heading/><heading>Übergangs-
+        bestimmung</heading>")."""
+        return " ".join(h for h in (self.inline_children(ch) for ch in el if local(ch.tag) == "heading") if h.strip())
 
     def container(self, el, depth: int):
         eid = el.get("eId") or ""
@@ -405,10 +404,16 @@ def convert(xml: bytes, front: dict, notice: str) -> str:
     d.scope = "t"
     d.lines.append(f"# {title or front.get('title') or front.get('sr')}")
     if preface is not None:
+        first = True
         for p in preface:
             if local(p.tag) != "p":
                 continue
             if any(local(x.tag) in ("docTitle", "docNumber") for x in p.iter()):
+                if not first:                            # a second title: the part of an amending act ("Vorlage B: …")
+                    for x in p:
+                        if local(x.tag) == "docTitle" and squash(d.inline_children(x)):
+                            d.para(f"**{squash(d.inline_children(x))}**")
+                first = first and not any(local(x.tag) == "docTitle" for x in p.iter())
                 rest = "".join(esc(x.tail or "") for x in p if local(x.tag) in ("docTitle", "docNumber"))
                 if squash(rest):
                     d.para(rest)
@@ -435,6 +440,8 @@ def convert(xml: bytes, front: dict, notice: str) -> str:
 
 
 def yval(v) -> str:
+    if isinstance(v, (list, tuple)):                     # a YAML flow sequence, every item quoted
+        return "[" + ", ".join('"' + str(x).replace("\\", "\\\\").replace('"', '\\"') + '"' for x in v) + "]"
     s = str(v)
     if re.search(r"[:#\[\]{}&*!|>'\"%@`,]|^\s|\s$|^[-?]", s) or s in ("yes", "no", "true", "false", "null") or re.fullmatch(r"[\d.]+", s):
         return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
@@ -446,7 +453,7 @@ def text_tokens_xml(xml: bytes) -> list[str]:
     root = ET.fromstring(xml)
     parts = []
     def walk(e):
-        if local(e.tag) in ("meta", "docNumber"):
+        if local(e.tag) in ("meta", "docNumber", "RDF", "style"):   # metadata Fedlex puts beside the act; CSS of an SVG
             return
         sep = "" if local(e.tag) in INLINE - {"authorialNote", "br", "ref"} else " "
         parts.append(sep + (e.text or ""))

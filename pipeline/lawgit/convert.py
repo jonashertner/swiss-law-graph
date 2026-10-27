@@ -6,7 +6,8 @@ Vaud (BLV): build/lawgit/vd/html/<htmlId>.html.gz → build/lawgit/md/vd/<cote>/
 Geneva, Neuchâtel (SIL, text in force only): build/cantonal/raw/<CT>/htm/<page>.htm → build/lawgit/md/<ct>/<nr>/current.fr.md.gz
 Each conversion is checked: the words of the source's text against the words of the Markdown (multiset); the result
 of every file goes to build/lawgit/check_<jur>.json. Resumable (existing Markdown is kept unless --force).
-Usage: python3 pipeline/lawgit/convert.py [ch] [kt] [vd] [sil] [pend] [pdfcur] [zh] [--force]
+Usage: python3 pipeline/lawgit/convert.py [ch] [kt] [vd] [sil] [pend] [pdfcur] [zh] [ktfront] [--force]
+(ktfront: rewrite the heads of the converted LexWork files only, see kt_front.)
 """
 import gzip
 import json
@@ -130,6 +131,90 @@ def federal():
 
 
 # ---- cantonal (LexWork)
+SPAN = None
+
+
+def header_names(v: dict, lang: str) -> tuple[str, str]:
+    """Title and abbreviation of a version in one language, from its header (empty for a version without structured text)."""
+    hs = lexwork2md.soup((((v.get("json_content") or {}).get("document") or {}).get("header") or {}).get(lang, ""))
+    for x in hs.find_all(["sup", "a"]):                  # footnote calls
+        x.decompose()
+    t, a = hs.find(class_="title"), hs.find(class_="abbreviation")
+    return (akn2md.squash(t.get_text(" ")) if t else "", akn2md.squash(a.get_text(" ")).strip("() ") if a else "")
+
+
+def kt_front(ct: str, act: dict, v: dict, lang: str, adir: Path, md: str = "") -> dict:
+    """The head of a LexWork file in its own language. The portal answers in the collection's first language (FR: French,
+    BE: German): in another language the title and abbreviation come from the version's header in that language, for a
+    version read from its PDF from the heading the PDF gives ("Verordnung über den Rebbau und den Wein (VRW)"), else from
+    another version's header; never the other language's. Dates as days; the portal's links in that language."""
+    global SPAN
+    if SPAN is None:
+        import build_repo
+        SPAN = build_repo.parse_span
+    link = act.get("canonical_link") or ""
+    m = re.search(r"/(?:app|api)/(\w\w)/", link or v.get("pdf_link_tol") or "")
+    first = m.group(1) if m else lang
+    title, short = (v.get("title") or act.get("title") or ""), (v.get("abbreviation") or act.get("abbreviation") or "")
+    if lang != first:
+        title, short = header_names(v, lang)
+        h1 = re.search(r"^# (.+)$", md, re.M)
+        if not title and h1:
+            h = re.sub(r"\[\^[^\]]+\]|\*+", "", h1.group(1)).strip()
+            m = re.fullmatch(r"(.+?)\s*\(([^()]{1,25})\)", h)
+            title, short = (m.group(1), m.group(2)) if m else (h, "")
+        if not title or not short:                       # another version of the act, the current one first
+            ids = [str((act.get("current_version") or {}).get("id") or "")]
+            for f in [adir / f"{i}.json.gz" for i in ids if i] + sorted(adir.glob("[0-9]*.json.gz"), reverse=True):
+                if f.exists():
+                    t2, s2 = header_names(json.load(gzip.open(f, "rt", encoding="utf-8")), lang)
+                    if t2:
+                        title, short = title or t2, short or s2
+                        break
+    sp = SPAN(v.get("version_dates_str") or "")
+    ln = (lambda u: re.sub(r"/(app|api)/\w\w/", rf"/\1/{lang}/", u, count=1) if u else "")
+    return {"canton": ct, "number": act.get("systematic_number"), "title": title, "short": short, "language": lang,
+            "version": sp.get("from", ""), "valid_until": sp.get("to", ""), "corrected": sp.get("fix", ""),
+            "version_adopted": sp.get("adopted", ""), "adopted": act.get("date_of_decision") or "",
+            "in_force": act.get("enactment") or "", "url": ln(link), "pdf": ln(v.get("pdf_link_tol") or "")}
+
+
+def set_front(md: str, front: dict) -> str:
+    """Replace the YAML head of a file (the keys of the old head that the new one lacks, such as text: pdf, are kept)."""
+    head, body = md[4:].split("\n---\n", 1)
+    old = dict(x.split(": ", 1) for x in head.split("\n") if ": " in x)
+    new = {k: akn2md.yval(v) for k, v in front.items() if v not in (None, "", [])}
+    keep = {k: x for k, x in old.items() if k not in front and k not in ("original",)}
+    return "---\n" + "\n".join(f"{k}: {x}" for k, x in {**new, **keep}.items()) + "\n---\n" + body
+
+
+def ktfront_one(args):
+    """ktfront: rewrite the head of one converted LexWork file (no new reading of the text; the word check is unchanged)."""
+    o, src = args
+    v = json.load(gzip.open(src, "rt", encoding="utf-8"))
+    act = json.load(gzip.open(src.parent / "_act.json.gz", "rt", encoding="utf-8"))
+    md = gzip.open(o, "rt", encoding="utf-8").read()
+    lang = o.name.split(".")[1]
+    new = set_front(md, kt_front(src.parent.parent.name, act, v, lang, src.parent, md))
+    if new != md:
+        write_gz(o, new)
+        return 1
+    return 0
+
+
+def ktfront():
+    jobs = []
+    for d in sorted((B / "kt").iterdir()):
+        if d.is_dir():
+            for src in d.glob("*/[0-9]*.json.gz"):
+                for o in (B / "md" / d.name.lower() / src.parent.name).glob(f"{src.name.split('.')[0]}.*.md.gz"):
+                    jobs.append((o, src))
+    print(f"ktfront: {len(jobs)} files", file=sys.stderr)
+    with Pool(4) as p:
+        n = sum(p.imap_unordered(ktfront_one, jobs, chunksize=16))
+    print(f"ktfront: {n} heads rewritten", file=sys.stderr)
+
+
 def kt_convert(args):
     ct, src, outdir = args
     v = json.load(gzip.open(src, "rt", encoding="utf-8"))
@@ -140,10 +225,7 @@ def kt_convert(args):
         o = outdir / f"{src.name.split('.')[0]}.{lang}.md.gz"
         if o.exists() and not FORCE:
             continue
-        front = {"canton": ct, "number": act.get("systematic_number"), "title": v.get("title") or act.get("title"),
-                 "short": v.get("abbreviation") or act.get("abbreviation") or "", "language": lang,
-                 "version": v.get("version_dates_str") or "", "original": v.get("original_dates_str") or "",
-                 "url": act.get("canonical_link") or "", "pdf": v.get("pdf_link_tol") or ""}
+        front = kt_front(ct, act, v, lang, src.parent)
         md = lexwork2md.convert(v, lang, front, NOTICE_KT.get(lang, NOTICE_KT["de"]).format(ct=ct))
         if md is None:                                   # no structured text: read the canton's PDF (lexwork_pdf_fetch.py)
             pdf = B / "kt_pdf" / ct / src.parent.name / f"{src.name.split('.')[0]}.{lang}.pdf"
@@ -157,6 +239,7 @@ def kt_convert(args):
             except Exception as e:                       # noqa: BLE001 — recorded, the version stays a stub
                 out.append({"f": str(o.relative_to(B)), "pdf_only": 1, "error": str(e)[:200]})
                 continue
+            md = set_front(md, kt_front(ct, act, v, lang, src.parent, md))      # the title the PDF gives in its language
             got = Counter(akn2md.text_tokens_md(md))
             write_gz(o, md)
             miss, extra = want - got, got - want
@@ -290,7 +373,8 @@ def pend_convert(args):
         xml = gzip.open(src).read()
         front = {"status": "beschlossen, noch nicht in Kraft" if kind == "as" else "Referendumsvorlage",
                  "reference": ref_label(a["id"]), "title": a["title"].get(lg) or a["title"].get("de", ""), "language": lg,
-                 "adopted": a.get("dd") or "", "published": a["pd"], "in_force": a.get("eif") or "",
+                 "adopted": a.get("dd") or "", "published": a["pd"],
+                 "in_force": a.get("eif") or "",                   # a list: several dates when it enters into force in stages
                  "url": f"https://www.fedlex.admin.ch/eli/{a['id']}/{lg}"}
         if kind == "ref":
             m = re.search(rb"Ablauf der Referendumsfrist:?\s*([^<]+)<", gzip.open(PEND / "xml" / (a["id"].replace("/", "_") + ".de.xml.gz")).read()) \
@@ -479,3 +563,5 @@ if __name__ == "__main__":
         pdfcur()
     if "zh" in which:
         zhhist()
+    if "ktfront" in which:
+        ktfront()
