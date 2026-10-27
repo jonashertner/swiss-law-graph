@@ -17,7 +17,7 @@ import json
 import re
 import subprocess
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -207,7 +207,7 @@ def cantonal_events():
             vlist.sort(key=lambda x: (x[0], x[1].get("fix") or "", x[2]["id"]))
             if not vlist:
                 continue
-            base = f"{ct.lower()}/{slug(nr)[:1]}/{slug(nr)}"
+            base = f"cantons/{ct.lower()}/{slug(nr)[:1]}/{slug(nr)}"
             short = t.get("abbreviation") or ""
             title = re.sub(r"\s+", " ", t.get("title") or "").strip()
             label = f"{ct} {nr} {short or (title[:60] + ('…' if len(title) > 60 else ''))}".strip()
@@ -236,7 +236,7 @@ def cantonal_events():
         end = r.get("abrogated") or ""
         if end and end <= START:
             continue
-        base = f"vd/{slug(nr)[:1]}/{slug(nr)}"
+        base = f"cantons/vd/{slug(nr)[:1]}/{slug(nr)}"
         short = a.get("abreviation") or ""
         title = re.sub(r"\s+", " ", a.get("titreCompletSansCote") or a.get("titre") or "").strip()
         label = f"VD {nr} {short or (title[:60] + ('…' if len(title) > 60 else ''))}".strip()
@@ -272,7 +272,7 @@ def cantonal_events():
         for r in json.load(open(zf)):
             nr = r["sr"]
             a = KZ.get(nr) or {}
-            base = f"zh/{slug(nr)[:1]}/{slug(nr)}"
+            base = f"cantons/zh/{slug(nr)[:1]}/{slug(nr)}"
             title = re.sub(r"\s+", " ", a.get("title") or "").strip()
             short = a.get("abbr") or ""
             label = f"ZH {nr} {short or (title[:60] + ('…' if len(title) > 60 else ''))}".strip()
@@ -309,7 +309,7 @@ def cantonal_events():
             if not ver:
                 stats["sil_no_date"] += 1
             d = max(ver or a.get("adopted") or START, START)
-            base = f"{ct.lower()}/{slug(nr)[:1]}/{slug(nr)}"
+            base = f"cantons/{ct.lower()}/{slug(nr)[:1]}/{slug(nr)}"
             title = re.sub(r"\s+", " ", a.get("title") or "").strip()
             short = a.get("abbr") or ""
             label = f"{ct} {nr} {short or (title[:60] + ('…' if len(title) > 60 else ''))}".strip()
@@ -323,9 +323,9 @@ def cantonal_events():
 
 # ---- adopted, not yet in force; consultations (fedlex_pending.py, convert.py pend)
 def pending_events():
-    """beschlossen/as/<year>/<nr>: an AS act from its publication to its (last) entry into force; beschlossen/bbl/<year>/<nr>:
+    """adopted/as/<year>/<nr>: an AS act from its publication to its (last) entry into force; adopted/bbl/<year>/<nr>:
     a Referendumsvorlage from its publication to its AS publication or, without one, the referendum deadline;
-    vernehmlassung/<year>/<nr>: the draft(s) of a consultation from its opening, its status changed when it closes."""
+    consultations/<year>/<nr>: the draft(s) of a consultation from its opening, its status changed when it closes."""
     P = B / "pending"
     ev, stats = [], defaultdict(int)
     if not (P / "as.json").exists():
@@ -359,7 +359,7 @@ def pending_events():
                 head = f"{label}: Referendumsvorlage" + (f", Referendumsfrist bis {de_date(dl)}" if dl else "")
             if end and end <= START:
                 continue
-            path = f"beschlossen/{sub}/{y}/{n}"
+            path = f"adopted/{sub}/{y}/{n}"
             url = f"https://www.fedlex.admin.ch/eli/{a['id']}/de"
             ev.append({"d": max(a["pd"], START), "jur": "beschlossen", "act": (sub, a["id"]), "path": path, "files": files,
                        "kind": "pending", "msg": f"{head}\n\nQuelle: {url}", "label": label})
@@ -372,7 +372,7 @@ def pending_events():
             continue
         y, n = c["id"].split("/")[2:4]
         cn = c["id"].rsplit("/", 1)[1]
-        path = f"vernehmlassung/{y}/{n}" + ("" if cn == "cons_1" else f"-{cn.split('_')[1]}")
+        path = f"consultations/{y}/{n}" + ("" if cn == "cons_1" else f"-{cn.split('_')[1]}")
         files = {}
         for dn, d in sorted(c["docs"].items(), key=lambda kv: int(kv[0].split("_")[1])):
             for lg in d["pdf"]:
@@ -568,8 +568,13 @@ def main() -> None:
     mark = stream(p.stdin, main_ev, "main", 0, None, snaps, days)
     ntags = month_tags(p.stdin, days)
     future = sorted({(e["d"], e["jur"], e["path"], e.get("label") or e["path"]) for e in fut_ev
-                     if e["kind"] in ("version", "fix") and not e["path"].startswith(("beschlossen/", "vernehmlassung/"))})
-    mark = write_extra(p.stdin, mark, "main", readme.files(snaps, facts, kacts, START, TODAY, future),
+                     if e["kind"] in ("version", "fix") and not e["path"].startswith(("adopted/", "consultations/"))})
+    # versions applied in main, per part and per canton, for the README
+    VK = ("version", "fix", "zh", "current", "pending")
+    nver = Counter(("ch" if e["jur"] == "ch" else "adopted" if e["jur"] == "beschlossen" else
+                    "consultations" if e["jur"] == "vernehmlassung" else "cantons") for e in main_ev if e["kind"] in VK)
+    nver.update(f"ct:{e['jur']}" for e in main_ev if e["kind"] in VK and e["jur"] not in ("ch", "beschlossen", "vernehmlassung"))
+    mark = write_extra(p.stdin, mark, "main", readme.files(snaps, facts, kacts, START, TODAY, future, nver),
                        f"README und Verzeichnisse: Stand {de_date(TODAY)}", TODAY)
     # for the atlas (08_web.py): where each act in force lives at the end of main, and in which languages
     where = {"ch": {a["sr"]: [a["path"], sorted(snaps[a["path"]])] for a in facts.values() if a.get("sr") and a["path"] in snaps},

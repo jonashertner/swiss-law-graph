@@ -571,8 +571,16 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     effect in future, as well as Vernehmlassungsvorlagen"; `pipeline/lawgit/`, repository `jonashertner/swisslaw-git` (Jonas: "i
     created swisslawgit … swisslaw-git") — not `swisslaw`, which is swisslaw.io). One Markdown file per act and language, one commit per version, dated 00:00 Zurich on the
     day the version applies, author "swiss-law · jonashertner.com"; `main` = the law as it applied each day from 2021-01-01 to the
-    run, `future` = main plus the versions already published for a later day. Paths: `ch/<area>/<SR>/<lang>.md` (area = first
-    digit, treaties 0.1–0.9), `<ct>/<first char>/<number>/<lang>.md`, `beschlossen/as|bbl/<year>/<nr>/`, `vernehmlassung/<year>/<nr>/`.
+    run, `future` = main plus the versions already published for a later day, tags `stand/YYYY-MM-01` the law on the first of
+    every month. Paths (Jonas: "the git repo must be exceptionally beautifully, elegantly, functionally done" — the root holds
+    four folders, not 26 cantons among them): `ch/<area>/<SR>/<lang>.md` (area = first digit, treaties 0.1–0.9),
+    `cantons/<ct>/<first char>/<number>/<lang>.md`, `adopted/as|bbl/<year>/<nr>/`, `consultations/<year>/<nr>/`. The repository's
+    own files (`readme.py`): README.md (DE) with a language bar to full README.fr/it/en.md (table of the parts with acts and
+    versions since 2021, the most-used acts in the reader's language, recipes, layout, sources with the word check per source,
+    limits, licence), a README per part (federal areas with their SR names in DE/FR/IT from the taxonomy; cantons in the order
+    of Art. 1 BV with source and history; each canton in its collection's language; adopted acts; consultations), AGENTS.md,
+    index.csv / index.jsonl, LICENSE (the official CC0 1.0 legal code, `pipeline/lawgit/CC0-1.0.txt`), CITATION.cff,
+    .gitattributes. The build also writes build/lawgit/repo_paths.json (act → path, languages) for links from the atlas.
     Format: YAML front matter (number, title, short title, language, version, adoption, entry into force, source URL), `#### Art. N`
     per article (GitHub anchors), one line per paragraph (`<sup>1</sup> …`) so diffs and blame are exact, lists `- a. …`,
     footnotes `[^<article>-k]` after their article, tables as HTML. Every file is checked: the words of the source must all be in
