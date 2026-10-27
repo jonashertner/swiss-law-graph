@@ -60,7 +60,9 @@ python3 pipeline/04_hierarchy.py && (cd layout && npm ci && node pack.mjs)
 python3 pipeline/05_site.py                         # 40 s -> site/data (44 MB, not in git)
 python3 pipeline/cantonal_basis.py                  # 10 s, offline: data/cantonal_basis.json
 python3 pipeline/07_tree.py                         # site/data/tree.json + ingress(_k).json + agg.json (Stufenbau, Aufbau)
-python3 pipeline/06_artifact.py                     # site/artifact.html for claude.ai preview
+python3 pipeline/06_artifact.py                     # site/artifact.html for claude.ai preview (the 3D page)
+python3 pipeline/08_web.py                          # 8 s -> docs/data (67 MB, committed): the public site
+python3 -m http.server -d docs 8766                 # the public site: http://localhost:8766
 python3 -m http.server -d site 8765                 # local view: http://localhost:8765
 ```
 Fedlex fetchers (only when refreshing data): `fetch_fedlex_acts.py`, `fetch_fedlex_articles.py`,
@@ -229,7 +231,7 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     80 federal, grey), no preamble published (1,227, hatched); a key below the cantons lists them and
     opens each kind across all blocks. Widths = acts on three disclosed scales (BV parts by what rests on them; federal; cantonal);
     a flow is exact at its lower end and a share of the source's outflow at its upper end (parallel-sets
-    style). 1,261 acts skip a floor: their flows run in a lane beside the target column instead of
+    style). 1,248 acts skip a floor (1,261 before the floor fixes of decisions 26/27): their flows run in a lane beside the target column instead of
     through the floor between. Art. 51 BV → 26 constitutions as a trunk on the left (not an Ingress).
     Layers: legislation = provisions of federal acts naming an act of another block (treaties naming
     treaties dropped); case law = distinct decisions citing acts of both blocks (refs_valid, BV by
@@ -328,6 +330,39 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     intercantonal issuer (4). 40 acts moved; the SRK's rules (a private body acting for the cantons)
     stay on 7. The lower-floor list: 54 (UR 20.2715 → ZBSA rules no longer lower).
 
+28. The public site (`docs/`, 2026-10-27; GitHub Pages from `/docs`; the 3D page in `site/` stays as it was).
+    Jonas: "redo the UI from scratch … world class … a better representation than blobs … clear white
+    background … each label super clear, no secondary labels … all screen sizes … DE/FR/IT/EN".
+    Form: a nested squarified treemap on canvas (Bruls et al.; d3's ratio φ), every act a tile — text fits
+    rectangles, circles waste a third of the plane. Hierarchy: root → federal / international / cantonal
+    law → SR areas (taxonomy) or cantons (Art. 1 BV order) → acts → (cited federal acts) divisions →
+    articles. "Fläche: Erlasse" = every act in force the same size (groups first, then acts by level, so a
+    canton shows its own Stufenbau as a staircase); "Fläche: Entscheide" = decisions referring to the act
+    (largest first; earlier acts and codes not in the collection appear, hatched). Colour = who enacted it
+    (Ingress floor): one blue ramp Verfassung → Parlament → Regierung → Verwaltung, treaties ochre (#d8b679,
+    checked with the dataviz validator: CVD ΔE ≥ 15 against the ramp), the one federal act without a
+    recorded level (SR 173.110.3) grey; inside an act, articles by decisions (log ramp). The 26 cantonal
+    constitutions sit in their canton only (no longer twice: SR 131.2 is skipped in the federal block),
+    so federal law in force = 2,013 (= decision 16's floors), total 21,495. An act heading its own SR
+    group (412.10 BBG with BBV and the 190 EFZ/EBA ordinances) is moved into that group, which takes its
+    abbreviation as name. Labels: abbreviation; an abbreviation three siblings share ("EFZ") is no name;
+    without one, the title without its date, without the words it shares with ≥ 2 siblings (prefix and
+    suffix) and without its type phrase ("Verordnung über die …", "Loi sur la …", "Ordinanza concernente
+    …"); VD's capitalised first word ("LOI sur …") is written "Loi"; a part filling > 80 % of its parent
+    does not repeat its header; a label is drawn only whole or with ≥ 8 characters. Zoom animates every
+    tile from its old to its new rectangle (exits fly out with the camera). Panel: act (facts, decisions
+    per year, most-cited articles, bases with clause verbatim, dependents, co-citation, references, most-
+    cited decisions, Ingress), article, area (acts by level, distinct decisions from core's containers,
+    most-cited acts). Views: Karte, Hierarchie (decision 23, restyled), Abhängigkeiten (decision 25; cell
+    panels from `docs/data/pairs.json`, every act → basis pair 07 counts: 24,537 in 1,457 cells, checked
+    against `basis`, 0 mismatches), Methode (the 3D page's method text with its 3D parts rewritten).
+    Search: abbreviations in every language, SR numbers, title words (short words must start a word),
+    "Art. 41 OR" (exact abbreviation first), division headings with parent headings and 4-letter stems
+    ("Mietrecht" → OR Achter Titel: Die Miete). Hash routes `#<lang>/<id>[:<eid>]` (`:` alone = inside the
+    act); old `#SR_220--art_41` links still work. Light only, by Jonas' wish. Geist / Geist Mono (OFL) self-
+    hosted. Phone: compact header with a language select, the panel as a bottom sheet above which the map
+    shrinks, hierarchy and matrix scroll sideways. 60 fps in headless Chromium (median frame 16.7 ms).
+
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
       Deterministic (ties broken explicitly); two runs give identical reports.
@@ -388,13 +423,23 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
 - [x] Step 5 partly: counts cross-checked with the opencaselaw MCP (BGE 143 IV 241 in-degree;
       Art. 41 OR — the MCP undercounts, see report D1); desktop + phone screenshots via Playwright.
 
+- [x] Step 11 public site (decision 28): `pipeline/08_web.py` → `docs/data` (atlas.json, names.<lang>.json,
+      links.json, hier.json, pairs.json, years.json, art/<n>.json, law/<x>.json, find.<lang>.json,
+      method.json); `docs/index.html`, `style.css`, `js/` (app, data, treemap, dossier, search, hierarchy,
+      matrix, method, methodtext, i18n, util). Tested at 1440×900, 1024×768 and 390×844 in DE/FR/IT/EN.
+
 ## Reports
 - `reports/opencaselaw-anomalies.md` — anomalies in OpenCaseLaw for Jonas to fix there (duplicates,
   impossible dates, alias errors, unflagged homonyms, SR reuse, extractor issues, MCP pairing). Keep
   adding to it rather than silently working around new ones.
 
 ## Next
-- Jonas to review the preview on desktop and phone; decide public vs private.
+- Jonas: make the repository public (Settings → General → Danger Zone) and enable Pages (Settings → Pages →
+  Deploy from a branch → this branch or main after merging, folder `/docs`). Pages on a private repository
+  needs a paid plan and publishes the site publicly anyway.
+- New site: row names of the hierarchy are not sticky when a phone scrolls sideways; the treemap has a
+  keyboard path through the top-level tiles but not inside nested parts; cantonal acts have no subject
+  grouping below the canton (their collections' numbering is not uniform: GE uses letters).
 - Decision search (by docket / BGE citation) and a decision panel with its own cites/cited-by.
 - PageRank as an optional authority measure (in-degree today).
 - EN titles exist for 471 SR entries only (fallback DE).

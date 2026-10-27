@@ -815,7 +815,8 @@ def main() -> None:
            "flows": [[s, d, sorted(v, key=by_dec)] for (s, d), v in sorted(bflows.items(), key=lambda x: (-len(x[1]), x[0]))],
            "stubs": [[d, g, sorted(v, key=by_dec)] for (d, g), v in sorted(bstubs.items())],
            "law": [[a, b, v[0], v[1]] for (a, b), v in sorted(law.items(), key=lambda x: (-x[1][0], x[0]))],
-           "court": court, "dec_any": dec_any, "ct_order": ct_order}
+           "court": court, "dec_any": dec_any, "ct_order": ct_order,
+           "pairs": sorted(seen_pair)}                    # every act → stated basis behind the matrix's cells
     stats["agg_blocks"] = len(blocks)
     stats["agg_flows"] = len(bflows)
     stats["agg_acts"] = sum(len(v) for v in bmembers.values())

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atlas des Schweizer Rechts</title>
+<meta name="description" content="Alle Erlasse von Bund und Kantonen, wie sie aufeinander aufbauen und wie oft Gerichte sie zitieren.">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="data/atlas.json" as="fetch" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main" id="skip">Zum Inhalt</a>
+<header class="top">
+  <a class="brand" href="#" id="brand"><span class="mark" aria-hidden="true"></span><span class="name" id="brandname">Atlas des Schweizer Rechts</span></a>
+  <nav class="views" id="views" aria-label="Ansichten">
+    <a href="#" data-view="map">Karte</a>
+    <a href="#" data-view="hier">Hierarchie</a>
+    <a href="#" data-view="matrix">Abhängigkeiten</a>
+    <a href="#" data-view="method">Methode</a>
+  </nav>
+  <div class="search" id="search" role="search">
+    <svg class="glass" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+    <input id="q" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" role="combobox" aria-expanded="false" aria-controls="results" aria-autocomplete="list">
+    <button class="closeq" id="closeq" type="button"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button>
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <button class="qbtn" id="qbtn" type="button"><svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg></button>
+  <select class="langsel" id="langsel"><option value="de">DE</option><option value="fr">FR</option><option value="it">IT</option><option value="en">EN</option></select>
+  <div class="langs" id="langs" role="group">
+    <button data-lang="de" lang="de">DE</button><button data-lang="fr" lang="fr">FR</button><button data-lang="it" lang="it">IT</button><button data-lang="en" lang="en">EN</button>
+  </div>
+</header>
+<main id="main">
+  <section class="view" id="v-map">
+    <div class="mapbar">
+      <nav class="crumbs" id="crumbs"></nav>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="tm" tabindex="0" role="application"></canvas>
+      <ul class="sr" id="tmlist"></ul>
+    </div>
+    <div class="legend"><div class="seg" id="mode" role="group"></div><div class="keys" id="legend"></div></div>
+  </section>
+  <section class="view" id="v-hier" hidden>
+    <div class="vhead"><h1 id="htitle"></h1><div class="hkey" id="hkey"></div></div>
+    <div class="scroller" id="hscroll"><svg id="hsvg" role="img"></svg></div>
+    <div class="hfoot" id="hfoot"></div>
+  </section>
+  <section class="view" id="v-matrix" hidden>
+    <div class="vhead"><h1 id="mtitle"></h1><div class="seg" id="mlayer" role="group"></div><div class="seg" id="mscope" role="group"></div></div>
+    <div class="scroller" id="mscroll"><div class="mwrap" id="mwrap"><canvas id="mc"></canvas><canvas id="mx" tabindex="0"></canvas></div></div>
+    <div class="hfoot" id="mfoot"></div>
+  </section>
+  <section class="view page" id="v-method" hidden><div class="doc" id="mdoc"></div></section>
+  <aside class="dossier" id="dossier" hidden></aside>
+  <div class="loading" id="loading"><div><span id="loadtxt">Lade …</span><div class="bar"><i></i></div></div></div>
+</main>
+<div class="tip" id="tip" hidden></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
