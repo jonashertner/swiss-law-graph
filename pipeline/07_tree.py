@@ -424,7 +424,7 @@ def main() -> None:
         out = []
         for b in kinfo[me]["bases"]:
             tgt, arts, clause = b[0], b[1], b[2]
-            via = "old" if len(b) > 3 and b[3] == "old" else "text"
+            via = {"old": "old", "note": "note"}.get(b[3], "text") if len(b) > 3 else "text"
             stats["k_bases"] += 1
             if tgt == "KV":
                 hit = [x for x in (kv_article(ct, n.split("–")[0]) for n in arts) if x]
@@ -445,6 +445,9 @@ def main() -> None:
                 eids = [eid_of(n) for n in arts if eid_of(n) in bvart]
                 stats["k_bases_federal"] += 1
                 out.append([bvart[eids[0]] if eids else root, eids, clause, "basis", via, int(len(eids) == len(arts))])
+            elif tgt.startswith("X:"):                 # an act of another canton (agreements name each party's law)
+                stats["k_bases_other_canton"] += 1
+                out.append([-1, [], clause, "basis", "other", 0])
             elif tgt == "SR ?":                       # federal law named in general ("Bundesgesetzgebung über …")
                 stats["k_bases_federal_unidentified"] += 1
                 out.append([-1, [], clause, "basis", "fedany", 0])
@@ -470,14 +473,14 @@ def main() -> None:
             stats["k_parent_same_floor"] += int(not best[0][0])
         else:
             # no cantonal basis to hang from: say why, in this order
-            if any(c[4] == "unresolved" for c in out):
-                g = "unres"                          # a basis named that the collection in force does not identify
+            if any(c[4] in ("unresolved", "other") for c in out):
+                g = "unres"                          # a basis named that the collection in force does not identify (or another canton's)
             elif any(c[0] >= 0 and is_k(c[0]) for c in out):
                 g = "lower"                          # it names only cantonal acts of a lower floor
             elif out:
                 g = "fed"                            # only federal law (in force, earlier, or in general)
-            elif (kinfo[me].get("ingress") or "").strip() and not re.match(r"\s*Dieser Erlass wird nur noch über", kinfo[me]["ingress"]):
-                g = "none"                           # the Ingress names no basis (ZG: an editorial note "published only on Intlex" is no Ingress)
+            elif (kinfo[me].get("ingress") or "").strip() and not kinfo[me].get("noing"):
+                g = "none"                           # the Ingress names no basis (an editorial note in its place, UR/ZG, is no Ingress)
             else:
                 g = "noing"                          # the collection publishes no Ingress
             parent[me] = kgroup[(ct, g)]
@@ -777,6 +780,11 @@ def main() -> None:
     bpair = defaultdict(lambda: [set(), set()])
     rank = Counter()
     seen_pair = set()
+    # bases on a lower floor, as reviewed by hand (reports/inversions_review.json): category per pair
+    rev = json.load(open(ROOT / "reports/inversions_review.json"))
+    rev_cats = [c["id"] for c in rev["categories"]] + ["open"]
+    rev_of = {(x["a"], x["t"]): rev_cats.index(x["c"]) for x in rev["items"]}
+    low = []
     for me, targets in [(act_node[sr], [c[0] for c in cands]) for sr, cands in resolved.items()] + \
             [(me, [c[0] for c in cands]) for me, cands in kresolved.items()]:
         a = nb[me]
@@ -790,13 +798,20 @@ def main() -> None:
                 x[1].add(me)
             fa, ft = floor_of(me), floor_of(t)
             rank["higher" if ft < fa else "same" if ft == fa else "lower"] += 1
+            if ft > fa:
+                low.append([me, t, rev_of.get((ids[me], ids[t]), len(rev_cats) - 1)])
     stats["mat_basis_pairs"] = len(seen_pair)
     stats["mat_basis_cells"] = len(bpair)
     for k_, v in rank.items():
         stats[f"mat_basis_{k_}"] = v
+    for k_, c_ in enumerate(rev_cats):
+        stats[f"mat_low_{c_}"] = sum(1 for x in low if x[2] == k_)
+    stale = set(rev_of) - {(ids[a], ids[b]) for a, b, _ in low}
+    stats["mat_low_review_stale"] = len(stale)          # reviewed pairs that no longer occur (data changed)
     agg = {"blocks": blocks, "members": [sorted(bmembers[b], key=by_dec) for b in range(len(blocks))],
            "basis": [[a, b, len(v[0]), len(v[1])] for (a, b), v in sorted(bpair.items())], "nb": nb, "cb": core_blk,
            "rank": {k_: rank[k_] for k_ in ("higher", "same", "lower")},
+           "low": {"cats": rev_cats, "reviewed": rev["reviewed"], "items": sorted(low)},
            "flows": [[s, d, sorted(v, key=by_dec)] for (s, d), v in sorted(bflows.items(), key=lambda x: (-len(x[1]), x[0]))],
            "stubs": [[d, g, sorted(v, key=by_dec)] for (d, g), v in sorted(bstubs.items())],
            "law": [[a, b, v[0], v[1]] for (a, b), v in sorted(law.items(), key=lambda x: (-x[1][0], x[0]))],

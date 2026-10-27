@@ -11,7 +11,13 @@ Ingress names, resolved to an exact target where the text allows it:
   "SR <n>@<year>"  an earlier federal act (no longer in force under that number),
   "KV"       the canton's own constitution (with its articles),
   "CT:<n>"   another act of the same canton (footnote/inline number, date, abbreviation),
+  "X:<…>"    an act of another canton (its collection number in a footnote, or the canton named:
+             "der bernischen Fischereiverordnung"); agreements name each party's law,
   "?"        named but not identified (kept verbatim, counted).
+A footnote whose number now carries a later act than the one the text cites by its date is flagged
+"old"; a footnote giving an act of another type than the text's act of that date yields to the text
+("note"). Editorial notes printed in place of an Ingress (UR "durch Verweis veröffentlicht") and the
+text after the enacting formula are not read for bases.
 A reference is identified by, in this order: its footnote or inline collection number (the
 canton's own prefix or SR/RS), the name of a constitution, a fixed federal title (ZGB, OR,
 StGB …), the act's type and date matched against the federal or cantonal titles of that
@@ -21,7 +27,8 @@ date, or an abbreviation the canton itself states. Nothing is guessed: an act na
 Floors (Art. 49 BV: all of them below federal law): 4 = the constitution; 5 = parliament,
 people, Landsgemeinde, intercantonal agreements; 6 = government and cantonal courts;
 7 = directorates, departments, offices, other bodies (incl. communal bodies some cantons
-publish). From the issuer; without one, from the title ("Verordnung des Regierungsrates").
+publish, church bodies). From the issuer; without one, from the title ("Verordnung des Regierungsrates");
+an agreement from its parties (agreement_floor).
 
 Usage: python3 pipeline/cantonal_basis.py       (~20 s, offline)
 """
@@ -137,9 +144,18 @@ AUTH = re.compile(r"(?:Rat\b|[Rr]äte\b|Regierung|Gericht|Volk|Landsgemeinde|Sti
                   r"Commissione|Conferenza|Cantoni\b|Tribunale|Ufficio|Camera|Erziehungsrat|Kirchenrat)", re.I)
 PARL = re.compile(r"Kantonsrat|Gro(?:ss|ß)e[rn]?\s+Rat|Grossrat|Landrat|Landsgemeinde|Kantonsparlament|Parlament|Parlement\b|Volke?s?\b|Stimmberechtigt|"
                   r"Stimmbürger|Verfassungsrat|Grand\s+Conseil|GRAND\s+CONSEIL|peuple|Assemblée\s+constituante|Constituante|"
-                  r"Gran\s+Consiglio|GRAN\s+CONSIGLIO|popolo|Landeskonferenz|Grosse\s+Landrat", re.I)
+                  r"Conseil\s+représentatif|Gran\s+Cons\w*glio|Consigli\s+del\s+Cantone|popolo|Landeskonferenz|Grosse\s+Landrat", re.I)
+# a conference of the cantons or of their directors (not "die Mittelschulkonferenz des Kantons", "la Conférence des préfets")
+CONF_INTER = (r"\w*(?:konferenz|conférence|conferenza)\b(?![^,;]{0,40}?\bdes\s+Kantons\b)[^;]{0,140}?(?:kantonal|cantona|\bKantone|\bcantons|"
+              r"\bCantoni|Kantonsregierungen|konkordat|concordat|Vereinbarungskantone|romand|latin|suisse|schweizerisch|svizzer|"
+              r"zentralschweiz|ostschweiz|nordwestschweiz|westschweiz|interkantonal|intercantonal|universitaire)|"
+              r"\w*(?:direktor|direktoren|direktorinnen|regierungs)\w*konferenz|interkantonal\w*\s+\w*(?:konferenz|conférence|conferenza)|"
+              r"\b(?:GDK|EDK|SODK|KKJPD|BPUK|FDK|VDK|SDK|CDIP|CDS|CDAS|CCDJP|DTAP|CDEP|LDK|EnDK|KdK|CdC|CIIP|CDPE|InöB|AiMp)\b")
+# an act a conference of the cantons issued, by its title ("Reglement der EDK", "Actes adoptés par la Conférence latine …")
+TITLE_CONF = re.compile(r"^.{0,60}?\b(?:der|des|de\s+la|du|par\s+la|della|dei)\s+(?:Organe\s+der\s+)?(?:[\w\-]+\s+){0,2}(?:" + CONF_INTER + ")", re.I)
 INTERCANT = re.compile(r"^(?:Die|Les|I|Gli)\s+(?:Regierungen\s+der\s+)?(?:Kantone|cantons|Cantoni|Vereinbarungskantone|"
-                       r"Konkordatskantone)|Konferenz|Conférence|Conferenza|Vereinbarungs|Konkordats|"
+                       r"Konkordatskantone|Uferkantone)|" + CONF_INTER + r"|\binter(?:k|c)?antonal\w*|[ée]change\s+de\s+notes|Notenaustausch|scambio\s+di\s+note|"
+                       r"Vereinbarungs|Konkordats|"
                        # the cantons named one by one, or "die dieser Vereinbarung beigetretenen Kantone"
                        r"^(?:Le|Der|Il)\s+(?:Canton|Kanton|Cantone)\b[^,]{0,40},\s*(?:le|der|il|la)\s+(?:Canton|Kanton|Cantone|République)|"
                        r"^(?!(?:Erlassen\s+vo[mn]\s+(?:der\s+|dem\s+)?)?(?:(?:Der|Die|Das|Le|La|L['’]|Il|Les|I)\s+)?(?:Verwaltungsrat|Vorstand|Hochschulrat|"
@@ -167,13 +183,13 @@ TITLE_FLOOR = [
                 r"du\s+Tribunal\s+cantonal)\b", re.I), 6),
     (re.compile(r"\b(?:der\s+\w*[Dd]irektion|des\s+\w*[Dd]epartement\w*|du\s+Département|de\s+la\s+Direction|"
                 r"del\s+Dipartimento|Weisung|Richtlinie|Directive|Direttiva)\b", re.I), 7),
-    (re.compile(r"^(?:\w*[Gg]esetz\w*|Loi|Legge|Code|Codice|\w*[Dd]ekret\w*|Décret|Decreto|Kantonsratsbeschluss|"
+    (re.compile(r"^(?:\w*[Gg]esetz\w*|Loi|Legge|Code|Codice|\w*[Dd]ekret\w*|Décret|Decreto|Kantonsratsbeschluss|Landsgemeindebeschluss|"
                 r"Landratsbeschluss|Grossratsbeschluss|Gro(?:ss|ß)ratsbeschluss|Konkordat|Concordat|Concordato|"
                 r"\w*[Vv]ereinbarung|Convention|Accord|Convenzione|Accordo|Beitritt|Adhésion|Adesione)\b", re.I), 5),
     (re.compile(r"^(?:\w*[Vv]erordnung|Ordonnance|Ordinanza|\w*[Rr]eglement|Règlement|Regolamento|Arrêté|Beschluss)\b", re.I), 6),
     (re.compile(r"^(?!.*\b(?:Einwohnergemeinde|Bürgergemeinde|Gemeinde|commune|comune)\b)"
                 r"(?!(?:Actes?\s+d['’]exécution|Ausführung|Vollzug|Gebühren|Tarif|Weisung|Richtlinie|Directive|Direttiv))"
-                r".*(?:\w[Vv]ereinbarung|\b[Kk]onkordat|\bConvention\b|"
+                r".*(?:[\w\-][Vv]ereinbarung|\w*[Kk]onkordat|\bConvention\b|"
                 r"\bConcordat\b|\bAccord\b|\bConvenzione\b|\bConcordato\b)", re.I), 5),     # "Zentralschweizer Fachhochschul-Vereinbarung"
 ]
 
@@ -182,7 +198,7 @@ OWN = {"ZH": r"LS", "BE": r"BSG|RSB", "LU": r"SRL(?:\s+Nr\.)?", "UR": r"RB", "SZ
        "GL": r"GS", "ZG": r"BGS", "FR": r"RSF", "SO": r"BGS", "BS": r"SG", "BL": r"SGS", "SH": r"SHR", "AR": r"bGS",
        "AI": r"GS", "SG": r"sGS", "GR": r"BR", "AG": r"SAR", "TG": r"RB", "TI": r"RL", "VD": r"BLV|RSV",
        "VS": r"RS/VS|RSVS|SGS/VS|GS/VS", "NE": r"RSN", "GE": r"rsGE|RSG", "JU": r"RSJU"}
-NUMTOK = r"(?:[IVX]+\s?[A-Z]+/[\d/]*\d|[A-L]\s\d+(?:\s\d+(?:\.\d+)*)?|\d+(?:\.\d+)+|\d+)"   # 155.611 · VIII B/21/5/1 · E 5 10.03 · 1
+NUMTOK = r"(?:[IVX]+\s?[A-Z]+/[\d/]*\d|[A-L]\s\d+(?:\s\d+(?:\.\d+)*)?|\d+(?:\.\d+)+|\d+[a-z]{1,2}(?![a-zäöüéèà])|\d+)"   # 155.611 · VIII B/21/5/1 · E 5 10.03 · 539c (LU) · 1
 LATIN = r"(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)"
 NUM = rf"\d+(?:[a-z](?![a-zäöüéèà])|{LATIN})?(?:{LATIN})?"      # 5a, 34ter; not "65 e" (and)
 ART_KW = re.compile(r"(?:\b(?:Artikeln|Artikel|Art\.?|[Aa]rticles?|art\.|[Aa]rticol[oi]|artt\.)|§§?)\s*(?=\d)")
@@ -290,6 +306,11 @@ def compound(x: str, y: str) -> bool:
         return False
     rest = y[len(x):]
     return bool(COMPOUND.fullmatch(rest)) or rest in ("es", "s", "en", "e", "n")
+
+
+# words that say what kind of act, not which ("d'exécution", "kantonale")
+GENERIC_W = re.compile(r"exécution|application|introduction|vollziehung\w*|ausführung\w*|vollzug\w*|einführung\w*|esecuzione|applicazione|"
+                       r"cantonal\w*|kantonal\w*|cantonale|federal\w*|fédéra\w*|eidgenössisch\w*")
 
 
 def type_of(s: str):
@@ -420,9 +441,129 @@ def split_clauses(ing: str):
 KV_TITLE = re.compile(r"^(?:Verfassung|Constitution|Costituzione)\s+(?:des\s+Kantons|für\s+den\s+Eidgenössischen\s+Stand|"
                       r"du\s+canton|de\s+la\s+République|della\s+Repubblica|del\s+Cantone)", re.I)
 CHURCH = re.compile(r"Kirche|Landeskirche|Kantonalkirche|Konfessionsteil|ecclésiastique|Eglise|Église|Chiesa|Verband\s+der", re.I)
+# an act of a church body ("Verordnung der Evangelischen Synode", "Gesetz der Katholischen Synode", "Geschäftsreglement des
+# Evangelischen Kirchenrates"): church law, below cantonal law whatever the body calls it
+CHURCH_BODY = (r"(?:Synode|Synodalrat\w*|Kirchenr[aä]t\w*|Landeskirche\w*|Kantonalkirche|Kirchgemeinde\w*|Kirchenpflege|Konfessionsteil\w*|"
+               r"Administrationsrat\w*|Kirchenvorsteherschaft|Kirchenverwaltungsrat\w*|Bistum\w*|Diözese|Kirche\b|Kirchen\b|"
+               r"Église|Eglise|paroisse\w*|Conseil\s+synodal|diocèse|évêché|Chiesa|parrocchi\w*|diocesi)")
+CHURCH_TITLE = re.compile(r"^(?:[\w\-]+\s+){0,1}(?:des|der|du|de\s+la|de\s+l['’]|della|del)\s+(?:(?:Evangelisch|Katholisch|Römisch|"
+                          r"Christkatholisch|Reformiert|röm\.|evang\.)[\w\-.]*\s+){0,2}" + CHURCH_BODY, re.I)
+CHURCH_ISSUER = re.compile(r"^(?:(?:Die|Der|Das|Le|La|L['’]|Il|Zwischen\s+dem|Zwischen\s+der)\s+)?(?:[\w\-.]+\s+){0,3}?" + CHURCH_BODY)
+
+# agreements: who the parties are decides the floor (decisions 17, 26)
+AGREE_HEAD = re.compile(r"^(?:Nachtrag\s+zu[mr]\s+)?(?:[A-ZÄÖÜ][\w.\-]*(?:e|er|es|en|isch)\s+){0,2}?[\w\-]*?(?i:vereinbarung|konkordat|"
+                        r"übereinkunft|übereinkommen|vertrag|verträge|konvention|abkommen|traité|convention|concordat|accord|"
+                        r"protocole|convenzione|accordo|concordato|trattato|protocollo)\b")
+TOPIC = re.compile(r"\s(?:über|betreffend|betr\.|bezüglich|wegen|zur|zum|für|im\s+Bereich|hinsichtlich|concernant|sur|relative?s?|réglant|"
+                   r"au\s+sujet|visant|portant|en\s+matière|pour|concernente|sulla|sul|sui|sugli|sulle|per|in\s+materia|riguardante|"
+                   r"relativ[ao])\s", re.I)
+CANTON_NAMES = {
+    "ZH": r"Zürich|Zurich|Zurigo", "BE": r"Bern|Berne|Berna", "LU": r"Luzern|Lucerne|Lucerna", "UR": r"Uri",
+    "SZ": r"Schwyz|Schwytz|Svitto", "OW": r"Obwalden|Obwald|Obvaldo|Unterwalden\s+ob\s+dem\s+Wald",
+    "NW": r"Nidwalden|Nidwald|Nidvaldo|Unterwalden\s+nid\s+dem\s+Wald", "GL": r"Glarus|Glaris|Glarona", "ZG": r"Zug|Zoug|Zugo",
+    "FR": r"Freiburg|Fribourg|Friburgo", "SO": r"Solothurn|Soleure|Soletta",
+    "BS": r"Basel-\s?Stadt|Bâle-Ville|Basilea[\s-]Città|Baselstadt", "BL": r"Basel-\s?Landschaft|Bâle-Campagne|Basilea[\s-]Campagna|Baselland",
+    "SH": r"Schaffhausen|Schaffhouse|Sciaffusa",
+    "AR": r"Appenzell\s+A(?:\.\s?Rh\.|R\b|usserrhoden)|Ausserrhoden|Rhodes-Extérieures|Appenzello\s+Esterno",
+    "AI": r"Appenzell\s+I(?:\.\s?Rh\.|R\b|nnerrhoden)|Innerrhoden|Rhodes-Intérieures|Appenzello\s+Interno",
+    "SG": r"St\.\s?Gallen|Sankt\s+Gallen|Saint-Gall|San\s+Gallo", "GR": r"Graubünden|Grisons|Grigioni", "AG": r"Aargau|Argovie|Argovia",
+    "TG": r"Thurgau|Thurgovie|Turgovia", "TI": r"Tessin|Ticino", "VD": r"Waadt|Vaud", "VS": r"Wallis|Valais|Vallese",
+    "NE": r"Neuenburg|Neuchâtel", "GE": r"Genf|Genève|Ginevra", "JU": r"Jura|Giura"}
+CANTON_RX = {ct: re.compile(rf"\b(?:{p})(?![\w])", re.I) for ct, p in CANTON_NAMES.items()}     # VD writes "LE CANTON DE VAUD"
+# names that are a canton's only (not also a town's)
+UNAMBIGUOUS = {"BS", "BL", "AR", "AI", "OW", "NW", "GR", "AG", "TG", "TI", "VD", "VS", "UR"}
+CANTON_CTX = re.compile(r"\b(?:Kantons?|Kantone[n]?|Standes|Ständen?|Stand|cantons?|Cantone|Cantoni|Canton|République\s+et\s+Canton|"
+                        r"Repubblica\s+e\s+Cantone|Etats?|États?|Staat|Staaten|Stato|Stati|Regierungen|Regierung|Regierungsrat(?:es)?|Conseil\s+d['’]\s*[ÉE]tat|"
+                        r"Conseil-exécutif|Gouvernement|Consiglio\s+di\s+Stato)\b\s+(?:de\s+la\s+|de\s+|du\s+|d['’]|di\s+|del\s+|des\s+|der\s+|von\s+)?"
+                        r"(?:Kantons?\s+|canton\s+(?:de\s+|du\s+)?)?", re.I)
+NOT_CANTON = re.compile(r"\b(?:Stadt|Einwohnergemeinde|Bürgergemeinde|Gemeinden?|Bezirk\w*|Hochschule|Universität|Université|Università|"
+                        r"Kantonsspital|Spital|ville\s+de|communes?\s+de|città\s+di|comune\s+di)\s+[A-ZÄÖÜ][\w.\-]*"
+                        r"(?:\s+(?:und|et|e)\s+[A-ZÄÖÜ][\w.\-]*)?|(?:[\w\-]+\s+){0,3}[\w\-]+\s+(?:AG|SA|GmbH|Sàrl)\b|"
+                        r"\w*(?:werk|spital|bank|versicherung|anstalt|klinik|betrieb)\w*\s+(?:des\s+Kantons\s+)?[A-ZÄÖÜ][\w.\-]*|"
+                        # a church body "des Kantons Thurgau" is no party of that canton
+                        r"(?:Synode|Synodalrat\w*|Kirchenr[aä]t\w*|Landeskirche\w*|Kirchgemeinde\w*|Konfessionsteil\w*|Administrationsrat\w*|"
+                        r"Kirche|Église|Eglise)[^,;|]{0,30}?\s+(?:des\s+Kantons|du\s+canton\s+(?:de|du))\s+[A-ZÄÖÜ][\w.\-]*(?:\s+[A-ZÄÖÜ][\w.\-]*)?")
+INTER_PARTY = re.compile(r"[Ii]nterkantonal\w*|[Ii]ntercantonal\w*|[Kk]onkordat\w*|[Cc]oncordat\w*|\b(?:Kantone|Kantonen|cantons|Cantoni|"
+                         r"Stände|Ständen|Uferkantone|Vereinbarungskantone|Konkordatskantone|Regierungen|gouvernements|governi)\b|"
+                         r"beider\s+Basel", re.I)
+FOREIGN_PARTY = re.compile(r"Eidgenossenschaft|Eidgenössisch\w*|Bundesrat\w*|\bBund\b|Bundesamt\w*|Bundesrepublik|Confédération|"
+                           r"Conseil\s+fédéral|Département\s+fédéral|Office\s+fédéral|Confederazione|Consiglio\s+federale|Staatsvertrag|"
+                           r"République\s+(?:française|fédérale)|Repubblica\s+italiana|Frankreich|\bFrance\b|Deutschland|Allemagne|Germania|"
+                           r"Österreich|Autriche|\bAustria\b|Italien|Italie|\bItalia\b|Liechtenstein|Fürstentum|Baden-Württemberg|Bayern|"
+                           r"Vorarlberg|Freistaat|Grossherzog\w*|Markgraf\w*|Deutsche[nsm]?\s+Reich\w*|Reichsbahn\w*|Badisch\w*|Kaiser\w*|Empereur|Majest\w*|\bRégion\b|\bRegione\b|"
+                           r"Départements?\s+(?:du|de\s+la|de\s+l['’]|des)|Präfekt\w*|Haut-Rhin|Bas-Rhin|Lörrach|Waldshut|Konstanz|Landkreis|"
+                           r"Regierungspräsidium|Provinz|Provincia|Lombardia|Piemonte|Haute-Savoie|Elsass|Alsace|Mülhausen|Mulhouse|"
+                           r"Heilige[nr]?\s+Stuhl|heil\.\s+Stuhl|päpstlich\w*\s+Stuhl|Saint-Siège|Santa\s+Sede|\((?:D|F|I|A|FL)\)|"
+                           r"transfrontali\w*|grenzüberschreitend\w*")
+GOV_PARTY = re.compile(r"Regierungsr[aä]t\w*|Regierung\b|Standeskommission|Conseil\s+d['’]\s*[ÉE]tat|Conseil-exécutif|Consiglio\s+di\s+Stato|"
+                       r"Gouvernement|Fiskus|\b(?:Staat|État|Etat|Stato)\b(?!\s*-)|(?:\b(?:dem|der|den|le|la|il|au)\s+|zwischen\s+dem\s+)"
+                       r"(?:Kanton|canton|Cantone)\b|^(?:Der|Le|Il)\s+(?:Kanton|canton|Cantone)\b", re.I)
+DEPT_PARTY = re.compile(r"\b(?:\w*[Dd]epartement\w*|\w*[Dd]irektion|Département|Direction|Dipartimento)\b")
+COMMUNE_PARTY = re.compile(r"\b(?:Gemeinde\w*|Einwohnergemeinde\w*|Bürgergemeinde\w*|Bezirk\w*|Stadtrat|Gemeinderat|Einwohnerrat|"
+                           r"Stadt\s+[A-ZÄÖÜ]|communes?\b|ville\s+de|municipalit\w*|comun[ei]\b|[Cc]ittà\s+di|Municipio)")
+COMPANY = re.compile(r"\b(?:AG|SA|GmbH|Sàrl|Genossenschaft|Stiftung|Verband|Verein|\w*[Bb]etrieb\w*|\w*[Kk]raftwerk\w*|\w*[Bb]ahn\w*|"
+                     r"Société|Association|Fondation|Compagnie|Coopérative|Versicherer|santésuisse|tarifsuisse)\b")
 
 
-def issuer_and_floor(rec):
+def cantons_named(txt: str) -> set:
+    """The cantons a party text names as parties: after a canton word ("den Kantonen Zürich, Schwyz und St.Gallen",
+    "le canton de Berne", "Regierungsrat des Kantons Appenzell A. Rh.") or by a name no town bears (Basel-Landschaft);
+    not "Stadt St.Gallen", "Gemeinde Olsberg", "BLT Baselland Transport AG", "Konfessionsteil des Kantons St. Gallen"."""
+    t = NOT_CANTON.sub(" ", txt)
+    out = set()
+    for m in CANTON_CTX.finditer(t):
+        win = re.split(r"\s(?:über|betreffend|und\s+(?:dem|der|den)\s+(?!Kanton|Stand|Regierung)|et\s+(?:le|la|les)\s+(?!canton|Etat|État|Conseil|Gouv))", t[m.end():m.end() + 120])[0]
+        for ct, rx in CANTON_RX.items():
+            if rx.search(win):
+                out.add(ct)
+    for ct in UNAMBIGUOUS:
+        if CANTON_RX[ct].search(t):
+            out.add(ct)
+    return out
+
+
+def agreement_floor(title: str, ing: str, iss: str, ct: str = ""):
+    """The floor of an agreement from its parties (title before the topic, and the opening of the Ingress):
+    two or more cantons, the Confederation, a foreign state or the Holy See → 5 (intercantonal law prevails over
+    cantonal law, Art. 48 Abs. 5 BV; agreements with other states are kept with it); church bodies among themselves → 7;
+    communes, or companies, among themselves → 7; the canton with communes, a church or a private party → 6
+    (concluded by the government; 5 when its parliament is the party, 7 when a department is) unless the Ingress
+    names the issuer; nothing telling → None (the other rules decide)."""
+    if not AGREE_HEAD.match(title):
+        return None
+    t = TOPIC.split(title, 1)[0]
+    h = ing
+    m = BASIS_KW.search(h)
+    if m:
+        h = h[:m.start()]
+    h = h[:320]
+    txt = t + " | " + h
+    named = cantons_named(txt)
+    inter = len(named) >= 2 or (named and ct and ct not in named) or INTER_PARTY.search(txt) or FOREIGN_PARTY.search(txt)
+    if inter:
+        return 5, "interkantonal" if iss else "Titel"
+    church = re.search(CHURCH_BODY, txt)
+    party = h.split("Vorbehalt")[0].split("Genehmigung")[0].split("approbation")[0].split("ratification")[0]
+    parl = PARL.search(party) or iss and PARL.search(iss.split(",")[0])
+    gov = GOV_PARTY.search(txt) or named or parl
+    if church and not (GOV_PARTY.search(txt) or parl):
+        return 7, "Kirche"              # "zwischen den evangelischen Kirchenräten von Schaffhausen und Thurgau"
+    if COMMUNE_PARTY.search(txt) and not gov:
+        return 7, "kommunal"
+    if gov:
+        if parl:
+            return 5, "Ingress" if iss or PARL.search(party) else "Titel"
+        if iss:
+            return None                 # a party named, the issuer rules decide
+        if DEPT_PARTY.search(txt) and not re.search(r"Regierungsr|Regierung\b|Conseil\s+d['’]\s*[ÉE]tat|Standeskommission", txt):
+            return 7, "Titel"           # concluded by a department
+        return 6, "Titel"
+    if COMPANY.search(txt):
+        return 7, "Titel"               # companies or institutions among themselves
+    return None
+
+
+def issuer_and_floor(rec, ct=""):
     ing = (rec.get("ingress") or "").strip()
     iss = (rec.get("issuer") or "").strip(" ,;:")
     head = ing
@@ -438,13 +579,26 @@ def issuer_and_floor(rec):
         if m:
             iss = m.group(1).strip()
     iss = re.sub(r"\s+(?:erlässt|beschliesst|verordnet)\s*$", "", iss)
+    if re.fullmatch(r"(?:Präambel|Préambule|Preambolo|Preamble|Ingress|Ingresso)", iss, re.I):
+        iss = ""                          # a heading the collection printed in place of the authority
     title = rec.get("title") or ""
     if KV_TITLE.match(title) and not CHURCH.search(title):
         return iss, 4, "Titel"
     if CHURCH.search(title) and re.match(r"^(?:Verfassung|Constitution|Costituzione)\b", title):
         return iss, 7, "Kirche"              # constitution of a recognised church: a body of public law
+    if CHURCH_TITLE.match(title) or iss and CHURCH_ISSUER.match(iss) and not (GOV.search(iss.split(",")[0]) or PARL.search(iss.split(",")[0])):
+        return iss, 7, "Kirche"              # an act of a church body (synod, church council, parish)
+    ag = agreement_floor(title, ing, iss, ct)
+    if ag:
+        return iss, ag[0], ag[1]
+    if TITLE_CONF.match(title) and not (iss and (GOV.search(iss.split(",")[0]) or PARL.search(iss.split(",")[0]))) or \
+            re.match(r"^[\w\-]+\s+(?:intercantona\w*|interkantonal\w*)\b|^Interkantonal\w*\s+(?!Vereinbarung)", title, re.I):
+        return iss, 5, "interkantonal" if iss else "Titel"   # "Reglement der EDK", "Règlement intercantonal …"
     if iss:
-        if INTERCANT.search(iss) and not GOV.search(iss.split(",")[0]) or re.search(r"\bund\s+(?:der|die|das)\s+Regierung|et\s+le\s+Gouvernement|"
+        # the authority itself, not "unter Genehmigungsvorbehalt der SDK" or "gestützt auf die interkantonale Vereinbarung"
+        subj = re.split(r"\s+(?:unter\s+Genehmigungsvorbehalt|im\s+Auftrag|mit\s+Zustimmung|nach\s+Anhörung|sous\s+réserve|"
+                        r"avec\s+l['’]accord)\b|" + HEAD_CUT.pattern, iss, flags=re.I)[0]
+        if INTERCANT.search(subj) and not GOV.search(subj.split(",")[0]) or re.search(r"\bund\s+(?:der|die|das)\s+Regierung|et\s+le\s+Gouvernement|"
                                                                                  r"\bund\s+der\s+Regierungsrat\s+des\s+Kantons", iss):
             return iss, 5, "interkantonal"
         if PARL.search(iss) and not re.search(r"Büro|Bureau|Ufficio|Kommission|Commission|Verwaltungskommission", iss):
@@ -464,6 +618,15 @@ class Canton:
     def __init__(self, ct, acts, fed, kv_struct, fed_date, fed_titles=None):
         self.ct, self.acts, self.fed, self.fed_date = ct, acts, fed, fed_date
         self.own = re.compile(rf"(?<![\w/])(?:{OWN[ct]})\s*({NUMTOK})")
+        # another canton's systematic collection ("SG 911.600" in a BL act, "RSJU 101" in a BE agreement); a bare "GS"
+        # is every canton's chronological Gesetzessammlung, except AI's systematic numbers ("GS 817.010")
+        others = sorted({p for c, ps in OWN.items() if c != ct for p in ps.split("|")} - set(OWN[ct].split("|")) - {"GS"}, key=len, reverse=True)
+        self.foreign = re.compile(rf"(?<![\w/])(?:(?:{'|'.join(others)})\s*{NUMTOK}|GS\s*\d{{3}}\.\d{{3}})" if ct not in ("GL", "AI") else
+                                  rf"(?<![\w/])(?:{'|'.join(others)})\s*{NUMTOK}")
+        self.other_ct = other_canton_rx(ct)
+        self.own_name = re.compile(rf"\b(?:{CANTON_NAMES[ct]})\b|\b(?:{CANTON_ADJ[ct]})\w*", re.I)
+        self.adopted = {a["sr"]: a.get("adopted") for a in acts}
+        self.title = {a["sr"]: a.get("title") or "" for a in acts}
         self.fed_ref = re.compile(rf"(?<![\w/])(?:SR|RS)(?!\s*/)\s*(0\.\d[\d.]*\d|\d[\d.]*\d|\d)\b")
         self.by_date = defaultdict(list)
         self.by_abbr = defaultdict(set)
@@ -494,6 +657,17 @@ class Canton:
                     if key_ok(k):
                         self.by_title[k].add(a["sr"])
 
+    def names_other(self, s: str):
+        """Another canton named, and not this one ("des Kantons Basel-Stadt" in a BL act; not "der Kantone Basel-Stadt
+        und Basel-Landschaft", an agreement this collection holds too)."""
+        if self.own_name.search(s):
+            return None
+        for m in self.other_ct.finditer(s):
+            if re.match(r"(?i:kanton|canton|stand|république|repubblica)", m.group(0)) or \
+                    TYPE_RE.search(s[max(0, m.start() - 25):m.start()]) or TYPE_RE.match(s[m.end():].lstrip()):
+                return m.group(0)                   # an adjective counts next to the act it qualifies ("der bernischen Verordnung")
+        return None
+
     def target_of_note(self, note: str):
         """The act a footnote gives the number of: "SR 281.1", "BGS 111.1", or, as VD writes them,
         "Code de droit privé judiciaire vaudois du 12.01.2010 (BLV 211.02)" (first number in the note).
@@ -506,6 +680,12 @@ class Canton:
             return "SR " + fm.group(1).rstrip(".")
         if om:
             return self.cantonal(om.group(1))
+        bm = re.fullmatch(r"\s*(\d+(?:\.\d+)+[a-z]?)\.?\s*", note)
+        if bm:
+            return self.cantonal(bm.group(1))     # ZH: "414.11." (the collection's prefix left out)
+        xm = self.foreign.search(note)
+        if xm:
+            return "X:" + re.sub(r"\s+", " ", xm.group(0)).rstrip(".")     # an act of another canton, by its own number
         return None
 
     def cantonal(self, num: str):
@@ -515,7 +695,7 @@ class Canton:
             return "KV" if sr == self.kv_sr else "CT:" + sr
         return "CT?:" + num.strip()            # a number of this canton's collection not in force today
 
-    def by_name_date(self, desig: str, date: str, federal_hint: bool):
+    def by_name_date(self, desig: str, date: str, federal_hint: bool, own_words=None):
         """The act of this type and date: federal (taxonomy titles) or of this canton."""
         """Same type required; title words must agree where the designation has any; a federal
         act is taken only when the text says so (Bundes-, fédéral, federale …) or, failing a
@@ -544,6 +724,14 @@ class Canton:
             if c:
                 return "SR " + c["sr"]
         c = best(can, lambda a: words(a["title"]), 1 if (w and len(can) > 1) else 0)
+        if c is None and own_words and len(can) > 1:           # "du règlement d'application de la loi précitée": that law's words
+            w, w_ = own_words, w
+            c = best(can, lambda a: words(a["title"]), 1)
+            w = w_
+        w2 = {x for x in (w if own_words is None else own_words) if not TYPE_RE.fullmatch(x) and not GENERIC_W.fullmatch(x)}  # the type
+        if c and len(can) == 1 and w2 and not (ty == "treaty" and type_of(c["title"]) == "treaty") and \
+                not any(x[:5] == y[:5] or compound(x, y) for x in w2 for y in words(c["title"] + " " + (c.get("abbr") or ""))):
+            c = None                       # the only act of that date, but nothing in its title agrees with the words
         if c:
             return "KV" if c["sr"] == self.kv_sr else "CT:" + c["sr"]
         if not federal_hint and not can:
@@ -576,6 +764,13 @@ class Canton:
         ing = rec.get("ingress") or ""
         notes = rec.get("notes") or {}
         bases, unresolved = [], 0
+        if ED_NOTE.search(ing):
+            return bases, unresolved             # an editorial note, not an Ingress
+        ing = re.split(r"\sNote\s*:\s", ing)[0]  # VD: an editorial note inside the Ingress
+        ing = re.sub(r":\s*(?:\[\w+\]\s*)+$", ":", ing)   # a footnote on the closing colon annotates the text, not a basis
+        e = enact_end(ing)
+        if e:
+            ing = ing[:e]
         for a, b in split_clauses(ing):
             seg = ing[a:b]
             anchors = []                     # (start, end, target, priority)
@@ -595,6 +790,11 @@ class Canton:
                     continue
                 if re.search(r"(?:fédérale|federale|der\s+Schweiz|der\s+Schweizerischen)", seg[m.start():m.end() + 30]):
                     continue
+                before = re.split(r"[,;\]]", seg[max(0, m.start() - 30):m.start()])[-1]     # "zur bernischen Staatsverfassung"
+                xo = self.names_other(before + re.split(r"[,;\[]", seg[m.start():m.end() + 40])[0])
+                if xo:
+                    anchors.append((m.start(), m.end(), "X:" + re.sub(r"\s+", " ", xo), 1))
+                    continue                     # the constitution of another canton (agreements name each party's)
                 anchors.append((m.start(), m.end(), "KV", 1))
             for rx, sr in FIXED:
                 for m in rx.finditer(seg):
@@ -625,6 +825,11 @@ class Canton:
                 desig = (desig_l[tm[-1].start():] if tm else "") + " " + right
                 if NOT_ACT.search(desig_l[-60:]) and not tm:
                     continue
+                xo = self.names_other(desig_l + " " + right) if type_of(desig) != "treaty" else None   # "Staatsvertrag mit dem Kanton NW": held here
+                if xo:
+                    st = max(0, ds - 170) + cut + (tm[-1].start() if tm else 0)
+                    anchors.append((st, de, "X:" + re.sub(r"\s+", " ", xo), 2))
+                    continue                     # "der Verordnung … des Kantons Basel-Stadt" in a BL agreement
                 hint = bool(FEDERAL_WORD.search(desig))
                 if re.search(r"\b(?:son|sa|ses|seine[nmr]?|ihre[nmr]?|sua|suo|i\s+suoi|le\s+sue)\s+\S*\s*$", desig_l[:tm[-1].start()] if tm else desig_l):
                     prev = [x for x in anchors if x[1] <= ds]
@@ -637,11 +842,23 @@ class Canton:
                     hit_k = {sr for sr in self.by_abbr.get(pa.group(1).lower(), set()) if any(a["sr"] == sr for a in self.by_date.get(d, []))}
                     if len(hit) + len(hit_k) == 1:
                         t = ("SR " + next(iter(hit))) if hit else ("KV" if next(iter(hit_k)) == self.kv_sr else "CT:" + next(iter(hit_k)))
+                # the words that name this act: before the date, and a title after it ("vom … über die Gemeinden"),
+                # not the next reference ("vom 27. April 1981 sowie § 17 des Schuldekretes")
+                ow = words((desig_l[tm[-1].start():] if tm else "") + " " + (right if re.match(
+                    r"\s*(?:über|betreffend|zur|zum|sur|concernant|relative?s?|portant|réglant|sul|sulla|sui|concernente|relativ[ao]|\()",
+                    right) else ""))
+                if re.search(r"\b(?:son|sa|ses|seine[nmr]?|ihre[nmr]?|sua|suo|i\s+suoi|le\s+sue|dessen|deren|il\s+relativo|la\s+relativa|"
+                             r"zugehörige[nmr]?|dazugehörige[nmr]?)\s+\S*\s*$", desig_l[:tm[-1].start()] if tm else desig_l) or \
+                        re.search(r"\b(?:précitée?s?|susmentionnée?s?|vorgenannte[nmrs]?|obgenannte[nmrs]?|erwähnte[nmrs]?|citat[ao]|predett[ao])\b", desig):
+                    prev = [x for x in anchors if x[1] <= ds]
+                    if prev:                     # "la loi … sur les forêts (LcFDN) et son ordonnance d'exécution": that law's words
+                        pa = max(prev, key=lambda x: x[1])
+                        ow = ow | words(seg[pa[0]:pa[1]])
                 if not t:
-                    t = self.by_name_date(desig, d, hint)
+                    t = self.by_name_date(desig, d, hint, ow)
                 pm = re.search(r"\b(\d{1,2})(?:er|\.)?\s*(?:et|und|e|/)\s*$", seg[max(0, ds - 12):ds])
                 if not t and pm:
-                    t = self.by_name_date(desig, f"{d[:8]}{int(pm.group(1)):02d}", hint)
+                    t = self.by_name_date(desig, f"{d[:8]}{int(pm.group(1)):02d}", hint, ow)
                 if t:
                     st = max(0, ds - 170) + cut + (tm[-1].start() if tm else 0)
                     anchors.append((st, de, t, 2))
@@ -663,6 +880,9 @@ class Canton:
                 if IMPL.search(seg[max(0, m.start() - 70):m.start()]) and FEDERAL_WORD.search(desig) or \
                         re.match(r"(?:Code|Codice)\b", desig) and IMPL.search(seg[max(0, m.start() - 70):m.start()]):
                     continue                     # "loi d'application du Code civil suisse": the cantonal act, below
+                lead = re.split(r"[,;\[\]]|\s(?:und|sowie|et|e|ainsi\s+que)\s", seg[max(0, m.start() - 40):m.start()])[-1]
+                if type_of(desig) != "treaty" and self.names_other(lead + desig):
+                    continue                     # "des bernischen Fischereigesetzes" in a SO agreement
                 t = self.by_title_only(desig, rec["sr"])
                 if t:
                     anchors.append((m.start(), m.end() + stop.start(), t, 2.5))
@@ -679,6 +899,8 @@ class Canton:
                     anchors.append((tm.start(), tm.end() + (e.start() if e else 0), "SR ?" if fed_ else "?", 3))
             for m in re.finditer(r"\(([A-ZÄÖÜ][\w./\-]{1,14}(?:\s[\w./\-]{1,8})?)\)", seg):
                 ab = m.group(1)
+                if self.names_other(seg[max(0, m.start() - 120):m.start()].split(";")[-1].split("[")[-1]):
+                    continue                     # the abbreviation of another canton's act
                 hit = self.by_abbr.get(ab.lower())
                 if hit and len(hit) == 1:
                     sr = next(iter(hit))
@@ -731,6 +953,24 @@ class Canton:
                     said = [d for ds, de, d in dates_in(seg[r["start"]:r["end"]])]
                     if said and self.fed_date.get(tgt[3:]) and self.fed_date[tgt[3:]] not in said:
                         flag = "old"                 # footnote gives today's number of a law the text cites by its old date
+                if tgt.startswith("CT:") and best[3] == 0:
+                    txt = seg[r["start"]:r["end"]]
+                    said = [d for ds, de, d in dates_in(txt) if not AMEND.search(txt[max(0, ds - 45):ds])]
+                    ad = self.adopted.get(tgt[3:])
+                    if said and ad and ad not in said:
+                        ty, w = type_of(txt), words(txt)
+
+                        def score(t):
+                            ti = self.title.get(t[3:], "")
+                            return (type_of(ti) == ty, sum(1 for x in w if any(x == y or compound(x, y) for y in words(ti))))
+                        # the text's act by type and date, when the footnote's act is of another type (RELSub for "la loi sur les
+                        # subventions, du 1er février 1999"; the approval decree for "das Konkordat vom …")
+                        alt = [x for x in r["an"] if x[3] == 2 and x[2].startswith("CT:") and x[2] != tgt and x[1] <= best[0] and
+                               self.adopted.get(x[2][3:]) in said and score(x[2])[0] and not score(tgt)[0] and score(x[2])[1] >= score(tgt)[1]]
+                        if alt:
+                            tgt, flag = alt[0][2], "note"    # the footnote gives another act than the one the text names by type and date
+                        elif ad[:4] > max(said)[:4] and not APPROVAL.match(self.title.get(tgt[3:], "")):
+                            flag = "old"                 # the number now carries a later act than the one cited by its date
                 words_ = seg[prev_end:r["start"]]
                 arts = articles_in(words_)
                 schlt = bool(SCHLT.search(seg[prev_end:r["end"]]))
@@ -740,11 +980,59 @@ class Canton:
                 prev_end = r["end"]
                 if tgt == "CT:" + rec["sr"]:
                     continue                     # the act naming itself (amendment notes, titles)
-                if tgt in ("?", "SR ?") or tgt.startswith("CT?"):
-                    unresolved += 1
+                if tgt in ("?", "SR ?") or tgt.startswith(("CT?", "X:")):
+                    unresolved += 1                  # X: another canton's act, not in this collection
                 fin = schlt and tgt.startswith("SR ") and tgt != "SR 101"      # SchlT ZGB, Schlussbestimmungen SchKG …
                 bases.append([tgt, [("SchlT " if fin else "") + x for x in arts], clause[:400]] + ([flag] if flag else []))
         return bases, unresolved
+
+
+# an editorial note printed where the Ingress would be (UR: "durch Verweis veröffentlicht"; ZG: "nur noch über Intlex")
+ED_NOTE = re.compile(r"durch\s+Verweis\s+veröffentlicht|Dieser\s+Erlass\s+wird\s+nur\s+noch\s+über", re.I)
+# the enacting formula ends the Ingress ("beschliesst:", "erlässt … als Tarif:", "décrète :"); what follows is the text
+# or the collection's footnote apparatus (SG prints "1 Geändert durch …" after it)
+ENACT = re.compile(r"\b(?:beschliess\w*|verordne\w*|erlässt|erlassen|verfügt|vereinbaren|schliessen\s+(?:folgende|nachstehende)|décrète|"
+                   r"arrêtent|arrête|adopte|édicte|ordonne|conviennent|concluent|decreta|risolve|ordina|emana|convengono)\b")
+
+
+def enact_end(ing: str):
+    """Where the enacting formula ends: the first colon after its verb, outside brackets, within 200 characters
+    ("erlässt, gestützt auf die Artikel 3 (neu nummeriert: 5) …:" ends at the second colon)."""
+    m = ENACT.search(ing)
+    if not m:
+        return None
+    depth = 0
+    for k in range(m.end(), min(len(ing), m.end() + 200)):
+        c = ing[k]
+        depth += c in "([" and 1 or c in ")]" and -1 or 0
+        if c == ":" and depth <= 0:
+            return k + 1
+    return None
+# adjectives naming a canton ("der bernischen Verordnung", "l'ordonnance jurassienne")
+CANTON_ADJ = {
+    "ZH": r"zürcherisch|zurichois|zurighes", "BE": r"bernisch|bernois|bernes", "LU": r"luzernisch|lucernois|lucernes",
+    "UR": r"urnerisch|uranais", "SZ": r"schwyzerisch|schwytzois|svittes", "OW": r"obwaldnerisch|obwaldien|obvaldes",
+    "NW": r"nidwaldnerisch|nidwaldien|nidvaldes", "GL": r"glarnerisch|glaronais|glarones", "ZG": r"zugerisch|zougois|zughes",
+    "FR": r"freiburgisch|fribourgeois|friburghes", "SO": r"solothurnisch|soleurois|solettes", "BS": r"baselstädtisch",
+    "BL": r"basellandschaftlich", "SH": r"schaffhausisch|schaffhousois|sciaffusan", "AR": r"ausserrhodisch", "AI": r"innerrhodisch",
+    "SG": r"st\.\s?gallisch|saint-gallois|sangalles", "GR": r"bündnerisch|grison|grigiones", "AG": r"aargauisch|argovien|argovies",
+    "TG": r"thurgauisch|thurgovien|turgovies", "TI": r"tessinisch|tessinois|ticines", "VD": r"waadtländisch|vaudois|vodes",
+    "VS": r"walliserisch|valaisan|valles", "NE": r"neuenburgisch|neuchâtelois|neocastellan", "GE": r"genferisch|genevois|ginevrin",
+    "JU": r"jurassisch|jurassien|giurassian"}
+
+
+def other_canton_rx(ct: str):
+    """Words that name another canton than ct: "des Kantons Basel-Stadt", "Constitution du canton de Fribourg", "bernoise"."""
+    names = "|".join(p for c, p in CANTON_NAMES.items() if c != ct)
+    adj = "|".join(p for c, p in CANTON_ADJ.items() if c != ct)
+    return re.compile(rf"(?:\b(?:Kantons?|Kantone|canton|Cantone|Canton|Standes|République\s+et\s+Canton|Repubblica\s+e\s+Cantone)\s+"
+                      rf"(?:de\s+|du\s+|d['’]|di\s+|del\s+|von\s+)?(?:{names})\b|\b(?:{adj})\w*)", re.I)
+
+
+# the canton files an agreement under the act approving it or joining it
+APPROVAL = re.compile(r"^(?:Arrêté|Acte|Décret|Loi|Beschluss|Grossratsbeschluss|Kantonsratsbeschluss|Landratsbeschluss|Dekret|Decreto)?\s*"
+                      r"(?:portant|relatif\s+à\s+l['’]|über\s+den|betreffend\s+den|concernant\s+l['’]|zur|sull['’])?\s*"
+                      r"(?:approbation|adhésion|Beitritt|Genehmigung|ratification|adesione|approvazione)", re.I)
 
 
 COMPANION = re.compile(r"mise\s+en\s+vigueur|Inkraftsetzung|Inkrafttreten|entrata\s+in\s+vigore|^ARRÊTÉ\s+(?:d['’]application|"
@@ -812,7 +1100,7 @@ def main():
                     a["sr"] = f"{sr_}~{k}"
                 stats["numbers_shared"] += 1
         for a in acts:
-            a["_issuer"], a["_floor"], a["_floor_by"] = issuer_and_floor(a)
+            a["_issuer"], a["_floor"], a["_floor_by"] = issuer_and_floor(a, ct)
         cx = Canton(ct, acts, fed, kvs.get(ct, {}).get("arts", {}), fed_date, fed_titles)
         recs = {}
         for a in acts:
@@ -827,7 +1115,8 @@ def main():
                              "issuer": a["_issuer"], "floor": a["_floor"], "floor_by": a["_floor_by"],
                              "ingress": a.get("ingress") or "", "bases": bases, "src": a.get("src"), "lang": a.get("lang"),
                              **({"i18n": {lg: {"title": v.get("title"), "abbr": v.get("abbr")} for lg, v in a["i18n"].items()}} if a.get("i18n") else {}),
-                             **({"kv_missing": kv_art_missing} if kv_art_missing else {})}
+                             **({"kv_missing": kv_art_missing} if kv_art_missing else {}),
+                             **({"noing": 1} if ED_NOTE.search(a.get("ingress") or "") else {})}
             stats["acts"] += 1
             stats[f"floor_{a['_floor']}"] += 1
             stats["with_ingress"] += bool(a.get("ingress"))
@@ -835,9 +1124,11 @@ def main():
             stats["bases"] += len(bases)
             stats["bases_unresolved"] += unres
             stats["bases_outdated"] += sum(1 for b in bases if len(b) > 3 and b[3] == "old")
+            stats["bases_note_disagrees"] += sum(1 for b in bases if len(b) > 3 and b[3] == "note")
+            stats["ingress_editorial_note"] += bool(ED_NOTE.search(a.get("ingress") or ""))
             for b in bases:
                 k = b[0].split(":")[0].split(" ")[0]
-                stats[f"target_{'SR_earlier' if '@' in b[0] else 'SR_generic' if b[0] == 'SR ?' else k}"] += 1
+                stats[f"target_{'SR_earlier' if '@' in b[0] else 'SR_generic' if b[0] == 'SR ?' else 'other_canton' if k == 'X' else k}"] += 1
             stats["kv_article_not_in_text"] += len(kv_art_missing)
         out[ct] = {"kv": cx.kv_sr, "kv_sr": CANTON_CONSTITUTION[ct], "acts": recs}
         print(f"{ct}: {len(recs)} acts, {sum(1 for r in recs.values() if r['bases'])} with bases, "

@@ -1557,9 +1557,9 @@ function kActSections(i) {
   if (bs.length) {
     html += `<ul class="list">${bs.map((b) => {
       const clause = rec && rec[2] ? rec[2][b.k] || "" : "";
-      const tags = [b.prim ? t.basisPlace : "", b.via === "old" ? t.basisOld : "", b.via === "earlier" ? t.basisEarlier : "",
+      const tags = [b.prim ? t.basisPlace : "", b.via === "old" ? t.basisOld : "", b.via === "note" ? t.basisNote : "", b.via === "earlier" ? t.basisEarlier : "",
         b.via === "absent" ? t.basisAbsent : "", b.j >= 0 && !b.found ? t.basisNotFound : ""].filter(Boolean).join(" · ");
-      if (b.j < 0) return `<li><span class="k"><i class="sw tree2"></i>${esc(b.via === "unresolved" ? t.basisUnresolved : b.via === "earlier" ? t.basisEarlierShort : b.via === "fedany" ? t.basisFedAnyShort : t.basisAbsentShort)}</span><span class="v">${esc(tags)}</span>${clause ? `<span class="d">«${esc(clause)}»</span>` : ""}</li>`;
+      if (b.j < 0) return `<li><span class="k"><i class="sw tree2"></i>${esc(b.via === "unresolved" ? t.basisUnresolved : b.via === "earlier" ? t.basisEarlierShort : b.via === "fedany" ? t.basisFedAnyShort : b.via === "other" ? t.basisOtherShort : t.basisAbsentShort)}</span><span class="v">${esc(tags)}</span>${clause ? `<span class="d">«${esc(clause)}»</span>` : ""}</li>`;
       const isBV = K[b.j] === "bvart" || b.j === LAY.tree.root;
       const names = artNames(b.eids);
       const head = K[b.j] === "kvart" ? label(b.j) + (names.length > 1 ? ` (${names.join(", ")})` : "")
@@ -1569,7 +1569,10 @@ function kActSections(i) {
       return `<li><button class="k link" data-sel="${target}"><i class="sw ${b.prim ? "tree" : "tree2"}"></i>${esc(head)}</button><span class="v">${esc(tags)}</span>${clause ? `<span class="d">«${esc(clause)}»</span>` : ""}</li>`;
     }).join("")}</ul>`;
     if (P[i] >= 0 && K[P[i]] === "tgroup") html += `<p class="note">${esc(t.kgPlace(t["kg_" + ids[P[i]].split(":")[2]] || ""))}</p>`;
-  } else html += `<p class="note">${esc(!rec && ingressKWait ? t.loading : rec && rec[1] ? t.kNoBasis : t.kNoIngress)}</p>`;
+  } else {
+    const grp = P[i] >= 0 && K[P[i]] === "tgroup" ? ids[P[i]].split(":")[2] : "";   // "noing": an editorial note stands in for the Ingress
+    html += `<p class="note">${esc(!rec && ingressKWait ? t.loading : rec && rec[1] ? (grp === "noing" ? t.kEdNote : t.kNoBasis) : t.kNoIngress)}</p>`;
+  }
   if (rec && rec[1]) html += `<details class="ingress"><summary>${esc(t.ingressK)}</summary><blockquote lang="${ctLang(o.ct)}">${esc(rec[1])}</blockquote></details>`;
   html += "</section>";
   if (deps.length) html += dependentsSection(deps, t.restHead);
@@ -3479,8 +3482,12 @@ function matLegend(G) {
   $("aggscale").style.right = (G.phone ? 16 : 26 + (G.panel ? 424 : 0)) + "px";
   $("aggscale").innerHTML = `<span class="mleg"><b>${esc(unit)}</b><i class="ramp" style="--c:var(${aggLayer === "basis" ? "--basis" : aggLayer === "law" ? "--wire" : "--current"})">${ticks.map((v) =>
     `<em style="left:${pos(v).toFixed(1)}%">${esc(aggLayer === "court" ? String(v).replace(".", lang === "en" ? "." : ",") : num(v))}</em>`).join("")}</i>` +
-    `<em class="mx">${esc((G.capped ? "≥ " : "") + (aggLayer === "court" ? num(Math.round(G.vmax)) : num(G.vmax)))}</em></span><span class="mleg"><i class="sw2"></i>${esc(t.matSame)}</span>`;
+    `<em class="mx">${esc((G.capped ? "≥ " : "") + (aggLayer === "court" ? num(Math.round(G.vmax)) : num(G.vmax)))}</em></span><span class="mleg"><i class="sw2"></i>${esc(t.matSame)}</span>` +
+    // no side list on a phone or a narrow window: the reviewed lower-floor list stays one tap away
+    (aggLayer === "basis" && agg.rank && (G.phone || !G.panel && Math.min(380, G.VW - (G.left + G.cols.length * G.cw + 40) - 28) < 240) ?
+      `<button class="lowbtn" data-mat-low="1"><i class="l"></i>${esc(t.matLower)} ${num(agg.rank.lower)}</button>` : "");
 }
+$("aggscale").addEventListener("click", (e) => { if (e.target.closest("[data-mat-low]")) matLowPanel(); });
 function matDrawHot() {
   const G = matG; if (!G) return;
   const ctx = $("matx").getContext("2d");
@@ -3556,21 +3563,25 @@ $("matx").addEventListener("pointermove", (e) => {
   aggTip(e, c ? matTipHtml(c) : "");
 });
 $("matx").addEventListener("pointerleave", () => { matHot = null; matDrawHot(); $("tip").hidden = true; });
-// bases on a lower floor than the act that names them: the Stufenbau upside down
+// bases on a lower floor than the act that names them: the Stufenbau upside down, each case read by hand
+// (reports/inversions_review.json → agg.low: [act, target, category])
 const nodeFloor = (j) => { const l = TN[j] ? TN[j].l : -1; return K[j] === "kvart" ? 4 : l < 0 || l === undefined ? 0 : l; };
+const floorName = (j) => (nodeFloor(j) >= 4 ? t["matK" + nodeFloor(j)] : t["matF" + nodeFloor(j)]) || "";
 function matLowPanel() {
-  const items = [];
-  for (let i = 0; i < N; i++) {
-    const bs = (basisOf[i] || []).filter((x) => x.j >= 0 && nodeFloor(x.j) > nodeFloor(i));
-    if (bs.length && (K[i] === "act")) items.push([i, bs]);
-  }
-  items.sort((p, q) => decOf(q[0]) - decOf(p[0]) || p[0] - q[0]);
-  const n = items.reduce((a, x) => a + new Set(x[1].map((y) => y.j)).size, 0);
-  const html = `<section><div class="big"><b>${num(n)}</b><span>${esc(t.matLowUnit)}</span></div><p class="note">${esc(t.matLowNote)}</p></section>` +
-    `<section><ul class="list">${items.map(([i, bs]) => `<li><button class="k link" data-agg-act="${i}">${esc(fullLabel(i))}</button><span class="v">${esc(LV(i) >= 5 ? t["matK" + LV(i)] : t["matF" + LV(i)] || "")}</span>` +
-      `<span class="d">→ ${bs.map((x) => `${esc(fullLabel(x.j))} (${esc(nodeFloor(x.j) >= 5 ? t["matK" + nodeFloor(x.j)] : t["matF" + nodeFloor(x.j)] || "")})`).join("; ")}</span></li>`).join("")}</ul></section>`;
+  const low = agg.low || { cats: ["open"], items: [] };
+  const html = [`<section><div class="big"><b>${num(low.items.length)}</b><span>${esc(t.matLowUnit)}</span></div><p class="note">${esc(t.matLowNote)}</p></section>`];
+  low.cats.forEach((c, k) => {
+    const by = new Map();
+    for (const [ti, tj, ck] of low.items) if (ck === k) { const i = gi(ti); if (!by.has(i)) by.set(i, []); by.get(i).push(gi(tj)); }
+    if (!by.size) return;
+    const n = [...by.values()].reduce((a, x) => a + x.length, 0);
+    const acts = [...by.entries()].sort((p, q) => decOf(q[0]) - decOf(p[0]) || p[0] - q[0]);
+    html.push(`<section class="lowcat"><h3>${esc(t["matLow_" + c] || c)} <span class="n">${num(n)}</span></h3><p class="note">${esc(t["matLowN_" + c] || "")}</p>` +
+      `<ul class="list">${acts.map(([i, js]) => `<li><button class="k link" data-agg-act="${i}">${esc(fullLabel(i))}</button><span class="v">${esc(floorName(i))}</span>` +
+        `<span class="d">→ ${js.map((j) => `${esc(fullLabel(j))} (${esc(floorName(j))})`).join("; ")}</span></li>`).join("")}</ul></section>`);
+  });
   aggSel = ["low"];
-  aggPanel(t.aggBasis, t.matLower, "", html);
+  aggPanel(t.aggBasis, t.matLower, "", html.join(""));
 }
 $("matside").addEventListener("click", (e) => { if (e.target.closest("[data-mat-low]")) { matLowPanel(); return; } const b = e.target.closest("[data-mat]"); if (!b) return; const [a, c] = b.dataset.mat.split(",").map(Number); matCellPanel(a, c); });
 $("matside").addEventListener("pointerover", (e) => { const b = e.target.closest("[data-mat]"); matHot = b ? matCellOf(...b.dataset.mat.split(",").map(Number)) : null; matDrawHot(); });
