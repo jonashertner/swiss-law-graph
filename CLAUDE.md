@@ -621,6 +621,9 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     tags are written on GitHub's side by `.github/workflows/stand.yml` (from `readme.STAND_WORKFLOW`; same rule as `month_tags`, run
     locally and on GitHub: 70 of 70 identical) on every push to main. Pushing a rebuild: `git push -f origin main future` — the
     workflow re-tags. GitHub renders even the OR (1.2 MB, 1,685 article headings) with working `#art-N` anchors.
+    Commits are authored with Jonas' GitHub noreply address (130315719+jonashertner@users.noreply.github.com, Jonas:
+    "use my github noreply address"); the first push's commits were rewritten once (fast-export --no-data, trees, dates and
+    messages identical, checked commit by commit) and force-pushed on Jonas' instruction.
 
 37. All cantons named on the map; search and closing in the network (2026-10-27, Jonas: "can we have all cantons, and name of
     canton, on the Karte?"; "i want to be able to search for laws in the Netz, without losing the position of the law in the Netz
@@ -760,9 +763,9 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - `reports/counts-check.md` — the number of acts in force checked against Fedlex's pages and LexFind (decision 33).
 
 ## Next
-- Jonas: make the repository public (Settings → General → Danger Zone) and enable Pages (Settings → Pages →
-  Deploy from a branch → this branch or main after merging, folder `/docs`). Pages on a private repository
-  needs a paid plan and publishes the site publicly anyway.
+- Live since 2026-10-27: https://jonashertner.github.io/swiss-law-graph/ (repository public, Pages from `main` → `/docs`,
+  merged in jonashertner/swiss-law-graph#1). Checked live in Chromium: start page, deep links, DE/FR/IT/EN, phone, no
+  console errors, no failed requests; og.png served as image/png. Later work: branch from `main`, merge by pull request.
 - Time view: cantonal history (repealed cantonal acts) is not published as data by the cantons; the network and
   matrix show repealed federal acts only where courts cite them (fetching the consolidated texts of repealed acts
   would add their bases and references).
@@ -799,7 +802,6 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
   article co-citation graph.
 
 ## Open questions for Jonas
-- Public at launch, or private preview first? (Preview above is private.)
 - TI and SZ come via LexFind (Institute of Federalism, academic service): only Ingress text (official,
   Art. 5 URG) and metadata are republished, links go to ti.ch / sz.ch. Acceptable for the public page?
 - VD shows only the BLV's "majeur" acts (895 of 2,747); the 1,852 "mineur" decrees are left out.
