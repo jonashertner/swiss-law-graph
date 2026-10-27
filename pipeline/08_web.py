@@ -36,6 +36,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "site" / "data"
 OUT = ROOT / "docs" / "data"
 LANGS = ("de", "fr", "it", "en")
+SITE = "https://jonashertner.github.io/swiss-law-graph/"     # where GitHub Pages serves docs/ (a custom domain: change here)
 CANTON_NAMES = {
     "ZH": ("Zürich", "Zurich", "Zurigo", "Zurich"), "BE": ("Bern", "Berne", "Berna", "Bern"),
     "LU": ("Luzern", "Lucerne", "Lucerna", "Lucerne"), "UR": ("Uri", "Uri", "Uri", "Uri"),
@@ -587,6 +588,104 @@ def main():
         law["F" if not tn.get("ct") else tn["ct"]][str(a)] = [rec[0] if rec else "", rec[1] if rec else "", bb]
     for x, d in law.items():
         json.dump(d, open(OUT / "law" / f"{x}.json", "w"), separators=(",", ":"), ensure_ascii=False)
+
+    # ---- the health check (Befund) and what is new (decision 35): lists computed from the same bases as the panels
+    basis_f = json.load(open(ROOT / "data/fedlex_basis.json"))["acts"]
+    fed_a = lambda n: n["k"] == "a" and not n.get("ct")
+    chk = {"run": run, "dangling": [], "repealed": [], "bv1874": [], "olddate": [], "note": [], "nobasis": [], "unchanged": []}
+    for ti, bl in tree["bases"].items():
+        a = t2a.get(int(ti), -1)
+        if a < 0 or out_nodes[a]["k"] != "a":
+            continue
+        rec = (ing_k if tnodes[int(ti)].get("ct") else ing_f).get(ti)
+        clauses = rec[2] if rec and len(rec) > 2 else []
+        for j, b in enumerate(bl):
+            tgt = b[0] if b[0] is not None and b[0] >= 0 else -1
+            t = t2a.get(tgt, -1) if tgt >= 0 else -1
+            art = tnodes[tgt].get("n") if tgt >= 0 and tnodes[tgt]["k"] in ("bvart", "kvart") else None
+            arts = [art] if art else [x for x in (b[1] or []) if isinstance(x, str)]
+            clause = b[2] or (clauses[j] if j < len(clauses) else "")
+            via, found = (b[4] if len(b) > 4 else ""), (b[5] if len(b) > 5 else 1)
+            row = [a, t, arts, clause, via]
+            if tgt >= 0 and not found:                        # articles the target's text today does not contain (07: b[7])
+                miss = (b[7] if len(b) > 7 else []) or [[x, "absent"] for x in arts]     # [number, "rep" | "absent"]
+                chk["dangling"].append([a, t, miss, clause, via])
+            if via in ("hist", "hist→today", "earlier", "absent"):
+                chk["repealed"].append(row)                   # an earlier act, or a number with no act in force
+            elif via in ("aBV", "aBV→BV", "kvold"):
+                chk["bv1874"].append(row)                     # the Constitution of 1874 or an earlier cantonal one
+            elif via == "old":
+                chk["olddate"].append(row)                    # today's number, the old act's date in the text
+            elif via == "note":
+                chk["note"].append(row)                       # the footnote names another act than the text
+    nob = next((k for k, x in enumerate(tnodes) if x["i"] == "TREE:none"), -1)
+    for ti, x in enumerate(tnodes):                           # federal acts whose Ingress names no basis
+        a = t2a.get(ti, -1)
+        if x["k"] == "act" and not x.get("ct") and x.get("p") == nob and a >= 0 and fed_a(out_nodes[a]) \
+                and not (basis_f.get(x["i"][3:]) or {}).get("bases"):
+            chk["nobasis"].append(a)
+    kt_nob = Counter(); kt_all = Counter()                    # cantonal acts naming no basis, per canton (drafting practice)
+    for ti, x in enumerate(tnodes):
+        if x["k"] == "act" and x.get("ct") and x.get("l") in (5, 6, 7):
+            kt_all[x["ct"]] += 1
+            if not tree["bases"].get(str(ti)):
+                kt_nob[x["ct"]] += 1
+    chk["nobasis_kt"] = {ct: [kt_nob[ct], kt_all[ct]] for ct in sorted(kt_all)}
+    for a, n in enumerate(out_nodes):                         # federal acts whose current version dates from before 1990
+        if fed_a(n) and not n["s"].startswith("0."):
+            v = (basis_f.get(n["s"]) or {}).get("date") or ""
+            if v and v < "1990-01-01":
+                chk["unchanged"].append([a, v])
+    chk["unchanged"].sort(key=lambda r: r[1])
+    chk["lower"] = len(agg["low"]["items"])
+    why = Counter(r["why"] for r in inforce.rows() if r["why"])
+    chk["fedlex"] = {"dates": why["dates"], "ended": why["ended"]}
+    json.dump(chk, open(OUT / "check.json", "w"), separators=(",", ":"), ensure_ascii=False)
+    print("check:", {k: len(v) if isinstance(v, (list, dict)) else v for k, v in chk.items()})
+
+    since = (date.fromisoformat(run) - timedelta(days=365)).isoformat()
+    path_ = lambda u: (u or "").split("/eli/")[-1]
+    hist_p = {path_(e): h for e, h in hist.items()}
+    new_in, ended, kt_new = [], [], []
+    for a, n in enumerate(out_nodes):
+        if fed_a(n):
+            h = hist_p.get(path_(n.get("u"))) or {}
+            f = h.get("in_force") or ""
+            if since < f <= run:
+                new_in.append([a, f])
+        elif n["k"] == "a" and n.get("ct") and since < (n.get("ad") or "") <= run:
+            kt_new.append([a, n["ad"]])
+        elif n["k"] == "o" and since < (n.get("rp") or "") <= run:
+            ended.append([a, n["rp"]])
+    for xs in (new_in, ended, kt_new):
+        xs.sort(key=lambda r: (r[1], r[0]), reverse=True)
+    json.dump({"run": run, "since": since, "in_force": new_in, "ended": ended, "cantonal": kt_new},
+              open(OUT / "news.json", "w"), separators=(",", ":"), ensure_ascii=False)
+    print(f"news: {len(new_in)} federal acts in force since {since}, {len(ended)} ended, {len(kt_new)} cantonal acts adopted")
+
+    def idof(n):
+        return f"{n['ct']}/{n['s']}" if n["k"] == "a" and n.get("ct") else n["s"]
+    FEED_T = {"de": ("Atlas des Schweizer Rechts – neu", "In Kraft seit", "Beschlossen am"),
+              "fr": ("Atlas du droit suisse – nouveautés", "En vigueur depuis le", "Adopté le"),
+              "it": ("Atlante del diritto svizzero – novità", "In vigore dal", "Adottato il"),
+              "en": ("Atlas of Swiss Law – new", "In force since", "Adopted on")}
+    xe = lambda x: (x or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    for lg in LANGS:
+        ft, w_in, w_ad = FEED_T[lg]
+        items = sorted([(f, a, w_in) for a, f in new_in] + [(d, a, w_ad) for a, d in kt_new], reverse=True)[:300]
+        entries = []
+        for d, a, w in items:
+            n = out_nodes[a]
+            lab, tit = names[lg]["l"][a], names[lg]["t"][a]
+            head = (f"{n['ct']} " if n.get("ct") else "SR ") + n["s"] + " " + (lab or "")
+            url = f"{SITE}#{lg}/{idof(n)}"
+            entries.append(f"<entry><title>{xe(head)}</title><id>{xe(url)}</id><updated>{d}T00:00:00Z</updated>"
+                           f"<link href=\"{xe(url)}\"/><summary>{xe(w + ' ' + d + (' · ' + tit if tit and tit != lab else ''))}</summary></entry>")
+        feed = (f'<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="{lg}">'
+                f"<title>{xe(ft)}</title><id>{SITE}feed.{lg}.xml</id><updated>{run}T00:00:00Z</updated>"
+                f'<link rel="self" href="{SITE}feed.{lg}.xml"/><link href="{SITE}#{lg}/new"/>'
+                f"<author><name>Jonas Hertner</name><uri>https://jonashertner.com</uri></author>" + "".join(entries) + "</feed>\n")
+        open(OUT.parent / f"feed.{lg}.xml", "w").write(feed)
 
     # ---- division headings for search
     for lg in LANGS:

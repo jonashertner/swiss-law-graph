@@ -33,8 +33,14 @@ function staticText() {
   for (const a of $("views").querySelectorAll("a")) {
     const v = a.dataset.view;
     a.textContent = t(v);
-    a.href = href(v === "map" ? mapTarget() : { net: "net", hier: "hierarchy", matrix: "matrix", method: "method" }[v]);
+    a.href = href(v === "map" ? mapTarget() : { links: "net", cantons: "cantons", check: "check", new: "new", method: "method" }[v]);
   }
+  for (const a of $("subnav").querySelectorAll("a")) {
+    a.textContent = t(a.dataset.sub === "hier" ? "hier" : a.dataset.sub);
+    a.href = href({ net: "net", hier: "hierarchy", matrix: "matrix" }[a.dataset.sub]);
+  }
+  $("subnav").setAttribute("aria-label", t("links"));
+  $("by").title = t("byline");
   $("q").placeholder = t("search"); $("q").setAttribute("aria-label", t("search"));
   $("qbtn").setAttribute("aria-label", t("searchOpen")); $("closeq").setAttribute("aria-label", t("close"));
   $("langs").setAttribute("aria-label", t("language"));
@@ -81,28 +87,36 @@ async function route() {
   const { lang: lg, rest, year } = parseHash();
   if (lg !== lang()) await switchLang(lg);
   if (year && (!TV.TIME.on || TV.TIME.year !== year)) await TV.enter(year);
-  const view = rest === "net" || rest.startsWith("net/") ? "net" : rest === "hierarchy" || rest.startsWith("hierarchy/") ? "hier" :
-    rest === "matrix" || rest.startsWith("matrix/") ? "matrix" : rest === "method" ? "method" : "map";
+  const first = rest.split("/")[0];
+  const view = { net: "net", hierarchy: "hier", matrix: "matrix", method: "method", cantons: "cantons", check: "check", new: "new" }[first] || "map";
   showView(view);
   TV.mount(["map", "net", "matrix"].includes(view) ? view : null);
   if (view === "map") { S.target = rest; TM.setTime(mapShare()); await showMap(rest); }
   else await showOther(view, rest);
   syncHash();
+  const top = ["net", "hier", "matrix"].includes(view) ? "links" : view;      // three lenses on the same links
   for (const a of $("views").querySelectorAll("a")) {
-    if (a.dataset.view === view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    if (a.dataset.view === top) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     if (a.dataset.view === "map") a.href = href(mapTarget());
+  }
+  const sub = $("subnav");
+  sub.hidden = top !== "links";
+  if (!sub.hidden) {
+    $("v-" + view).prepend(sub);
+    for (const a of sub.querySelectorAll("a")) if (a.dataset.sub === view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   }
 }
 const mapTarget = () => S.target || "";
 function showView(v) {
   S.view = v;
-  for (const id of ["map", "net", "hier", "matrix", "method"]) $("v-" + id).hidden = id !== v;
+  for (const id of ["map", "net", "hier", "matrix", "method", "cantons", "check", "new"]) $("v-" + id).hidden = id !== v;
   DOS.setLinker(v === "net" ? (j) => (NET.has(j) ? href("net/" + idOf(j)) : href(idOf(j))) : null);
   if (v !== "map") $("tip").hidden = true;
 }
 async function showOther(view, rest) {
   if (!views[view]) {
-    const mod = view === "net" ? NET : await import(view === "hier" ? "./hierarchy.js" : view === "matrix" ? "./matrix.js" : "./method.js");
+    const mod = view === "net" ? NET : await import({ hier: "./hierarchy.js", matrix: "./matrix.js", cantons: "./cantons.js",
+      check: "./check.js", new: "./check.js" }[view] || "./method.js");
     views[view] = mod;
     await mod.init({ go, panel: DOS });
   }
@@ -317,6 +331,10 @@ async function boot() {
   initSearch({ go: (target) => { const i = M.byId.get(target); return S.view === "net" && i != null && NET.has(i) ? go("net/" + target) : go(target); }, ensureAct });
   NET.load().then(() => { if (S.view === "map") panelFor(); }).catch(() => {});
   DOS.setExtra((i) => (NET.has(i) ? `<a class="btn" href="${href("net/" + idOf(i))}">${ICON.net} ${esc(t("inNet"))}</a>` : ""));
+  $("dossier").addEventListener("click", (e) => {             // "Wie ist das Recht gewachsen?": the time view plays
+    const b = e.target.closest("[data-act=time]"); if (!b) return;
+    if (S.view !== "map") go(""); TV.enter(TV.TIME.y0, true);
+  });
   addEventListener("hashchange", route);
   addEventListener("popstate", route);
   wide.addEventListener("change", () => S.view === "map" && panelFor());

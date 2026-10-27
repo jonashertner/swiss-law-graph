@@ -49,7 +49,7 @@ RUN_DATE = inforce.RUN_DATE
 SPARQL = "https://fedlex.data.admin.ch/sparqlendpoint"
 FX = "{http://fedlex.admin.ch/}"
 LATIN = r"(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies|undecies|duodecies)"
-NUM = rf"\d+(?:\s?[a-z](?![a-z])|{LATIN})?(?:{LATIN})?"
+NUM = rf"\d+(?:[a-z](?={LATIN})|\s?[a-z](?![a-z])|{LATIN})?(?:{LATIN})?"      # 5a, 34ter, 57hter
 ART_KW = re.compile(r"\b(?:Artikeln|Artikel|Art\.?)\s+(?=\d)")
 QUAL = re.compile(r"^(?:Absätze|Absatz|Abs\.|Buchstaben|Buchstabe|Bst\.|lit\.|Ziffern|Ziffer|Ziff\.|Sätze|Satz|Unterabsatz)\s*")
 SR_TEXT = re.compile(r"\bSR\s+(0\.\d[\d.]*\d|\d[\d.]*\d|\d)\b")
@@ -169,8 +169,17 @@ def parse_list(s: str) -> tuple[list[str], int]:
     return out, pos
 
 
+# "SR 832.10. Heute: Krankenversicherungsgesetz. Dem aufgehobenen Art. 131 (BS 8 281) entspricht heute Art. 83 des
+# Unfallversicherungsgesetzes (SR 832.20)": the footnote gives today's equivalent in another act
+NOW_EQUIV = re.compile(r"[Aa]ufgehobenen\s+Art(?:ikel|\.)?\s+[^.()]*?(?:\([^)]*\))?\s*entspr\w*\s+heute\s+(?:(?:dem|den|der|die)\s+)?"
+                       r"Art(?:ikeln|ikel|\.)?\s+(.+?)\s+(?:der|des)\b[^()]*\(SR\s+(\d[\d.]*\d)\)")
 HIST_EQUIV = re.compile(r"(?:entspr\w*|[Hh]eute:?)\s+(?:heute\s+)?(?:(?:dem|den|der|die)\s+)?Art(?:ikeln|ikel|\.)?\s+(.+?)\s+(?:der|des|dieses)\b")
 TAIL_SAME = re.compile(r"^[\s,]*(?:(?:sowie|und|und\s+auf|sowie\s+auf)\s+)?(?:des\s+)?(Schlusstitels?|Übergangsbestimmungen)?\s*$")
+
+
+# the enacting formula: what follows is the act's text (the BGer tariff, SR 173.110.210.1, prints it inside the preamble)
+ENACT = re.compile(r"\b(?:beschliesst|beschliessen|verordnet|verordnen|erlässt|erlassen|vereinbaren|vereinbart|ordnet\s+an|verfügt)\s*:")
+SEE_NOW = re.compile(r"(?:Siehe\s+)?[Hh]eute:?\s[^\[\]]*?\(?SR\s?(\d[\d.]*\d)\)?")
 
 
 def is_basis_note(note: str) -> bool:
@@ -214,7 +223,12 @@ def preamble_bases(pre, eli_to_sr: dict[str, str]) -> tuple[str, str, list]:
         if local(el.tag) == "authorialNote":
             target = note_target(el, eli_to_sr)
             note = squash("".join(el.itertext()))
-            if target and is_basis_note(note):
+            if re.match(r"\[BS\s+1\s+3\b", note):
+                target = "101"                  # BS 1 3: the Federal Constitution of 1874
+            if ENACT.search(squash("".join(plain))):     # after the enacting formula: the act's own text
+                if not is_basis_note(note):
+                    notes.append(note[:240])
+            elif is_basis_note(note):
                 seg = squash("".join(buf))
                 buf.clear()
                 clause, arts = clause_articles(seg)
@@ -225,7 +239,13 @@ def preamble_bases(pre, eli_to_sr: dict[str, str]) -> tuple[str, str, list]:
                 how = "exec" if re.search(r"(in Ausführung|in Vollzug)\s+(von|des|der|dieses)?\s*$", lead) else "basis"
                 hist = note.startswith("[")
                 eq = (EQUIV if target == "101" else HIST_EQUIV).search(note) if hist else None
-                if hist and target == "101":
+                now = NOW_EQUIV.search(note) if not hist else None
+                if not target:                  # "[AS 1998 868 …]": an act no longer in the SR, the clause ends here
+                    see = SEE_NOW.search(note)    # "… Siehe heute: das BG vom 23. Juni 2006 … (SR 811.11)"
+                    bases.append([see.group(1) if see else None, [] if see else arts, clause, note, "hist", how])
+                elif now:
+                    bases.append([now.group(2), parse_articles(now.group(1)), clause, note, "hist→today", how])
+                elif hist and target == "101":
                     bases.append([target, parse_articles(eq.group(1)) if eq else [], clause, note,
                                   "aBV→BV" if eq else "aBV", how])
                 elif hist and eq:

@@ -210,7 +210,7 @@ OWN = {"ZH": r"LS", "BE": r"BSG|RSB", "LU": r"SRL(?:\s+Nr\.)?", "UR": r"RB", "SZ
        "VS": r"RS/VS|RSVS|SGS/VS|GS/VS", "NE": r"RSN", "GE": r"rsGE|RSG", "JU": r"RSJU"}
 NUMTOK = r"(?:[IVX]+\s?[A-Z]+/[\d/]*\d|[A-L]\s\d+(?:\s\d+(?:\.\d+)*)?|\d+(?:\.\d+)+|\d+[a-z]{1,2}(?![a-zäöüéèà])|\d+)"   # 155.611 · VIII B/21/5/1 · E 5 10.03 · 539c (LU) · 1
 LATIN = r"(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)"
-NUM = rf"\d+(?:[a-z](?![a-zäöüéèà])|{LATIN})?(?:{LATIN})?"      # 5a, 34ter; not "65 e" (and)
+NUM = rf"\d+(?:[a-z](?={LATIN})|[a-z](?![a-zäöüéèà])|{LATIN})?(?:{LATIN})?"      # 5a, 34ter, 32abis; not "65 e" (and)
 ART_KW = re.compile(r"(?:\b(?:Artikeln|Artikel|Art\.?|[Aa]rticles?|art\.|[Aa]rticol[oi]|artt\.)|§§?)\s*(?=\d)")
 QUAL = re.compile(r"^(?:Absätze|Absatz|Abs\.|Buchstaben|Buchstabe|Bst\.|lit\.|let\.|lettres?|lettere|lettera|lett\.|"
                   r"Ziffern|Ziffer|Ziff\.|Sätze|Satz|Unterabsatz|alinéas|alinéa|al\.|chiffres|chiffre|ch\.|"
@@ -243,6 +243,11 @@ def parse_list(s: str) -> tuple[list[str], int]:
             mode, last_q, sep = "qual0", None, None
             pos += q.end()
             continue
+        o = re.match(r"\d+(?:e|er|ème|a)(?:\s+(?:et|e)\s+\d+(?:e|ème|a))?\s+(?:phr\.|phrases?|frasi|frase|périodes?|periodi|periodo)", rest)
+        if o:                                        # "al. 4, 2e phr.": a sentence of the paragraph, not an article
+            mode = "qual"
+            pos += o.end()
+            continue
         m = re.match(rf"({NUM})(?:er|e)?\b", rest)
         if m:
             a = m.group(1).replace(" ", "")
@@ -250,6 +255,9 @@ def parse_list(s: str) -> tuple[list[str], int]:
             after = rest[m.end():]
             if mode == "qual0":
                 mode, last_q = "qual", n
+            elif mode == "qual" and last_q == n and a != str(n) and re.search(rf"(?:{LATIN}|[abc])$", a) and \
+                    not QUAL.match(re.sub(r"^[\s,]+", "", after)):
+                pass                                 # "Abs. 2 und 2bis", "Abs. 2, 2a und 2b": a paragraph inserted after 2
             elif mode == "qual":
                 followed = bool(QUAL.match(re.sub(r"^[\s,]+", "", after)))
                 if followed or sep == "sowie" or qtype == "sing" or last_q is None or (
@@ -640,7 +648,7 @@ class Canton:
         self.foreign = re.compile(rf"(?<![\w/])(?:(?:{'|'.join(others)})\s*{NUMTOK}|GS\s*\d{{3}}\.\d{{3}})" if ct not in ("GL", "AI") else
                                   rf"(?<![\w/])(?:{'|'.join(others)})\s*{NUMTOK}")
         self.other_ct = other_canton_rx(ct)
-        self.own_name = re.compile(rf"\b(?:{CANTON_NAMES[ct]})\b|\b(?:{CANTON_ADJ[ct]})\w*", re.I)
+        self.own_name = re.compile(rf"\b(?:{CANTON_NAMES[ct]})(?!\w)|\b(?:{CANTON_ADJ[ct]})\w*", re.I)
         self.adopted = {a["sr"]: a.get("adopted") for a in acts}
         self.title = {a["sr"]: a.get("title") or "" for a in acts}
         self.fed_ref = re.compile(rf"(?<![\w/])(?:SR|RS)(?!\s*/)\s*(0\.\d[\d.]*\d|\d[\d.]*\d|\d)\b")
@@ -1042,7 +1050,7 @@ def other_canton_rx(ct: str):
     names = "|".join(p for c, p in CANTON_NAMES.items() if c != ct)
     adj = "|".join(p for c, p in CANTON_ADJ.items() if c != ct)
     return re.compile(rf"(?:\b(?:Kantons?|Kantone|canton|Cantone|Canton|Standes|République\s+et\s+Canton|Repubblica\s+e\s+Cantone)\s+"
-                      rf"(?:de\s+|du\s+|d['’]|di\s+|del\s+|von\s+)?(?:{names})\b|\b(?:{adj})\w*)", re.I)
+                      rf"(?:de\s+|du\s+|d['’]|di\s+|del\s+|von\s+)?(?:{names})(?!\w)|\b(?:{adj})\w*)", re.I)     # (?!\w), not \b: "A.Rh." ends in a dot
 
 
 # the canton files an agreement under the act approving it or joining it

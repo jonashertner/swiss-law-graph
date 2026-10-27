@@ -15,6 +15,7 @@ footnotes and the issuer of the target.
 | Newly exposed by the floor fixes (agreements now on floor 5) | 8 |
 | **Lower-floor bases after the review** | **55** |
 | … after decision 27 (acts of intercantonal bodies on floor 5; UR 20.2715 → ZBSA rules no longer lower) | **54** |
+| … after decision 35 (federal Ingress read only up to the enacting formula; SR 414.110.11 → 414.110.1 gone) | **53** |
 
 Of the 55, **one** inverts the delegation (ZG 413.123). The other 54 are structural. They are preamble
 lists, agreements naming each party's norm, approvals and successor numbers, plus 12 whose floor is
@@ -210,14 +211,12 @@ The cited act was replaced: the Ingress cites it by its date, the footnote's num
 - **JU 701.511 — Décision portant délégation de compétences du Service de l'aménagement du territoire en vertu de l'article 47 de la loi sur les constructions** → JU 701.11 — Ordonnance sur l’aménagement du territoire et les constructions (OATC).
   As above (act of the Constituent Assembly, the 1978 ordinance's number now carries the OATC).
 
-### Approval names the approved contract (3)
+### Approval names the approved contract (2)
 
 An approval decree names the contract it approves; the contract sits on a lower floor by its title only.
 
 - **SR 112.1** → SR 112.
   The Federal Assembly approves the contract of 22 June 1875 between the Federal Council and the municipal council of Bern on the city's contributions to the federal seat.
-- **SR 414.110.11** → SR 414.110.1.
-  Approval of the Aussonderungsvertrag of 28 December 1905 (ETH) between the Confederation, the Canton and the City of Zurich.
 - **SR 725.151** → SR 725.151.1.
   Approval of the agreement of 23 May 1958 with Vaud and Valais on the Great St Bernard road tunnel ("in Anbetracht des Abkommens").
 
@@ -231,3 +230,9 @@ concordat rules, the HES-SO's and the Gymnase de la Broye's acts, the fishing co
 UR's and ZG's acts published only by reference to an intercantonal body. Not moved: a canton's
 approval or executing act for an agreement, private bodies acting for the cantons (the SRK's
 rules), foundations not called intercantonal.
+
+## Decision 35 (2026-10-27)
+
+SR 414.110.11 → SR 414.110.1 is no longer a stated basis: the 1908 decree names the 1905 Aussonderungsvertrag after its
+enacting formula ("beschliesst: 1. Der … Aussonderungsvertrag … wird genehmigt"), in its text, not in its Ingress. The
+federal parser now stops at the enacting formula. 53 lower-floor bases remain.

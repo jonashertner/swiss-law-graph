@@ -1,7 +1,7 @@
 {
  "reviewed": "2026-10-27",
  "by": "manual reading of each Ingress (swiss-law-graph)",
- "note": "Every stated basis whose target sits on a lower floor than the act naming it, after the parser and floor fixes of 2026-10-27. Categories in display order; 'n' quotes or paraphrases the Ingress. 2026-10-27, decision 27: acts of intercantonal bodies on floor 5; UR 20.2715 → ZBSA rules is no longer an inversion.",
+ "note": "Every stated basis whose target sits on a lower floor than the act naming it, after the parser and floor fixes of 2026-10-27. Categories in display order; 'n' quotes or paraphrases the Ingress. 2026-10-27, decision 27: acts of intercantonal bodies on floor 5; UR 20.2715 → ZBSA rules is no longer an inversion. Decision 35: SR 414.110.11 → 414.110.1 is gone (the contract is named after the enacting formula, in the act's text, not in its Ingress).",
  "categories": [
   {
    "id": "claim",
@@ -34,12 +34,6 @@
    "t": "SR 112",
    "c": "approval",
    "n": "The Federal Assembly approves the contract of 22 June 1875 between the Federal Council and the municipal council of Bern on the city's contributions to the federal seat."
-  },
-  {
-   "a": "SR 414.110.11",
-   "t": "SR 414.110.1",
-   "c": "approval",
-   "n": "Approval of the Aussonderungsvertrag of 28 December 1905 (ETH) between the Confederation, the Canton and the City of Zurich."
   },
   {
    "a": "SR 725.151",

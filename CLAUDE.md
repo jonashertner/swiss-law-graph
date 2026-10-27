@@ -35,8 +35,9 @@ contradictions and lacunae. Owner: Jonas Hertner (also owner of opencaselaw.ch).
   consolidated DE XML): issuer, verbatim Ingress, stated bases (target SR from the footnote, article
   numbers, the clause verbatim), adoption date, editorial notes, body article eIds
   (`fetch_fedlex_basis.py`, ~6 min; SPARQL by ELI URI, cached in build/fedlex_xml_urls.json).
-  Only a footnote that *is* an SR reference marks a basis ("SR …", "[BS …]"); editorial notes
-  ("Der Titel wurde … PublG (SR 170.512) angepasst") let the clause run on.
+  Only a footnote that *is* an SR reference marks a basis ("SR …", "[BS …]", "[AS …]" — the last two an act no longer
+  in the SR, "[BS 1 3]" the BV 1874); editorial notes ("Der Titel wurde … PublG (SR 170.512) angepasst") let the clause
+  run on. Read up to the enacting formula ("beschliesst:", "verordnet:") only (decision 35).
 - `data/cantonal_basis.json` — all 26 cantonal collections in force (16,385 acts since decision 33; `cantonal_basis.py`):
   title, abbreviation, URL, adoption date, issuer, verbatim Ingress, floor, and every stated basis resolved
   to `SR <n>` / `SR <n>@<year>` / `KV` (+ articles) / `CT:<n>` / `?` with the clause verbatim. Read by the
@@ -513,6 +514,50 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     today's map (the layout of every act ever in force eases into today's). The first click, scroll, key or touch hands
     over: playback stops and the year stays (the bar's own buttons act as usual). Deep links and prefers-reduced-motion
     do not play it. `time.js::playIntro`, called from `app.js` boot.
+35. From scratch: a public good and a working tool (2026-10-27, Jonas: "both: public good for the general public, and a
+    working tool for practitioners and legislators. own brand (jonashertner.com); no full text or decision pages. static
+    site on github pages"). Navigation by task: Karte · Zusammenhänge (sub-row Netz / Hierarchie / Abhängigkeiten) ·
+    Kantone · Befund · Neu · Methode; byline jonashertner.com, meta author, Atom feeds; the root panel asks six questions
+    (what rests on an act, how the cantons implement it, how it grew, where the law points into the void, what is new,
+    how it hangs together). `SITE` in 08 is `https://jonashertner.github.io/swiss-law-graph/` until a custom domain.
+    Impact ("Was hängt davon ab", `docs/js/impact.js`): in act and article panels, every act in force whose Ingress
+    names it, then whatever rests on those (breadth-first over links.json), by depth and jurisdiction (RPG 87 direct /
+    243 in all; Art. 75 BV 4 / 259). Kantone (`cantons.js`, `#de/cantons/700`): per federal act the cantonal acts resting
+    on it, canton by canton in the order of Art. 1 BV, with level and the articles named; the index ranks federal acts by
+    cantons (RPG: 85 acts in 21 cantons). Befund (`check.js`, `docs/data/check.json`): ten lists from the stated bases,
+    scope by jurisdiction — basis pointing into the void 17 (15 federal: 12 repealed articles, 3 not in the text; 2 KV
+    articles repealed), basis repealed 597, an earlier constitution 391 (BV 1874 with Fedlex's equivalent 36, without
+    77; an earlier cantonal constitution 278), designation not updated 1,225, footnote and text disagree 54, federal acts
+    naming no basis 58, cantonal acts naming none per canton (drafting practice), federal acts whose version predates
+    1990 53, lower floor 53, Fedlex status 265 / 29. Neu (`news.json`, `feed.<lang>.xml`): federal acts in force in the
+    365 days to the run (120), cantonal acts adopted (393), federal acts ended (70). Every row links to the act.
+    Building the Befund exposed reading errors; each fix was diffed against the run before and read (all corrections):
+    federal parser — a footnote naming an act no longer in the SR ("[AS 1998 868 …]") had let the clause run into the
+    next act (PVFMH: Art. 18 of the BB 1995 Osteuropa was hung on the BG 2003; 6 federal acts in force, 125 treaties);
+    "[BS 1 3]" is the BV 1874 (15 acts had read as naming no basis: acts without a basis in the tree 83 → 69); "Dem
+    aufgehobenen Art. 131 … entspricht heute Art. 83 des UVG (SR 832.20)" and "Siehe heute: … (SR 811.11)" give the
+    target (3); footnotes after the enacting formula are the act's text (112.1, 414.110.11, 173.110.210.1; the inversion
+    414.110.11 → 414.110.1 is gone, 53 lower-floor bases); numbers with a letter and a Latin suffix ("57hter",
+    "32abis", "108dquinquies") had been cut to "57" (21 bases; the cantonal parser likewise, 3). 07, federal — the date in
+    the clause against the target's: the earlier act under the number → flag "old", articles not checked against today's
+    text (14, e.g. "BZG vom 4. Oktober 2002" → SR 520.1 of 2019); another act in force of that date sharing a title stem
+    → that act, flag "note" (1: UEV names the FinfraG of 19 June 2015, the footnote says SR 954.1 = FINIG → SR 958.1).
+    Articles: ranges expanded (art_27_a_27_c = 27a–27c), repealed vs absent from fedlex_structure, final provisions that
+    continue the numbering count (PatG disp_u1/art_141), ranges shown without text count as present (JSFVG art_6_8).
+    Cantonal — a cantonal act names the constitution in force when its Ingress was written: BV 1874 if a date before 1990
+    follows the word, an article is numbered the old way, or the act is older than 2000 and names no date (50: "Art. 7
+    Abs. 2 BV" of 1951 had hung on today's Art. 7, Menschenwürde); an earlier cantonal constitution if a date 3+ years
+    before today's follows the word, or without a date the act is older than today's KV's entry into force (Fedlex
+    in_force of SR 131.2xx) (278, node KV without article, via "kvold": UR acts 1954–84 "Art. 59 lit. e KV" had hung on
+    today's Art. 59 "Mittelbeschaffung", SZ 2006–12 "§ 42 KV" on today's § 42 "Unvereinbarkeit"; samples 30/30 and
+    20/20 right); KV transitional provisions ("article 3 des dispositions finales et transitoires", JU, 126) → the KV
+    without article (had been the main body's Art. 3); canton names ending in a dot ("Appenzell A.Rh.") never matched
+    (`\b` after a dot; 15 acts, 14 corrections, one AR act from "other canton" to "not identifiable"); "Abs. 2 und 2bis",
+    "Abs. 2, 2a und 2b" (not "Absatz 4, 4octies Absatz 3") and "2e phr." no longer read as articles (11). KV VS Art. 3 has
+    the Fedlex id art_3_a (note marker; mapped). Fedlex's own errors: `reports/fedlex-anomalies.md`. Effects: federal
+    tree 2,122 acts, 3,254 bases, 69 without a basis in the tree (58 name none), 15 dangling; cantonal 24,384 bases;
+    matrix 24,791 pairs in 1,466 cells (24,790 after decision 33); network 18,213 acts (4,332 in force without a link).
+    The method page states the reading rules with the counts from method.json.
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -589,11 +634,19 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - [x] Step 13′ federal history (decision 32): `pipeline/fetch_fedlex_history.py` → `data/fedlex_history.json` (11 MB);
       08 adds 11,413 acts no longer in force (repealed or lapsed; kind o, `_y`), `hnames.<lang>.json`; step 1 fix
       for acts never in force.
+- [x] Step 14 (decision 35): task-led navigation, impact, Kantone, Befund, Neu + feeds (`impact.js`, `cantons.js`,
+      `check.js`; `check.json`, `news.json`, `feed.<lang>.xml`); reading fixes in fetch_fedlex_basis, cantonal_basis, 07.
+      Tested at 1440×900, 1024×768, 390×844 in DE/FR/IT/EN with the regression scripts (time, intro, nav, phone,
+      decisions, perf), no console errors.
 
 ## Reports
 - `reports/opencaselaw-anomalies.md` — anomalies in OpenCaseLaw for Jonas to fix there (duplicates,
   impossible dates, alias errors, unflagged homonyms, SR reuse, extractor issues, MCP pairing). Keep
   adding to it rather than silently working around new ones.
+- `reports/fedlex-anomalies.md` — Fedlex markup errors (wrong footnote SR number, an id taken from a note marker, operative
+  text inside a preamble, ranges without text) and the Ingresses naming provisions that no longer exist, for the
+  Federal Chancellery and the drafting services.
+- `reports/counts-check.md` — the number of acts in force checked against Fedlex's pages and LexFind (decision 33).
 
 ## Next
 - Jonas: make the repository public (Settings → General → Danger Zone) and enable Pages (Settings → Pages →
@@ -625,7 +678,9 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - Cantonal law: article-level targets for bases naming a cantonal act's article (today the act);
   read the 1,500 not identifiable mentions by hand per canton; TI/SZ from their own portals when reachable;
   communal law (BZO …) is out of scope of the cantonal collections.
-- The 13 dangling bases and 79 acts without a basis are Phase-2 material (lacunae, outdated Ingress);
+- The 17 dangling bases, 1,225 designations not updated and 69 acts without a basis (Befund) are Phase-2 material
+  (lacunae, outdated Ingress); a by-hand reading of the 278 earlier-constitution and 1,225 old-date bases per canton
+  would confirm the rules of decision 35 beyond the samples;
   so is the one genuine upward delegation of decision 26 (ZG 413.123 → § 20 of the Amt's provisions).
 - The 11 inversions with a default floor (decision 26) need the issuer read in the official gazette:
   FR Tarif des émoluments administratifs 1968, ZG Richtplan 1988, SO Volksbeschluss 1898.
@@ -637,3 +692,4 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - TI and SZ come via LexFind (Institute of Federalism, academic service): only Ingress text (official,
   Art. 5 URG) and metadata are republished, links go to ti.ch / sz.ch. Acceptable for the public page?
 - VD shows only the BLV's "majeur" acts (895 of 2,747); the 1,852 "mineur" decrees are left out.
+- Custom domain for the site (e.g. atlas.jonashertner.com)? `SITE` in 08 and the feeds use the github.io address until then.

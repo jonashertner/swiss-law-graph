@@ -6,6 +6,8 @@
 <title>Atlas des Schweizer Rechts</title>
 <meta name="description" content="Alle Erlasse von Bund und Kantonen, wie sie aufeinander aufbauen und wie oft Gerichte sie zitieren.">
 <meta name="theme-color" content="#ffffff">
+<meta name="author" content="Jonas Hertner">
+<link rel="alternate" type="application/atom+xml" title="Neu in Kraft" href="feed.de.xml">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="data/atlas.json" as="fetch" crossorigin>
@@ -17,9 +19,10 @@
   <a class="brand" href="#" id="brand"><span class="mark" aria-hidden="true"></span><span class="name" id="brandname">Atlas des Schweizer Rechts</span></a>
   <nav class="views" id="views" aria-label="Ansichten">
     <a href="#" data-view="map">Karte</a>
-    <a href="#" data-view="net">Netz</a>
-    <a href="#" data-view="hier">Hierarchie</a>
-    <a href="#" data-view="matrix">Abhängigkeiten</a>
+    <a href="#" data-view="links">Zusammenhänge</a>
+    <a href="#" data-view="cantons">Kantone</a>
+    <a href="#" data-view="check">Befund</a>
+    <a href="#" data-view="new">Neu</a>
     <a href="#" data-view="method">Methode</a>
   </nav>
   <div class="search" id="search" role="search">
@@ -30,6 +33,7 @@
   </div>
   <button class="qbtn" id="qbtn" type="button"><svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg></button>
   <select class="langsel" id="langsel"><option value="de">DE</option><option value="fr">FR</option><option value="it">IT</option><option value="en">EN</option></select>
+  <a class="by" id="by" href="https://jonashertner.com" rel="author">jonashertner.com</a>
   <div class="langs" id="langs" role="group">
     <button data-lang="de" lang="de">DE</button><button data-lang="fr" lang="fr">FR</button><button data-lang="it" lang="it">IT</button><button data-lang="en" lang="en">EN</button>
   </div>
@@ -65,7 +69,11 @@
     <div class="scroller" id="mscroll"><div class="mwrap" id="mwrap"><canvas id="mc"></canvas><canvas id="mx" tabindex="0"></canvas></div></div>
     <div class="hfoot" id="mfoot"></div>
   </section>
+  <section class="view page" id="v-cantons" hidden><div class="doc wide" id="cdoc"></div></section>
+  <section class="view page" id="v-check" hidden><div class="doc wide" id="kdoc"></div></section>
+  <section class="view page" id="v-new" hidden><div class="doc wide" id="ndoc"></div></section>
   <section class="view page" id="v-method" hidden><div class="doc" id="mdoc"></div></section>
+  <nav class="subnav" id="subnav" hidden><a href="#" data-sub="net">Netz</a><a href="#" data-sub="hier">Hierarchie</a><a href="#" data-sub="matrix">Abhängigkeiten</a></nav>
   <aside class="dossier" id="dossier" hidden></aside>
   <div class="loading" id="loading"><div><span id="loadtxt">Lade …</span><div class="bar"><i></i></div></div></div>
 </main>

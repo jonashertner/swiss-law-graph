@@ -119,6 +119,37 @@ def cites_1874(rec: dict, nums: list[str]) -> bool:
     return True
 
 
+# the date a clause gives the act it names, read right after the word naming it ("Kantonsverfassung vom 30. April 1995")
+BV_WORD = re.compile(r"Bundesverfassung|Constitution\s+f[ée]d[ée]rale|Costituzione\s+federale|\bBV\b|\bCst\.?(?!\w)", re.I)
+KV_WORD = re.compile(r"[Vv]erfassung|[Cc]onstitution|[Cc]ostituzione|\bKV\b|\bCst\.?(?!\w)")
+GENERIC = ("bundesg", "bundesb", "bundesv", "verordn", "artikel", "absatz", "absätz", "buchsta", "schweiz", "eidgenö",
+           "bundesr", "gestütz", "ausführ", "vollzug", "beschlu", "änderun", "fassung")
+
+
+def dates_after(clause: str, word) -> list[str]:
+    from cantonal_basis import DATE, iso
+    m = None
+    for m in word.finditer(clause or ""):
+        pass
+    return [iso(x) for x in DATE.finditer(clause[m.end():m.end() + 90])] if m else []
+
+
+BLOCK = re.compile(r"^art_(\d+)(?:_([a-z]+))?_(\d+)(?:_([a-z]+))?$")         # "art_27_a_27_c": Art. 27a–27c as one element
+TRANS = re.compile(r"(?:Übergangs|Schluss)bestimmung|dispositions?\s+(?:finales|transitoires)|disposizion[ei]\s+(?:finali|transitori)", re.I)
+
+
+def expand_eid(eid: str) -> list[str]:
+    m = BLOCK.match(eid)
+    if not m:
+        return [eid]
+    out = [eid_of(x) for x in expand_range(m.group(1) + (m.group(2) or ""), m.group(3) + (m.group(4) or ""))]
+    return [e for e in out if e] or [eid]
+
+
+def stems(s: str) -> set[str]:
+    return {w.lower()[:7] for w in re.findall(r"[A-Za-zÄÖÜäöüß]{7,}", s or "")} - set(GENERIC)
+
+
 def eid_of(num: str) -> str | None:
     p = split(num)
     if not p:
@@ -269,8 +300,55 @@ def main() -> None:
             stats["cited_matched_decisions"] += info[t].get("dn", 0) - core["nodes"][core_i[t]].get("n", 0)
     treaty_node = {}
 
+    # ---- the act a clause names by its date (decision 35): the footnote gives today's number, the text may name the
+    # earlier act under it ("Artikel 131 des Bundesgesetzes vom 13. Juni 1911", footnote SR 832.10 = KVG 1994) or, where
+    # the footnote is wrong, another act of that date ("Finanzmarktinfrastrukturgesetzes vom 19. Juni 2015", SR 954.1)
+    hist = json.load(open(ROOT / "data/fedlex_history.json"))
+    num_dates, in_date, by_date, ttl = defaultdict(set), {}, defaultdict(set), {}
+    for r in inforce.rows():
+        h = hist.get(r["act"].rstrip("/")) or {}
+        if not h.get("date"):
+            continue
+        num_dates[r["notation"]].add(h["date"])
+        if inforce.in_force(r):
+            in_date[r["notation"]], ttl[r["notation"]] = h["date"], (h.get("title") or {}).get("de", "")
+            by_date[h["date"]].add(r["notation"])
+
+    def by_its_date(tgt, clause):
+        from cantonal_basis import DATE, iso
+        ds = [iso(m) for m in DATE.finditer(clause or "")]
+        if not ds or tgt not in in_date or in_date[tgt] in ds:
+            return tgt, None
+        if num_dates[tgt] & set(ds):
+            return tgt, "old"                             # the earlier act under today's number
+        cw = stems(clause)
+        hits = sorted({x for d in ds for x in by_date.get(d, ()) if x != tgt and stems(ttl[x]) & cw})
+        return (hits[0], "note") if len(hits) == 1 else (tgt, None)
+
+    # every article of an act's text today: "in" (in force, or a range shown without text: not yet in force) or "rep"
+    # (repealed); ranges expanded; the final provisions where they continue the numbering (PatG: disp_u1/art_141)
+    stat_cache = {}
+
+    def art_status(sr):
+        if sr not in stat_cache:
+            st = {}
+            for a in struct_all.get(sr, {}).get("articles", []):
+                for e in expand_eid(a["id"]):
+                    st.setdefault(e, "rep" if a.get("rep") else "in")
+            for e in acts.get(sr, {}).get("arts") or []:
+                if "/" in e:
+                    st.setdefault(e, "in")
+                    if e.startswith("disp_"):
+                        st.setdefault(e.split("/")[-1], "in")
+                else:
+                    for x in expand_eid(e):
+                        st.setdefault(x, "in")
+            stat_cache[sr] = st
+        return stat_cache[sr]
+
     # ---- bases: resolve targets and articles
     resolved = {}      # sr -> list of [target node, [eIds], clause, how, via, found]
+    missing = {}       # (act node, base index) -> article numbers the target's text today does not contain
     for sr, rec in members.items():
         out = []
         for b in rec.get("bases", []):
@@ -278,6 +356,20 @@ def main() -> None:
             stats["bases"] += 1
             if tgt == sr:
                 continue
+            if not tgt:                                   # "[AS 1998 868 …]": an act no longer in the SR
+                stats["bases_act_no_longer_in_sr"] += 1
+                out.append([-1, [], clause, how, "hist", 0])
+                continue
+            if via == "text" and tgt != "101" and not tgt.startswith("0."):
+                t2, flag = by_its_date(tgt, clause)
+                if flag == "old":                         # the text's articles are the earlier act's: not checked
+                    stats["bases_old_date"] += 1
+                    if tgt in members:
+                        out.append([act_node[tgt], [], clause, how, "old", 1])
+                    continue
+                if flag == "note":
+                    stats["bases_footnote_other_act"] += 1
+                    tgt, via = t2, "note"
             if tgt == "101":
                 stats["bases_bv"] += 1
                 if via == "text" and cites_1874(rec, nums):
@@ -288,7 +380,7 @@ def main() -> None:
                     continue
                 if via == "aBV→BV":
                     stats["bases_abv_mapped"] += 1
-                eids, found = [], 1
+                eids, miss = [], []
                 for n in nums:
                     if "–" in n:
                         a_, b_ = n.split("–")
@@ -296,22 +388,24 @@ def main() -> None:
                         if e1 in bv_order and e2 in bv_order:
                             eids += bv_order[bv_order.index(e1):bv_order.index(e2) + 1]
                         else:
-                            found = 0
+                            miss.append([n, "absent"])
                     else:
                         e = eid_of(n)
                         if e in bvart:
                             eids.append(e)
                         else:
-                            found = 0
+                            miss.append([n, "absent"])
                 if not nums:
                     stats["bases_bv_no_article"] += 1
-                if not found:
+                if miss:
                     stats["bases_bv_article_not_found"] += 1
-                out.append([bvart[eids[0]] if eids else root, eids, clause, how, via, found])
+                    missing[(act_node[sr], len(out))] = miss
+                out.append([bvart[eids[0]] if eids else root, eids, clause, how, via, int(not miss)])
             elif tgt in members:
                 alist = acts[tgt].get("arts") or []
-                tarts = set(alist)
-                eids, found = [], 1
+                st = art_status(tgt)
+                stat = lambda e: st.get(e) or "absent"
+                eids, miss = [], []
                 for n in nums:
                     block = None
                     if n.startswith(("SchlT ", "ÜB ")):              # final / transitional provisions
@@ -322,14 +416,16 @@ def main() -> None:
                         es = [next((a for a in alist if a.startswith("disp_") and a.endswith("/" + e)), e) if e else e for e in es]
                     if len(parts) == 2 and all(es):
                         rng = [eid_of(x) for x in expand_range(*parts)]
-                        eids += [e for e in rng if e in tarts]
-                        found &= int(es[0] in tarts and es[1] in tarts)
+                        eids += [e for e in rng if stat(e) == "in"]
+                        miss += [[x, stat(e)] for x, e in zip(parts, es) if stat(e) != "in"]
                     elif es[0]:
                         eids.append(es[0])
-                        found &= int(es[0] in tarts)
-                if nums and not found:
+                        if stat(es[0]) != "in":
+                            miss.append([n, stat(es[0])])
+                if miss:
                     stats["bases_article_not_in_current_text"] += 1
-                out.append([act_node[tgt], eids, clause, how, via, found])
+                    missing[(act_node[sr], len(out))] = miss
+                out.append([act_node[tgt], eids, clause, how, via, int(not miss)])
             elif tgt.startswith("0."):
                 stats["bases_treaty"] += 1
                 if f"SR {tgt}" in cidx:
@@ -365,6 +461,8 @@ def main() -> None:
         cands = resolved[sr]
         best = None
         for order, (t, eids, clause, how, via, found) in enumerate(cands):
+            if t < 0:
+                continue                                  # an act no longer in the SR
             tl = lvl_of_node(t)
             if tl >= my_l:
                 continue                                  # not a higher norm: secondary only
@@ -372,8 +470,8 @@ def main() -> None:
             key = (tl, common_prefix(sr, tsr), -order)    # nearest higher level, SR prefix, text order
             if best is None or key > best[0]:
                 best = (key, order)
-        if best is None and cands:                        # only same-level bases: the first one, if acyclic
-            best = ((0, 0, 0), 0)
+        if best is None and any(c[0] >= 0 for c in cands):   # only same-level bases: the first one, if acyclic
+            best = ((0, 0, 0), next(k_ for k_, c in enumerate(cands) if c[0] >= 0))
             stats["parent_same_level"] += 1
         if best is None:
             parent[me] = nob
@@ -395,8 +493,17 @@ def main() -> None:
             stats["cycle_broken"] += 1
 
     # ---- cantonal bases: resolve to tree nodes; the parent is the nearest higher cantonal floor
+    kv_alias = {ct: {x: e for e in st for x in expand_eid(e)} for ct, st in kvst.items()}
+    # Fedlex ids taken from a note marker: KV VS prints "<b>Art. 3</b><sup>a</sup>" (note a) and names it art_3_a
+    for ct, a, e in (("VS", "art_3", "art_3_a"),):
+        if e in kvst[ct] and a not in kvst[ct]:
+            kv_alias[ct][a] = e
+    kv_rep = {ct: {x for a in struct_all.get(sr, {}).get("articles", []) if a.get("rep") for x in expand_eid(a["id"])}
+              for ct, sr in CANTON_CONSTITUTION.items()}
+
     def kv_article(ct, n):
         e = eid_of(n)
+        e = kv_alias[ct].get(e, e)
         if not e or e not in kvst[ct]:
             return None
         if e not in kv_art[ct]:
@@ -424,6 +531,31 @@ def main() -> None:
 
     def is_k(t):
         return t in kv_nodes or kind[t] == "kvart" or ids[t].startswith("K:")
+    # a cantonal act names the constitution in force when its Ingress was written: the BV of 1874 before 2000, an
+    # earlier cantonal constitution before today's entered into force (decision 35) — its article numbers are that text's
+    kv_in = {}
+    for r in inforce.rows():
+        ct_ = next((c for c, n in CANTON_CONSTITUTION.items() if n == r["notation"]), None)
+        if ct_ and inforce.in_force(r):
+            kv_in[ct_] = (hist.get(r["act"].rstrip("/")) or {}).get("in_force") or ""
+
+    def k_bv1874(rec, clause, arts):
+        ds = dates_after(clause, BV_WORD)
+        if "1999-04-18" in ds:
+            return False
+        if any(d < "1990" for d in ds) or any(LATIN_NUM.match(n.split("–")[0]) for n in arts):
+            return True
+        return bool(rec.get("adopted")) and rec["adopted"] < "2000-01-01"
+
+    def k_earlier_kv(ct, rec, clause):
+        kvd = (kinfo.get(kv_node[ct]) or {}).get("adopted") or ""
+        if not kvd:
+            return False
+        ds = dates_after(clause, KV_WORD)
+        if ds:                                            # a date 3 years or more before today's constitution: an earlier one
+            return all(int(d[:4]) <= int(kvd[:4]) - 3 for d in ds)
+        start = kv_in.get(ct) or kvd
+        return bool(rec.get("adopted")) and rec["adopted"] < start
     kresolved = {}
     for (ct, ksr), me in kact.items():
         out = []
@@ -432,12 +564,23 @@ def main() -> None:
             via = {"old": "old", "note": "note"}.get(b[3], "text") if len(b) > 3 else "text"
             stats["k_bases"] += 1
             if tgt == "KV":
-                hit = [x for x in (kv_article(ct, n.split("–")[0]) for n in arts) if x]
-                found = int(len(hit) == len(arts))
-                if not found:
-                    stats["k_bases_kv_article_not_found"] += 1
                 stats["k_bases_kv"] += 1
-                out.append([hit[0] if hit else kv_node[ct], [ids[x].split(":")[-1] for x in hit], clause, "basis", via, found])
+                if k_earlier_kv(ct, kinfo[me], clause):
+                    stats["k_bases_kv_earlier"] += 1
+                    out.append([kv_node[ct], [], clause, "basis", "kvold", 1])
+                    continue
+                if TRANS.search(clause or ""):            # its transitional provisions (numbered apart): not checked
+                    stats["k_bases_kv_transitional"] += 1
+                    out.append([kv_node[ct], [], clause, "basis", via, 1])
+                    continue
+                hit, miss = [], []
+                for n in arts:
+                    x = kv_article(ct, n.split("–")[0])
+                    (hit.append(x) if x else miss.append([n, "rep" if eid_of(n.split("–")[0]) in kv_rep[ct] else "absent"]))
+                if miss:
+                    stats["k_bases_kv_article_not_found"] += 1
+                    missing[(me, len(out))] = miss
+                out.append([hit[0] if hit else kv_node[ct], [ids[x].split(":")[-1] for x in hit], clause, "basis", via, int(not miss)])
             elif tgt.startswith("CT:"):
                 t2 = kact.get((ct, tgt[3:])) or (kv_node[ct] if tgt[3:] == cb["cantons"][ct].get("kv") else None)
                 if t2 is None or t2 == me:
@@ -447,9 +590,16 @@ def main() -> None:
                 stats["k_bases_cantonal"] += 1
                 out.append([t2, arts, clause, "basis", via, 1])
             elif tgt == "SR 101":
-                eids = [eid_of(n) for n in arts if eid_of(n) in bvart]
                 stats["k_bases_federal"] += 1
-                out.append([bvart[eids[0]] if eids else root, eids, clause, "basis", via, int(len(eids) == len(arts))])
+                if k_bv1874(kinfo[me], clause, arts):
+                    stats["k_bases_bv1874"] += 1
+                    out.append([abv, [], clause, "basis", "aBV", 1])
+                    continue
+                eids = [eid_of(n) for n in arts if eid_of(n) in bvart]
+                miss = [[n, "absent"] for n in arts if eid_of(n) not in bvart]
+                if miss:
+                    missing[(me, len(out))] = miss
+                out.append([bvart[eids[0]] if eids else root, eids, clause, "basis", via, int(not miss)])
             elif tgt.startswith("X:"):                 # an act of another canton (agreements name each party's law)
                 stats["k_bases_other_canton"] += 1
                 out.append([-1, [], clause, "basis", "other", 0])
@@ -665,7 +815,8 @@ def main() -> None:
     rests_on = defaultdict(list)                 # target -> acts naming it as a basis
     for sr, cands in resolved.items():
         for c in cands:
-            rests_on[c[0]].append(act_node[sr])
+            if c[0] >= 0:
+                rests_on[c[0]].append(act_node[sr])
     for me, cands in kresolved.items():
         for c in cands:
             if c[0] >= 0:
@@ -850,11 +1001,11 @@ def main() -> None:
     bases_out = {}
     for sr, cands in resolved.items():
         if cands:
-            bases_out[act_node[sr]] = [c[:6] + [c[6] if len(c) > 6 else 0] for c in cands]
+            bases_out[act_node[sr]] = [c[:6] + [c[6] if len(c) > 6 else 0, missing.get((act_node[sr], k_), [])] for k_, c in enumerate(cands)]
     kclauses = {}
     for me, cands in kresolved.items():       # cantonal clauses travel with the Ingress (loaded on demand)
         if cands:
-            bases_out[me] = [[c[0], c[1], "", *c[3:]] for c in cands]
+            bases_out[me] = [[c[0], c[1], "", *c[3:7], missing.get((me, k_), [])] for k_, c in enumerate(cands)]
             kclauses[me] = [c[2] for c in cands]
     by_level = defaultdict(int)
     for sr in members:

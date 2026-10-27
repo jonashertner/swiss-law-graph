@@ -4,6 +4,7 @@ import { t, cantonName, pick, lang } from "./i18n.js";
 import { M, KIND, kindOf, isAct, idOf, label, labelCt, title, srOf, urlOf, getJSON, loadLinks, loadYears, loadLaw } from "./data.js";
 import { $, esc, num, date, sw, href, decUrl, ICON } from "./util.js";
 import { headingOf } from "./treemap.js";
+import { dependents, jurisdiction, cantonOrder, normArt } from "./impact.js";
 
 const el = () => $("dossier");
 let token = 0, opts = {}, linker = null, extra = () => "";
@@ -88,6 +89,37 @@ function fill(id, html, my) {
   wire(el()); wireCharts(el());
 }
 
+// ---------- the start: the questions the site answers, each a way in (decision 35)
+function asks() {
+  const rpg = M.byId.get("700");
+  const q = [["q1", rpg != null ? href("700") : href("net"), rpg != null ? label(rpg) : ""], ["q2", href("cantons/700"), rpg != null ? label(rpg) : ""],
+    ["q3", null, "1848–"], ["q4", href("check"), ""], ["q5", href("new"), ""], ["q6", href("net"), ""]];
+  return section(t("ask"), `<ul class="rows asks">${q.map(([k, h, v]) => `<li>${h ? `<a class="r" href="${h}">` : `<button class="r" data-act="time">`}` +
+    `<span class="a">${esc(t(k))}</span>${v ? `<span class="v">${esc(v)}</span>` : ""}${h ? "</a>" : "</button>"}</li>`).join("")}</ul>`);
+}
+
+// ---------- what depends on it: counts by depth and by jurisdiction, from the stated bases
+function impactHTML(i, dep, art) {
+  if (!dep.size) return section(t("impact"), `<p class="note">${esc(t(art ? "impArtNone" : "impNone"))}</p>`);
+  let d1 = 0, d2 = 0, d3 = 0;
+  const by = new Map();
+  for (const [j, d] of dep) {
+    if (d === 1) d1++; else if (d === 2) d2++; else d3++;
+    const w = jurisdiction(j); by.set(w, (by.get(w) || 0) + 1);
+  }
+  const keys = ["fed", "int", ...cantonOrder()].filter((w) => by.has(w));
+  const name = (w) => (w === "fed" ? t("impFed") : w === "int" ? t("impInt") : w);
+  const max = Math.max(...by.values());
+  const juris = `<ul class="juris">${keys.map((w) => `<li title="${esc(w.length === 2 ? cantonName(w) : name(w))}"><span class="w">${esc(name(w))}</span>` +
+    `<span class="t"><i style="width:${(100 * by.get(w) / max).toFixed(1)}%"></i></span><span class="num">${esc(num(by.get(w)))}</span></li>`).join("")}</ul>`;
+  const depth = `<div class="depth">${[[d1, "impD1"], [d2, "impD2"], [d3, "impD3"]].filter((x) => x[0]).map(([n, k]) =>
+    `<span><b class="num">${esc(num(n))}</b> ${esc(t(k))}</span>`).join("")}</div>`;
+  const cmp = !art && !M.CT[i] && M.K[i] === KIND.a && keys.some((w) => w.length === 2) ?
+    `<div class="btnrow"><a class="btn" href="${href("cantons/" + idOf(i))}">${esc(t("impCompare"))}</a></div>` : "";
+  return section(t("impact"), `<p class="lede2">${esc(t(art ? "impArtLede" : "impLede", num(d1), num(dep.size)))}</p>${depth}${juris}${cmp}` +
+    `<p class="note">${esc(t("impNote"))}</p>`, dep.size);
+}
+
 // ---------- a part of the collection (block, SR area, canton) or the whole
 function topActsBelow(i, cap = 12) {
   const out = [];
@@ -104,7 +136,7 @@ function groupHTML(i) {
     `<div class="stackkey">${parts.map((c) => `<span>${sw(c)}${esc(clsName(c))}</span><span class="num">${esc(num(comp[o + c]))}</span>`).join("")}</div>` : "";
   const top = topActsBelow(i);
   return `${kick ? `<div class="k">${kick}</div>` : ""}<h1${h1.length > 42 ? ' class="long"' : ""}>${esc(h1)}</h1>` +
-    (i === 0 ? `<p class="lede">${esc(t("description"))}</p>` : k === KIND.g ? `<p class="lede">${esc(t(M.HG[i] ? "noSrNote" : "codeNote"))}</p>` : "") +
+    (i === 0 ? `<p class="lede">${esc(t("description"))}</p>` + asks() : k === KIND.g ? `<p class="lede">${esc(t(M.HG[i] ? "noSrNote" : "codeNote"))}</p>` : "") +
     `<div class="stat2">${acts ? `<div class="stat"><b>${esc(num(acts))}</b><span>${esc(t("inForceActs"))}</span></div>` : ""}` +
     `${M.HG[i] ? `<div class="stat"><b>${esc(num(M.val.hist[i]))}</b><span>${esc(t("nRepealed"))}</span></div>` : ""}` +
     `${M.DD[i] ? `<div class="stat"><b>${esc(num(M.DD[i]))}</b><span>${esc(t("referring"))}</span></div>` : ""}</div>` + stack +
@@ -141,7 +173,7 @@ export async function node(i, o = {}) {
     (facts.length ? `<dl class="facts">${facts.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${b}</dd>`).join("")}</dl>` : "") +
     (M.D[i] ? `<div class="stat"><b>${esc(num(M.D[i]))}</b><span>${esc(t("referring"))}</span></div>` : "");
   const hasArts = M.PK[i] >= 0;
-  open(head + later("d-years") + (hasArts ? later("d-arts") : "") + later("d-basis") + later("d-down") + later("d-co") + later("d-legis") +
+  open(head + later("d-years") + (hasArts ? later("d-arts") : "") + later("d-basis") + later("d-imp") + later("d-down") + later("d-co") + later("d-legis") +
     (hasArts ? later("d-dec") : "") + later("d-ing"), o);
   // decisions per year
   loadYears().then((y) => fill("d-years", y[i] ? section(t("perYear"), yearsChart(y[i][0], y[i][1])) : "", my)).catch(() => fill("d-years", "", my));
@@ -165,6 +197,7 @@ export async function node(i, o = {}) {
   const L = await loadLinks().catch(() => null);
   if (my !== token) return;
   if (L) {
+    fill("d-imp", M.K[i] === KIND.x ? "" : impactHTML(i, dependents(L, i), null), my);
     const down = (L.down.get(i) || []).slice().sort((p, q) => M.D[q.j] - M.D[p.j] || p.j - q.j);
     fill("d-down", section(t("restingOn"), rowsHTML(down, (x) => actRow(x.j, x.arts && x.arts.length ? fmtArts(x.arts, i) : null)), down.length), my);
     const co = (L.co.get(i) || []).slice().sort((p, q) => q.n * Math.log(q.lift) - p.n * Math.log(p.lift));
@@ -172,7 +205,7 @@ export async function node(i, o = {}) {
     const out = (L.out.get(i) || []).slice().sort((p, q) => q.n - p.n), inn = (L.inn.get(i) || []).slice().sort((p, q) => q.n - p.n);
     fill("d-legis", (out.length ? section(t("refersTo"), rowsHTML(out, (x) => actRow(x.j, t("provisions", num(x.n))), 6), out.length) : "") +
       (inn.length ? section(t("referredBy"), rowsHTML(inn, (x) => actRow(x.j, t("provisions", num(x.n))), 6), inn.length) : ""), my);
-  } else { fill("d-down", "", my); fill("d-co", "", my); fill("d-legis", "", my); }
+  } else { fill("d-imp", "", my); fill("d-down", "", my); fill("d-co", "", my); fill("d-legis", "", my); }
   // Ingress and the bases it states, with the clause verbatim
   if (k !== KIND.a) { fill("d-basis", "", my); fill("d-ing", "", my); return; }
   loadLaw(i).then((law) => {
@@ -187,12 +220,12 @@ export async function node(i, o = {}) {
     const bs = bases.slice().sort((p, q) => q[4] - p[4]);
     const basisRow = (b) => {
       const [j, arts, clause, via, prim] = b;
-      const note = via === "old" ? t("viaOld") : via === "note" ? t("viaNote") : via === "aBV→BV" ? t("viaABV") : "";
+      const note = via === "old" ? t("viaOld") : via === "note" ? t("viaNote") : via === "aBV→BV" ? t("viaABV") : via === "kvold" ? t("viaKvOld") : "";
       if (j >= 0) {
         return `<a class="r wrap" href="${linkTo(j)}"><span class="a">${sw(M.cls[j] >= 0 ? M.cls[j] : 6)}${esc(labelCt(j))}${prim ? "" : ""}</span>` +
           `<span class="v">${esc(fmtArts(arts, j))}</span><span class="b">${esc(clause || title(j))}${note ? ` · ${esc(note)}` : ""}${prim && bs.length > 1 ? ` · ${esc(t("primary"))}` : ""}</span></a>`;
       }
-      const why = { absent: t("viaAbsent"), earlier: t("viaEarlier"), fedany: t("basisFederal"), other: t("basisOther"), unresolved: t("basisUnknown") }[via] || t("basisUnknown");
+      const why = { absent: t("viaAbsent"), earlier: t("viaEarlier"), hist: t("viaEarlier"), fedany: t("basisFederal"), other: t("basisOther"), unresolved: t("basisUnknown") }[via] || t("basisUnknown");
       return `<div class="r wrap"><span class="a" style="color:var(--ink-2)">${esc(why)}</span><span class="b">${esc(clause)}</span></div>`;
     };
     fill("d-basis", section(t("restsOn"), bs.length ? rowsHTML(bs, basisRow, 8) : `<p class="note">${esc(ing ? t("noBasis") : t("noIngress"))}</p>`), my);
@@ -222,8 +255,14 @@ export async function article(oa, aid, o = {}) {
     (path.length ? `<p class="path">${path.map((p) => `<span>${esc(p)}</span>`).join("")}</p>` : "") +
     (u ? `<a class="src" href="${esc(u)}#${esc(eid)}" target="_blank" rel="noopener">${esc(t("fedlex"))} ${ICON.ext}</a>` : "") +
     `<div class="stat"><b>${esc(num(nd))}</b><span>${esc(t("referring"))}</span></div>`;
-  open(head + section(t("perYear"), yearsChart(y0, ys)) + later("a-dec") + later("a-co"), o);
+  open(head + section(t("perYear"), yearsChart(y0, ys)) + later("a-imp") + later("a-dec") + later("a-co"), o);
   wireCharts(el());
+  loadLinks().then((L) => {                                   // acts naming this article as their basis, and what rests on them
+    const dep = dependents(L, i, normArt(eid));
+    const named = (L.down.get(i) || []).filter((x) => M.K[x.j] === KIND.a && (x.arts || []).some((z) => normArt(z) === normArt(eid)));
+    fill("a-imp", impactHTML(i, dep, true) + (named.length ? section(t("restingOn"), rowsHTML(named.sort((p, q) => M.D[q.j] - M.D[p.j] || p.j - q.j),
+      (x) => actRow(x.j, null)), named.length) : ""), my);
+  }).catch(() => fill("a-imp", "", my));
   const sh = await getJSON(`data/art/${M.PK[i]}.json`).catch(() => null);
   if (my !== token) return;
   fill("a-dec", sh ? section(t("topDec"), decRows(top, sh.dec)) : "", my);
