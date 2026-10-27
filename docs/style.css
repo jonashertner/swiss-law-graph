@@ -266,15 +266,45 @@ details.more[open] > summary::before { content: "− "; }
 .nhint {
   position: absolute; left: 10px; top: 8px; z-index: 2; margin: 0; pointer-events: none; max-width: calc(100% - 20px);
   font-size: var(--t-s); color: var(--ink-2); background: rgba(255,255,255,.92); border: 1px solid var(--rule);
-  padding: 6px 10px; border-radius: 6px; animation: nhint .5s ease-out both; max-width: min(300px, calc(100% - 20px)); line-height: 1.4;
+  padding: 6px 10px; border-radius: 6px; animation: nhint .5s ease-out; max-width: min(300px, calc(100% - 20px)); line-height: 1.4;
 }
 @keyframes nhint { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.nhint.gone { opacity: 0; transition: opacity .6s ease; }
 @media (prefers-reduced-motion: reduce) { .nhint { animation: none; } }
 #nmini {
   position: absolute; inset: auto auto 10px 10px; width: 112px; height: 112px; z-index: 2; cursor: pointer;
   background: rgba(255,255,255,.94); border-radius: 8px; box-shadow: 0 0 0 1px var(--rule), 0 2px 8px rgba(14,17,22,.08);
 }
 .tip .t4 { display: block; margin-top: 5px; color: #fff; }
+.chip.past { border-style: dashed; }
+.chip.past .num { font-family: var(--sans); }
+
+/* ---------- the time view (decision 31) */
+.tbtn {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 15px; flex: none;
+  border: 1px solid var(--rule-2); font-size: var(--t-s); font-weight: 560; color: var(--ink-2); background: var(--paper);
+}
+.tbtn:hover { color: var(--ink); border-color: var(--ink); }
+.tbtn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.mapbar .tbtn { margin-left: auto; }
+.timebar {
+  flex: none; padding: 8px max(20px, env(safe-area-inset-right, 0px)) 6px max(20px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--rule); background: var(--paper);
+}
+.timebar .trow { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.timebar .tplay {
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: var(--ink); color: #fff;
+}
+.timebar .tplay:hover { background: var(--accent); }
+.timebar .tyear { font: 600 28px/1 var(--mono); letter-spacing: -.02em; width: 3.1em; flex: none; color: var(--ink); }
+.timebar .ttrack { position: relative; flex: 1 1 auto; min-width: 120px; height: 62px; cursor: ew-resize; touch-action: none; border-radius: 4px; }
+.timebar .ttrack:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.timebar .ttrack canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.timebar .tstat { flex: none; width: 15em; font: 500 var(--t-s)/1.35 var(--mono); color: var(--ink-2); }
+.timebar .tclose { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; color: var(--ink-2); flex: none; }
+.timebar .tclose:hover { background: var(--wash); color: var(--ink); }
+.timebar .tnote { margin: 4px 0 0; font-size: var(--t-xs); line-height: 1.4; color: var(--ink-3); max-width: 110ch; }
 .tip .t4::before { content: "→ "; color: #9aa0a8; }
 #nfoot .it.num { margin-left: auto; color: var(--ink-3); font-size: var(--t-xs); }
 
@@ -424,6 +454,18 @@ details.more[open] > summary::before { content: "− "; }
   .ntitle .crumbs { font-size: var(--t-m); }
   .ntitle .crumbs .upbtn { margin-right: 4px; }
   #nmini { width: 84px; height: 84px; inset: auto auto 6px 6px; }
+  .tbtn span { display: none; }
+  #v-net .vhead { position: relative; }
+  #v-net .vhead .tbtn { position: absolute; right: 8px; top: 6px; }
+  #v-net .vhead .ntitle { padding-right: 46px; }
+  .tbtn { padding: 0 9px; }
+  .timebar { padding: 6px 8px 4px; }
+  .timebar .trow { flex-wrap: wrap; gap: 6px 10px; }
+  .timebar .tyear { font-size: 22px; width: auto; }
+  .timebar .tstat { order: 3; width: auto; flex: 1 1 auto; font-size: var(--t-xs); }
+  .timebar .ttrack { order: 4; flex: 1 1 100%; height: 52px; }
+  .timebar .tclose { order: 2; margin-left: auto; }
+  .timebar .tnote { font-size: 10.5px; margin-top: 2px; }
   .nhint { font-size: var(--t-xs); left: 6px; right: 6px; top: 6px; max-width: none; text-align: center; }
   .hkey, .hfoot { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; scrollbar-width: none; font-size: var(--t-xs); }
   .hkey::-webkit-scrollbar, .hfoot::-webkit-scrollbar { display: none; }

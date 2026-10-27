@@ -374,6 +374,69 @@ def main():
             ys[str(k)] = [cn["y0"], cn["ys"]]
     json.dump(ys, open(OUT / "years.json", "w"), separators=(",", ":"))
 
+    # ---- the time view (decision 31): the year each act appears (and an earlier act goes), the year each
+    # co-citation pair reaches the 20 shared decisions it is drawn from, and decisions per year
+    import duckdb
+    fd_path = ROOT / "data/fedlex_dates.json"
+    fdates = json.load(open(fd_path)) if fd_path.exists() else {}
+    year = lambda s: int(s[:4]) if s and str(s)[:4].isdigit() else 0
+    born, died, how = [0] * len(out_nodes), {}, Counter()
+    for k, n in enumerate(out_nodes):
+        kind, s = n["k"], n.get("s") or ""
+        if kind not in ("a", "o", "x"):
+            continue
+        if kind == "x" or s.endswith("@a"):           # codes not in the collection, editions: from their first citation
+            y = ys.get(str(k))
+            born[k] = y[0] if y else 0
+            how["first cited"] += 1
+        elif kind == "o":                              # an earlier federal act: while it was in force
+            base, at = s.split("@")
+            fv = next((v for v in fedacts.get(base, []) if (v.get("date") or "")[:4] == at), None)
+            if fv:
+                born[k] = year(fv.get("in_force") or fv.get("date"))
+                if year(fv.get("repealed")):
+                    died[k] = year(fv.get("repealed"))
+            how["earlier, in force" if fv else "earlier, undated"] += 1
+        elif s.startswith("0.") and not n.get("ct"):   # a treaty: in force for Switzerland
+            path = (n.get("u") or "").split("/eli/")[-1]
+            recs = fdates.get(s, [])
+            r = next((v for v in recs if v["eli"].split("/eli/")[-1] == path), None) or \
+                next((v for v in reversed(recs) if not v.get("repealed")), None)
+            born[k] = year((r or {}).get("in_force")) or year((r or {}).get("date")) or year(n.get("ad"))
+            how["treaty in force" if r and r.get("in_force") else "treaty adopted" if born[k] else "treaty undated"] += 1
+        else:                                          # federal and cantonal acts: adopted
+            born[k] = year(n.get("ad"))
+            how["adopted" if born[k] else "undated"] += 1
+    ey = json.load(open(SRC / "ey.json"))
+    assert len(ey) == len(core["edges"])
+    cy = []
+    for e, (a, b, _, _) in zip(ey, core["edges"]):    # aligned with links.cocite
+        if c2a.get(a, -1) < 0 or c2a.get(b, -1) < 0:
+            continue
+        y, cum = 0, 0
+        for j, v in enumerate((e or [0, []])[1]):
+            cum += v
+            if cum >= 20:
+                y = e[0] + j
+                break
+        cy.append(y)
+    con = duckdb.connect()
+    dec = con.sql(f"""select year(m.dt) y, count(distinct r.decision_id) filter (where m.canton in ('CH', 'CE')) f,
+                        count(distinct r.decision_id) filter (where m.canton not in ('CH', 'CE')) k
+                      from '{ROOT}/build/refs_valid.parquet' r join '{ROOT}/build/meta.parquet' m using (decision_id)
+                      where m.dt is not null group by 1 order by 1""").fetchall()
+    undated = con.sql(f"""select count(distinct decision_id) from '{ROOT}/build/refs_valid.parquet' r
+                          join '{ROOT}/build/meta.parquet' m using (decision_id) where m.dt is null""").fetchall()[0][0]
+    y1 = int((tree["method"].get("run_date") or "2026")[:4])
+    dy = {r[0]: r[1:] for r in dec}
+    d0 = min(dy)
+    json.dump({"y0": 1848, "y1": y1, "born": born, "died": died, "cy": cy,
+               "dec": {"y0": d0, "fed": [dy.get(y, (0, 0))[0] for y in range(d0, y1 + 1)],
+                       "kt": [dy.get(y, (0, 0))[1] for y in range(d0, y1 + 1)], "undated": undated},
+               "how": dict(how)}, open(OUT / "time.json", "w"), separators=(",", ":"))
+    print("time:", dict(how), f"{sum(1 for y in cy if y)} of {len(cy)} pairs reach 20 with dated decisions;",
+          f"{sum(r[1] + r[2] for r in dec)} dated decisions, {undated} undated")
+
     # ---- Ingress, issuer, bases with clauses: federal in one file, cantonal per canton
     (OUT / "law").mkdir(exist_ok=True)
     ing_f = json.load(open(SRC / "ingress.json"))

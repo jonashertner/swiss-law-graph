@@ -61,14 +61,16 @@ python3 pipeline/05_site.py                         # 40 s -> site/data (44 MB, 
 python3 pipeline/cantonal_basis.py                  # 10 s, offline: data/cantonal_basis.json
 python3 pipeline/07_tree.py                         # site/data/tree.json + ingress(_k).json + agg.json (Stufenbau, Aufbau)
 python3 pipeline/06_artifact.py                     # site/artifact.html for claude.ai preview (the 3D page)
-python3 pipeline/08_web.py                          # 8 s -> docs/data (67 MB, committed): the public site
+python3 pipeline/08_web.py                          # 20 s -> docs/data (68 MB, committed): the public site (reads build/*.parquet too)
 node layout/net.mjs                                 # 40 s -> docs/data/net.json (network layout, decision 29)
 python3 -m http.server -d docs 8766                 # the public site: http://localhost:8766
 python3 -m http.server -d site 8765                 # local view: http://localhost:8765
 ```
 Fedlex fetchers (only when refreshing data): `fetch_fedlex_acts.py`, `fetch_fedlex_articles.py`,
 `fetch_fedlex_structure.py` (`--missing` adds new acts only), then step 1, then `fetch_fedlex_regimes.py`;
-`fetch_fedlex_xrefs.py` and `fetch_fedlex_basis.py` for the two legislative layers.
+`fetch_fedlex_xrefs.py` and `fetch_fedlex_basis.py` for the two legislative layers; `fetch_fedlex_dates.py` (~25 min,
+after 08 has written atlas.json; then 08 again) for the time view: adoption, entry into force and repeal of every
+federal act and treaty on the site (`data/fedlex_dates.json`, 5,111 SR numbers).
 Cantonal collections (only when refreshing): `python3 pipeline/cantonal/lexwork.py` (~15 min), `zh.py`
 (~15 min), `vd.py` (~30 min), `ge.py`, `ne.py`, `ju.py`, `ti.py`, `sz.py` (minutes each), then `cantonal_basis.py`.
 Preview (private): the public site (decision 28) at https://claude.ai/artifact/XBRDshccV9KQwnf8qdaqo9 and,
@@ -420,6 +422,27 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     way, Enter opens. A hint per step until the visitor has done it once (`slm-net-learnt`), an overview map in
     the corner once the view is closer than 1.8× the whole. Found on the way: while dragging, the cached picture
     moved against the hand until it was redrawn (sign of the pan term in the blit).
+31. Time view "Zeit" (2026-10-27, Jonas: "a historical development view for Karte, Netz and Abhängigkeiten so we can
+    understand how this evolved over time"; `docs/js/time.js`, data `docs/data/time.json` from 08). One year for the
+    three views, in the hash (`#de/net@1975`; internal links keep it). When an act exists: a federal or cantonal act
+    from its year of adoption (18,389; 8 undated → only the last year); a treaty from its entry into force for
+    Switzerland (Fedlex, all 3,098; EMRK 1974, not 1950); an earlier federal act courts cite while it was in force
+    (293; BV 1874 1874 to end 1999, OG 1945 to end 2006; 9 undated); a cited code no collection holds from its first
+    citation (2,726); before 1848 → 1848. Bases: both acts exist (as today's Ingress names them — it may have been
+    amended; RPG names today's BV, so in 1985 it has no chain). Co-citation pair: from the year of its 20th shared
+    dated decision (7,283 of 7,396; 113 only in the last year). Legislation: today's text only (chip "nur heutiger
+    Stand"). Decisions by date: 966,313 dated, 13,413 undated; series from 1895, federal + European courts
+    (canton CH/CE) and cantonal courts. The bar under the view is the history: today's acts existing per year, stacked
+    by level, and decisions per year below (no shared axis); drag, ←/→ (±1), PageUp/Down (±10), Home/End, play at 13
+    years/s (from 1848); the note under it states both limits (survivorship; the rise since 2000 is mostly courts
+    publishing more). Map: today's layout kept, an act not yet there is an empty plot (labels faint); with
+    "Entscheide" a plot fills by the share of its decisions handed down; groups too small to subdivide by their
+    share; tooltip "seit 1979" / "erst 2003". Network: an act not yet there a 1 px trace; sizes by decisions so far;
+    the chain stops at an act not yet there. Matrix: the basis layer recounted from `pairs.json` (an act counts once
+    in a cell when it and its basis exist), today's colour scale kept so cells darken over time; provisions and case
+    law today only; the rank shares hidden. 60 fps in headless Chromium while playing (map, matrix; network p95
+    33 ms after 1995). Uncomfortable truths, said on the page: earlier periods look emptier than they were (repealed
+    law is missing except the 305 earlier federal acts), and the growth of case law is largely publication.
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -491,6 +514,8 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - [x] Step 12′ network navigation (decision 30): routes per step, van Wijk flights, previews after a dwell, growth,
       chain as breadcrumb, moving points, brushing from panel and crumbs, keyboard, overview map; walk-throughs
       in headless Chromium at 1440×900 (DE, IT) and 390×844 (FR), no console errors.
+- [x] Step 13 time view (decision 31): `pipeline/fetch_fedlex_dates.py`, `08_web.py` → `docs/data/time.json` (0.16 MB);
+      `docs/js/time.js` (state, bar, chart) with hooks in treemap.js, net.js, matrix.js, app.js (hash `@year`).
 
 ## Reports
 - `reports/opencaselaw-anomalies.md` — anomalies in OpenCaseLaw for Jonas to fix there (duplicates,
@@ -501,6 +526,9 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - Jonas: make the repository public (Settings → General → Danger Zone) and enable Pages (Settings → Pages →
   Deploy from a branch → this branch or main after merging, folder `/docs`). Pages on a private repository
   needs a paid plan and publishes the site publicly anyway.
+- Time view: the law of the past itself (repealed acts) is known only for the 305 earlier federal acts courts cite.
+  A full federal history needs every consolidation abstract ever in the SR (Fedlex SPARQL, ~20k acts, SR since
+  1970; earlier only via the AS/BS) placed by SR number; cantonal history is not published as data.
 - Network: the angle inside a ring is a force-layout position (designed); a measured alternative would be
   community detection (Leiden) per canton with communities as sectors. Treaties are a dense legislative
   cluster of their own (3,304 pairs) with few links to the rest; a "law in force only" filter and a time

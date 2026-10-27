@@ -5,8 +5,10 @@ import { t, cantonName, lang } from "./i18n.js";
 import { M, loadHier, getJSON, loadLinks, idOf, labelCt, title } from "./data.js";
 import { $, esc, num, sw, href } from "./util.js";
 import { nameOf, rowName, ensure } from "./hierarchy.js";
+import * as TV from "./time.js";
 
 let H = null, G = null, ctx = {}, layer = "basis", scope = "all", hotCell = null, selCell = null, idx = null, dpr = 1;
+let BY = null;                       // in the time view: acts per basis cell in the year shown (decision 31)
 const MIN_DEC = 20;
 const RAMP = ["#eaf1fa", "#cfe0f3", "#9cc0e8", "#5d8fd0", "#1f5fae", "#0b2a4a"];
 
@@ -41,9 +43,22 @@ function order(sc) {
   return { rows: [...FR, ...C], cols: [...F, ...C] };
 }
 const colOf = (c, a) => (typeof c === "number" ? c : H.blocks.findIndex((b) => b.r === c.own && b.k === H.blocks[a].k));
+// the year shown: an act counts in a cell once it and the basis it names exist
+async function timeCells() {
+  if (!TV.TIME.on) { BY = null; return; }
+  const pairs = await getJSON("data/pairs.json"), y = TV.TIME.year, m = new Map(), seen = new Set();
+  for (const [ra, rb, i, j] of pairs) {
+    if (i < 0 || !TV.exists(i, y) || (j >= 0 && !TV.exists(j, y))) continue;
+    const key = ra * 1024 + rb, u = key * 32768 + i;
+    if (seen.has(u)) continue;
+    seen.add(u); m.set(key, (m.get(key) || 0) + 1);
+  }
+  BY = m;
+}
 function value(a, b) {
   if (a < 0 || b < 0) return null;
   const m = index();
+  if (layer === "basis" && BY) { const v = BY.get(a * 1024 + b); return v ? { v, n: v, np: null } : null; }
   if (layer === "basis") { const v = m.basis.get(a * 1024 + b); return v ? { v: v[0], n: v[0], np: v[1] } : null; }
   if (layer === "law") { const v = m.law.get(a * 1024 + b); return v ? { v: v[0], n: v[0], p: v[1] } : null; }
   if (a === b) return null;
@@ -95,6 +110,11 @@ function render() {
   const { rows, cols, left, top, cw, ch } = G;
   c.clearRect(0, 0, G.VW, G.VH);
   let vmax = 1;
+  if (BY && layer === "basis") {                       // the time view keeps today's scale: cells darken as the years pass
+    const keep = BY; BY = null;
+    for (const r of rows) for (const cc of cols) { const v = value(r.x, colOf(cc.x, r.x)); if (v && v.v > vmax) vmax = v.v; }
+    BY = keep;
+  }
   const val = rows.map((r) => cols.map((cc) => { const v = value(r.x, colOf(cc.x, r.x)); if (v && v.v > vmax) vmax = v.v; return v; }));
   if (layer === "court") {
     const ls = val.flat().filter((v) => v && v.v).map((v) => v.v).sort((a, b) => a - b);
@@ -183,7 +203,8 @@ function foot() {
   const grad = `linear-gradient(90deg,${RAMP.join(",")})`;
   let html = `<span class="mramp"><span>${esc(unit)}</span><span class="num">${layer === "court" ? "1" : "1"}</span><i style="background:${grad}"></i><span class="num">${esc((G.capped ? "≥ " : "") + num(Math.round(G.vmax)))}</span></span>` +
     `<span class="mkey"><span><i class="sw" style="background:var(--wash-2)"></i>${esc(t("mSame"))}</span></span>`;
-  if (layer === "basis" && H.rank) {
+  if (TV.TIME.on && layer !== "basis") html += `<span class="mkey"><span>${esc(t("timeToday"))}</span></span>`;
+  if (layer === "basis" && H.rank && !TV.TIME.on) {
     const r = H.rank, tot = r.higher + r.same + r.lower, pc = (x) => (100 * x) / tot;
     html += `<span class="mkey"><span class="mshare" aria-hidden="true"><i style="flex:${r.higher};background:var(--c1)"></i><i style="flex:${r.same};background:var(--c2)"></i><i style="flex:${Math.max(r.lower, tot / 400)};background:var(--accent)"></i></span>` +
       `<span>${esc(t("mHigher"))} ${Math.round(pc(r.higher))} %</span><span>${esc(t("mSame"))} ${Math.round(pc(r.same))} %</span>` +
@@ -214,7 +235,7 @@ const fx = (v) => v.toFixed(1).replace(".", lang() === "en" ? "." : ",");
 function tipHtml([i, j]) {
   const a = G.rows[i].x, b = colOf(G.cols[j].x, a), v = G.val[i][j];
   let s;
-  if (layer === "basis") s = v ? t("mBasisCell", t("nActs", num(v.n)), num(v.np)) : t("mNone");
+  if (layer === "basis") s = v ? (v.np == null ? t("mBasisCellY", t("nActs", num(v.n))) : t("mBasisCell", t("nActs", num(v.n)), num(v.np))) : t("mNone");
   else if (layer === "law") s = v ? t("mLawCell", num(v.n), num(v.p)) : t("mNone");
   else s = a === b ? t("mDiag") : !v ? t("mNone") : v.n < MIN_DEC || v.l <= 1 ? `${t("mFew")} (${num(v.n)})` : t("mCourtCell", num(v.n), fx(v.l));
   const rel = floorOf(b) < floorOf(a) ? t("mHigher") : floorOf(b) === floorOf(a) ? t("mSame") : t("mLower");
@@ -233,9 +254,13 @@ async function cellPanel(a, b) {
   if (layer === "basis") {
     const pairs = await getJSON("data/pairs.json");
     const by = new Map();
-    for (const [ra, rb, i, j, art] of pairs) if (ra === a && rb === b && i >= 0) { if (!by.has(i)) by.set(i, []); by.get(i).push([j, art]); }
+    for (const [ra, rb, i, j, art] of pairs) {
+      if (ra !== a || rb !== b || i < 0 || !TV.exists(i) || (j >= 0 && !TV.exists(j))) continue;
+      if (!by.has(i)) by.set(i, []);
+      by.get(i).push([j, art]);
+    }
     const items = [...by.entries()].sort((p, q) => M.D[q[0]] - M.D[p[0]] || p[0] - q[0]);
-    html = `<div class="stat"><b>${esc(num(items.length))}</b><span>${esc(t("acts"))}</span></div><p class="note">${esc(v ? t("mBasisCell", t("nActs", num(v.n)), num(v.np)) : t("mNone"))}</p>` +
+    html = `<div class="stat"><b>${esc(num(items.length))}</b><span>${esc(t("acts"))}</span></div><p class="note">${esc(v ? (v.np == null ? t("mBasisCellY", t("nActs", num(v.n))) : t("mBasisCell", t("nActs", num(v.n)), num(v.np))) : t("mNone"))}</p>` +
       sec(t("restsOn"), rows(items, ([i, js]) => actA(i, "", "→ " + js.map(([j, art]) => (art ? `${M.CT[j] && M.meta.ksym[M.CT[j]] === "§" ? "§" : t("art")} ${art} ` : "") + (j >= 0 ? labelCt(j) : "?")).join("; "))));
   } else {
     const L = await loadLinks(), m = index(), pairs = [];
@@ -343,6 +368,11 @@ export async function init(c) {
     }
   });
   new ResizeObserver(() => { if (!$("v-matrix").hidden) render(); }).observe($("mscroll"));
+  TV.subscribe(async () => {
+    if ($("v-matrix").hidden) return;
+    await timeCells(); render();
+    if (!selCell && !TV.playing()) sidePanel();
+  });
 }
-export async function show() { controls(); render(); if (!selCell) sidePanel(); }
+export async function show() { controls(); await timeCells(); render(); if (!selCell) sidePanel(); }
 export function refresh() { if (!$("v-matrix").hidden) { idx = null; show(); } }

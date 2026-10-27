@@ -17,6 +17,7 @@ const H1 = 26, H2 = 20;             // header bands of groups at depth 1 and bel
 let cb = {};                        // callbacks: select(id), focus(id), hover(id)
 let COL = {}, HEAT = [];
 let hatch = null;
+let TSH = null;                     // the time view: per node the share of it that exists in the year shown (decision 31)
 
 // ---------- the tree the map walks: atlas nodes are numbers, divisions "L<k>", articles "A<j>"
 const isStr = (id) => typeof id === "string";
@@ -238,15 +239,22 @@ function drawFill(it, r, alpha) {
   const x0 = snap(r.x), y0 = snap(r.y), x1 = snap(r.x + r.w), y1 = snap(r.y + r.h);
   const w = x1 - x0, h = y1 - y0;
   if (w <= 0 || h <= 0 || !(it.leaf || it.small)) return;
-  const id = it.id, g = w > 3 && h > 3 ? 1 : 0;
+  const id = it.id, g = w > 3 && h > 3 ? 1 : 0, s = shareOf(id);
   ctx.globalAlpha = alpha * (hiCls >= 0 && !isStr(id) && (!it.leaf || clsOf(id) !== hiCls) ? 0.16 : 1);
+  if (s === 0) {                                     // not yet there: an empty plot of its size
+    ctx.fillStyle = COL.wash; ctx.fillRect(x0, y0, Math.max(0.5, w - g), Math.max(0.5, h - g));
+    return;
+  }
+  ctx.globalAlpha *= it.leaf ? (mode === "dec" ? 0.25 + 0.75 * s : 1) : 0.18 + 0.82 * s;
   ctx.fillStyle = it.leaf ? fillOf(id) : groupFill(id);
   ctx.fillRect(x0, y0, Math.max(0.5, w - g), Math.max(0.5, h - g));
 }
+const shareOf = (id) => (!TSH ? 1 : isStr(id) ? (OA ? TSH[OA.i] : 1) : TSH[id]);
+export function setTime(share) { TSH = share; redraw(); }
 function drawLabel(it, alpha, r = it) {
   const x0 = snap(r.x), y0 = snap(r.y), x1 = snap(r.x + r.w), y1 = snap(r.y + r.h);
   const w = x1 - x0, h = y1 - y0;
-  ctx.globalAlpha = alpha * (hiCls >= 0 && it.leaf && !isStr(it.id) && clsOf(it.id) !== hiCls ? 0.25 : 1);
+  ctx.globalAlpha = alpha * (hiCls >= 0 && it.leaf && !isStr(it.id) && clsOf(it.id) !== hiCls ? 0.25 : 1) * (it.leaf && shareOf(it.id) === 0 ? 0.4 : 1);
   if (it.leaf) { if (it.lab) drawLeafLabel(it, x0, y0, w - 1, h - 1); return; }
   if (!it.hdr) return;
   const big = it.d === 1, f = font(big ? 620 : 600, big ? 13 : 11.5);
@@ -266,7 +274,7 @@ function drawLeafLabel(it, x, y, w, h) {
 }
 function drawLeafText(it, x, y, w, h, px, tp, lab, sub, f, room) {
   const id = it.id;
-  ctx.fillStyle = inkOf(id); ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = shareOf(id) === 0 ? COL.ink3 : inkOf(id); ctx.textBaseline = "alphabetic";
   let used = 0;
   if (textW(lab, f) <= room) {
     ctx.font = f; ctx.fillText(lab, x + 5, y + px + 3); used = px + 3;

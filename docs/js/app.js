@@ -6,6 +6,7 @@ import * as TM from "./treemap.js";
 import * as DOS from "./dossier.js";
 import { initSearch, refreshSearch } from "./search.js";
 import * as NET from "./net.js";
+import * as TV from "./time.js";
 import { $, esc, num, sw, href, ICON, store } from "./util.js";
 
 const wide = matchMedia("(min-width: 1181px)"), phone = matchMedia("(max-width: 720px)");
@@ -42,6 +43,7 @@ function staticText() {
   $("tm").setAttribute("aria-label", t("mapLabel"));
   $("loadtxt").textContent = t("loading");
   renderMode();
+  TV.texts();
 }
 async function switchLang(lg) {
   if (lg === lang()) return;
@@ -58,9 +60,11 @@ function parseHash() {
   let h = decodeURIComponent(location.hash.slice(1));
   const old = /^SR_(.+?)(?:--(.+))?$/.exec(h);              // links of the previous map: #SR_220--art_41
   if (old) return { lang: lang(), rest: old[1] + (old[2] ? ":" + old[2] : "") };
-  const parts = h.split("/");
-  if (LANGS.includes(parts[0])) return { lang: parts[0], rest: parts.slice(1).join("/") };
-  return { lang: lang(), rest: h };
+  const ym = /@(\d{4})$/.exec(h);                            // the year of the time view: #de/net@1975
+  if (ym) h = h.slice(0, -ym[0].length);
+  const year = ym ? +ym[1] : null, parts = h.split("/");
+  if (LANGS.includes(parts[0])) return { lang: parts[0], rest: parts.slice(1).join("/"), year };
+  return { lang: lang(), rest: h, year };
 }
 function go(target, replace = false) {
   const h = href(target);
@@ -69,13 +73,16 @@ function go(target, replace = false) {
   route();
 }
 async function route() {
-  const { lang: lg, rest } = parseHash();
+  const { lang: lg, rest, year } = parseHash();
   if (lg !== lang()) await switchLang(lg);
+  if (year && (!TV.TIME.on || TV.TIME.year !== year)) await TV.enter(year);
   const view = rest === "net" || rest.startsWith("net/") ? "net" : rest === "hierarchy" || rest.startsWith("hierarchy/") ? "hier" :
     rest === "matrix" || rest.startsWith("matrix/") ? "matrix" : rest === "method" ? "method" : "map";
   showView(view);
-  if (view === "map") { S.target = rest; await showMap(rest); }
+  TV.mount(["map", "net", "matrix"].includes(view) ? view : null);
+  if (view === "map") { S.target = rest; TM.setTime(mapShare()); await showMap(rest); }
   else await showOther(view, rest);
+  syncHash();
   for (const a of $("views").querySelectorAll("a")) {
     if (a.dataset.view === view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     if (a.dataset.view === "map") a.href = href(mapTarget());
@@ -214,8 +221,9 @@ function tipHtml(id) {
     const oa = TM.openActState(), n = oa.n.get(id) || 0;
     meta = id[0] === "A" ? `${esc(t("nDec", num(n)))}${oa.arts[+id.slice(1)][4] ? " · " + esc(t("repealed")) : ""}` : esc(t("nArts", num(oa.va.get(id) || 0)));
   } else if (isAct(id)) {
-    const c = M.cls[id];
-    meta = `<i style="background:var(--c${c})"></i>${esc(t(c === 6 ? "levelUnknown" : "c" + c))} · ${esc(t("nDec", num(M.D[id])))}`;
+    const c = M.cls[id], b = TV.TIME.on ? TV.bornOf(id) : 0;
+    meta = `<i style="background:var(--c${c})"></i>${esc(t(c === 6 ? "levelUnknown" : "c" + c))} · ${esc(t("nDec", num(TV.decTo(id))))}` +
+      (b ? ` · ${esc(t(TV.exists(id) ? "timeSince" : "timeNotYet", b))}` : "");
   } else {
     meta = esc(t("nActsInForce", num(M.val.acts[id])));
     if (M.DD[id]) meta += " · " + esc(t("nDec", num(M.DD[id])));
@@ -238,6 +246,32 @@ function onHover(id, e, it) {
   tip.style.left = Math.max(8, tx) + "px"; tip.style.top = Math.max(8, ty) + "px";
 }
 
+// ---------- the time view (decision 31): on the map, an act not yet there is an empty plot of its size; with
+// "decisions" as area, a tile fills as its case law accrues. The year rides on the hash (#de/net@1975).
+function mapShare() {
+  if (!TV.TIME.on) return null;
+  const n = M.n, mode = TM.getMode(), y = TV.TIME.year, a = new Float32Array(n), tot = new Float32Array(n), sh = new Float32Array(n).fill(1);
+  for (let i = n - 1; i >= 1; i--) {                  // children follow their parent: sum upwards from the end
+    if (isAct(i)) {
+      const v = M.val[mode][i];
+      // with decisions as area: an act that exists but has none yet is faint, not an empty plot
+      if (v > 0) { tot[i] = v; a[i] = TV.exists(i, y) ? (mode === "acts" ? v : Math.max(v * 0.001, Math.min(v, TV.decTo(i, y)))) : 0; }
+    }
+    tot[M.P[i]] += tot[i]; a[M.P[i]] += a[i];
+  }
+  for (let i = 0; i < n; i++) if (tot[i] > 0) sh[i] = a[i] / tot[i];
+  return sh;
+}
+function syncHash() {
+  const base = (location.hash || `#${lang()}/`).replace(/@\d{4}$/, ""), h = TV.TIME.on ? `${base}@${TV.TIME.year}` : base;
+  if (h !== location.hash) history.replaceState(null, "", h);
+}
+let hashT = 0;
+TV.subscribe(() => {
+  if (S.view === "map") TM.setTime(mapShare());
+  if (!hashT) hashT = setTimeout(() => { hashT = 0; syncHash(); }, 400);   // at most every 400 ms, also while playing
+});
+
 // ---------- boot
 async function boot() {
   setLang(pickLang());
@@ -253,9 +287,12 @@ async function boot() {
   });
   if (sm === "dec") TM.setMode("dec");
   if (document.fonts) document.fonts.load("600 12px Geist").then(() => TM.refreshLabels()).catch(() => {});
+  $("v-map").querySelector(".mapbar").appendChild(TV.toggle());
+  $("v-net").querySelector(".vhead").appendChild(TV.toggle());
+  $("v-matrix").querySelector(".vhead").appendChild(TV.toggle());
   $("mode").addEventListener("click", (e) => {
     const b = e.target.closest("[data-mode]"); if (!b) return;
-    TM.setMode(b.dataset.mode); store("atlas-mode", b.dataset.mode);
+    TM.setMode(b.dataset.mode); store("atlas-mode", b.dataset.mode); TM.setTime(mapShare());
     renderMode(); renderCrumbs(); setTimeout(renderLegend, 700);
   });
   $("legend").addEventListener("pointerover", (e) => { const b = e.target.closest("[data-cls]"); TM.highlightClass(b ? +b.dataset.cls : -1); });

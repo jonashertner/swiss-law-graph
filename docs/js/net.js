@@ -13,6 +13,7 @@ import { M, KIND, getJSON, idOf, label, labelCt, title } from "./data.js";
 import { $, esc, num, sw, href, ICON, store } from "./util.js";
 import { tileLabel } from "./treemap.js";
 import { fmtArts } from "./dossier.js";
+import * as TV from "./time.js";
 
 const LAYERS = ["bases", "legis", "cocite"];
 const EDGE = { bases: [58, 65, 80], legis: [213, 94, 0], cocite: [123, 63, 168] };
@@ -27,7 +28,8 @@ let ctx = {}, NET = null, ready = null;
 let cv, g, mini, mg, W = 0, H = 0, dpr = 1;
 // the network
 let n = 0, AT, X, Y, RW, CL, D, KC, order, grid, adj, deg, par, BVk = -1, CLU = [];
-const GS = 24, EP = {}, EI = {};
+const GS = 24, EP = {}, EI = {}, EO = {};
+let AL = null;                                           // the time view: 1 if the act exists in the year shown (decision 31)
 // the camera, and the pictures it moves while flying
 let view = { x: 0, y: 0, z: 1 }, fitZ = 1, mx = 90, my = 40, flight = null, aim = null;   // aim: what the camera frames, until the hand takes over
 let base0 = null, base0V = null, cache = null, cacheV = null, cacheTimer = 0, raf = 0, still = 0, wheelT = 0;
@@ -90,17 +92,17 @@ function build(net, links) {
   adj = Array.from({ length: n }, () => []);
   par = new Int32Array(n).fill(-1);
   LAYERS.forEach((L, li) => {
-    const P = [], I = [];
-    for (const e of links[L]) {
+    const P = [], I = [], O = [];
+    links[L].forEach((e, o) => {
       const a = idx.get(e[0]), b = idx.get(e[1]);
-      if (a == null || b == null || a === b) continue;
+      if (a == null || b == null || a === b) return;
       const j = P.length / 2;
-      P.push(a, b); I.push(L === "bases" ? e[3] || [] : e[2]);
+      P.push(a, b); I.push(L === "bases" ? e[3] || [] : e[2]); O.push(o);
       if (L === "bases" && e[2] && par[a] < 0) par[a] = b;          // the act's place in the Stufenbau
       adj[a].push(b, li, j); adj[b].push(a, li, j);
       if (KC[a] !== KC[b]) for (const [p, q] of [[a, b], [b, a]]) { const C = CLU[KC[p]]; C.out[li]++; C.to.set(KC[q], (C.to.get(KC[q]) || 0) + 1); }
-    }
-    EP[L] = Int32Array.from(P); EI[L] = I;
+    });
+    EP[L] = Int32Array.from(P); EI[L] = I; EO[L] = Int32Array.from(O);
   });
   deg = new Int32Array(n);
   for (let k = 0; k < n; k++) { const s = new Set(); for (let q = 0; q < adj[k].length; q += 3) s.add(adj[k][q]); deg[k] = s.size; }
@@ -114,10 +116,31 @@ function build(net, links) {
 // the chain of primary bases from the act up to the top; a cantonal constitution rests on Art. 51 BV
 function chainOf(k) {
   const out = [k];
-  for (let c = k, guard = 0; par[c] >= 0 && guard < 16; guard++) { c = par[c]; if (out.includes(c)) break; out.push(c); }
+  for (let c = k, guard = 0; par[c] >= 0 && guard < 16; guard++) { c = par[c]; if (out.includes(c) || !live(c)) break; out.push(c); }
   const top = out[out.length - 1];
-  if (CL[top] === 0 && M.CT[AT[top]] && BVk >= 0) out.push(BVk);
+  if (CL[top] === 0 && M.CT[AT[top]] && BVk >= 0 && live(BVk)) out.push(BVk);
   return out.reverse();                                    // top … k
+}
+
+// the year shown: which acts exist, how many decisions refer to them by then, which links are there
+const live = (k) => !AL || AL[k] === 1;
+function liveLink(li, j) {
+  if (!AL) return true;
+  const p = EP[LAYERS[li]];
+  if (!AL[p[2 * j]] || !AL[p[2 * j + 1]]) return false;
+  if (li === 1) return TV.TIME.year >= TV.TIME.y1;           // legislation: today's text only
+  if (li === 2) return TV.pairYear(EO.cocite[j]) <= TV.TIME.year;
+  return true;
+}
+function applyTime() {
+  const on = TV.TIME.on, y = TV.TIME.year;
+  AL = on ? new Uint8Array(n) : null;
+  for (let k = 0; k < n; k++) {
+    if (on) AL[k] = TV.exists(AT[k], y) ? 1 : 0;
+    D[k] = on ? TV.decTo(AT[k], y) : M.D[AT[k]];
+    RW[k] = 2.1 + Math.min(15, Math.sqrt(D[k]) * 0.05);
+  }
+  order = Int32Array.from([...Array(n).keys()].sort((a, b) => RW[a] - RW[b]));
 }
 
 // ---------- geometry
@@ -183,13 +206,13 @@ function drawBase(c, v) {
   const a = Math.min(0.4, 0.1 * Math.pow(zoom, 0.45)), lw = Math.min(1.2, 0.6 + 0.08 * zoom);
   for (const L of LAYERS) {
     if (!on[L]) continue;
-    const p = EP[L], [r, gg, b] = EDGE[L];
+    const p = EP[L], [r, gg, b] = EDGE[L], li = LAYERS.indexOf(L);
     for (const inter of [false, true]) {
       c.strokeStyle = `rgba(${r},${gg},${b},${inter ? a : a * 0.7})`; c.lineWidth = lw;
       c.beginPath();
       for (let j = 0; j < p.length; j += 2) {
         const u = p[j], w = p[j + 1];
-        if ((KC[u] !== KC[w]) !== inter) continue;
+        if ((KC[u] !== KC[w]) !== inter || (AL && !liveLink(li, j / 2))) continue;
         const x1 = X0(X[u]), y1 = Y0(Y[u]), x2 = X0(X[w]), y2 = Y0(Y[w]);
         if ((x1 < -40 && x2 < -40) || (x1 > W + 40 && x2 > W + 40) || (y1 < -40 && y2 < -40) || (y1 > H + 40 && y2 > H + 40)) continue;
         if (inter) { curve(u, w, SC); c.moveTo(x1, y1); c.bezierCurveTo(X0(SC[2]), Y0(SC[3]), X0(SC[4]), Y0(SC[5]), x2, y2); }
@@ -202,6 +225,10 @@ function drawBase(c, v) {
   for (let q = 0; q < n; q++) {
     const k = order[q], x = X0(X[k]), y = Y0(Y[k]);
     if (x < -50 || x > W + 50 || y < -50 || y > H + 50) continue;
+    if (AL && !AL[k]) {                                    // not yet there: a trace of its place
+      c.fillStyle = "#e4e7eb"; c.fillRect(x - 0.6, y - 0.6, 1.2, 1.2);
+      continue;
+    }
     const r = rpx(k, z);
     c.fillStyle = COLS[CL[k]];
     c.beginPath(); c.arc(x, y, r, 0, 2 * Math.PI); c.fill();
@@ -244,6 +271,7 @@ function vanWijk(a, b) {
 function fly(target, frame = null) {
   aim = frame;
   if (!motion()) { flight = null; view = { ...target }; renderCache(); still = performance.now(); redraw(); return; }
+  if (!base0) renderBase0();
   const a = { ...view }, P = vanWijk(a, target);
   flight = { a, b: { ...target }, f: P.f, t0: performance.now(), dur: Math.max(420, Math.min(1500, P.S * 780)) };
   renderCache(target);                                    // the destination, sharp on arrival
@@ -267,7 +295,7 @@ function egoOf(k) {
   const links = [], nodes = new Map(), a = adj[k];
   for (let q = 0; q < a.length; q += 3) {
     const w = a[q], li = a[q + 1], j = a[q + 2], L = LAYERS[li];
-    if (!on[L]) continue;
+    if (!on[L] || !liveLink(li, j)) continue;
     const dir = li === 2 ? 0 : EP[L][2 * j + 1] === w ? 1 : -1;      // 1: this act names the partner
     links.push({ w, li, j, dir, c: curve(k, w) });
     nodes.set(w, (nodes.get(w) || 0) | (1 << li));
@@ -373,7 +401,7 @@ function extLinks(c, alpha) {
     const [r, gg, b] = EDGE[L], p = EP[L];
     g.strokeStyle = `rgba(${r},${gg},${b},${alpha})`;
     g.beginPath();
-    for (let q = 0; q < ex.length; q += 2) if (ex[q] === li) { const j = ex[q + 1]; curve(p[2 * j], p[2 * j + 1], SC); seg(SC); }
+    for (let q = 0; q < ex.length; q += 2) if (ex[q] === li && liveLink(li, ex[q + 1])) { const j = ex[q + 1]; curve(p[2 * j], p[2 * j + 1], SC); seg(SC); }
     g.stroke();
   }
 }
@@ -481,7 +509,7 @@ function labels(now, moving) {
     const cand = [];
     for (let k = 0; k < n; k++) {
       const x = sx(X[k]), y = sy(Y[k]);
-      if (x < 0 || x > W || y < 0 || y > H) continue;
+      if (x < 0 || x > W || y < 0 || y > H || (AL && !AL[k])) continue;
       if (rpx(k) >= 2.4 || zoom > 6 || CLU[KC[k]].r * view.z > 260) cand.push(k);
     }
     const mine = (k) => (focus.lvl === 1 && KC[k] === focus.c ? 1 : 0);
@@ -603,6 +631,7 @@ function nearest(wx, wy, rad) {
   for (let a = gx - span; a <= gx + span; a++) for (let b = gy - span; b <= gy + span; b++) {
     const cell = grid.get(a + ":" + b); if (!cell) continue;
     for (const k of cell) {
+      if (AL && !AL[k]) continue;
       const d = Math.hypot(X[k] - wx, Y[k] - wy), lim = Math.max(rad, RW[k] + 2 / view.z);
       if (d < lim && d < bd) { bd = d; best = k; }
     }
@@ -664,7 +693,8 @@ function tip(it, cx, cy) {
     const act = k === focus.k ? "" : focus.lvl === 2 && (ego.nodes.has(k) || ego.chain.includes(k)) ? t("netFollow") : focus.lvl === 2 ? t("netSwitch") : "";
     html = `<b>${esc(labelCt(i))}</b>${title(i) && title(i) !== label(i) ? `<span class="t2">${esc(title(i).length > 150 ? title(i).slice(0, 148) + "…" : title(i))}</span>` : ""}` +
       rel.map((r) => `<span class="t4">${esc(r)}</span>`).join("") +
-      `<span class="t3"><i style="background:${COLS[CL[k]]}"></i>${esc(t(CL[k] === 6 ? "levelUnknown" : "c" + CL[k]))} · ${esc(t("nLinks", num(deg[k])))}</span>` +
+      `<span class="t3"><i style="background:${COLS[CL[k]]}"></i>${esc(t(CL[k] === 6 ? "levelUnknown" : "c" + CL[k]))} · ${esc(t("nLinks", num(deg[k])))}` +
+      `${TV.TIME.on && TV.bornOf(i) ? " · " + esc(t(live(k) ? "timeSince" : "timeNotYet", TV.bornOf(i))) : ""}</span>` +
       (act ? `<span class="t3">${esc(act)}</span>` : "");
   }
   el.innerHTML = html;
@@ -724,6 +754,7 @@ function wire() {
   const local = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
   cv.addEventListener("pointerdown", (e) => {
     cv.setPointerCapture(e.pointerId);
+    $("nhint").classList.add("gone");
     pts.set(e.pointerId, [e.clientX, e.clientY]);
     if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: view.z }; drag = null; }
     else drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
@@ -848,11 +879,14 @@ function crumbs() {
   el.innerHTML = `<nav class="crumbs" aria-label="${esc(t("netPath"))}"><button class="upbtn" id="nup" title="${esc(t("up"))}" aria-label="${esc(t("up"))}">${ICON.up}</button>${parts.join(sep)}</nav>`;
   $("nup").onclick = () => up(true);
 }
+let hintT = 0;
 function hints() {
   const el = $("nhint"), seen = +(store("slm-net-learnt") || 0);
+  clearTimeout(hintT);
   if (seen & (1 << focus.lvl)) { el.hidden = true; return; }
   el.textContent = t(`netHint${focus.lvl}${coarse() ? "t" : ""}`);
-  el.hidden = false;
+  el.hidden = false; el.classList.remove("gone");
+  hintT = setTimeout(() => el.classList.add("gone"), 8000);   // it steps aside after a while, or at the first touch
 }
 function legend() {
   const lv = [0, 1, 2, 3, 4, 5].map((c) => `<span class="it">${sw(c)}<span>${esc(t("c" + c))}</span></span>`).join("");
@@ -865,7 +899,8 @@ function legend() {
 }
 function controls() {
   const cnt = (L) => EP[L].length / 2;
-  $("nlayers").innerHTML = LAYERS.map((L) => `<button class="chip" data-layer="${L}" aria-pressed="${on[L]}"><i style="background:rgb(${EDGE[L].join(",")})"></i>${esc(t(LNAME[L]))} <span class="num">${esc(num(cnt(L)))}</span></button>`).join("") +
+  const past = TV.TIME.on && TV.TIME.year < TV.TIME.y1;
+  $("nlayers").innerHTML = LAYERS.map((L) => `<button class="chip${past && L === "legis" ? " past" : ""}" data-layer="${L}" aria-pressed="${on[L]}"${past && L === "legis" ? ` title="${esc(t("timeToday"))}"` : ""}><i style="background:rgb(${EDGE[L].join(",")})"></i>${esc(t(LNAME[L]))} <span class="num">${esc(past && L === "legis" ? t("timeToday") : num(cnt(L)))}</span></button>`).join("") +
     `<button class="chip fit" id="nfit" title="${esc(t("netFit"))}" aria-label="${esc(t("netFit"))}">${ICON.fit}</button>`;
   cv.setAttribute("aria-label", t("netKeys"));
   mini.setAttribute("aria-label", t("netMini"));
@@ -935,10 +970,27 @@ export async function init(c) {
     controls(); legend(); renderBase0(); renderCache(); redraw();
   });
   if (document.fonts) document.fonts.ready.then(() => redraw());
+  let lastPast = null;
+  TV.subscribe(() => {
+    if ($("v-net").hidden) return;
+    applyTime();
+    if (ego) { const t0 = ego.t0; ego = egoOf(ego.k); ego.t0 = Math.min(t0, performance.now() - GROW - FLOW); }
+    if (prevEgo) prevEgo = egoOf(prevEgo.k);
+    const past = TV.TIME.on && TV.TIME.year < TV.TIME.y1;
+    if (past !== lastPast) { lastPast = past; controls(); }
+    if (TV.playing()) base0 = null; else renderBase0();      // the whole picture only once the years rest
+    renderCache(); redraw();
+    drawnFor = TV.TIME.on ? TV.TIME.year : 0;
+  });
 }
+let drawnFor = null;                                       // the year the pictures were drawn for
 export async function show(rest) {
   controls();
+  applyTime();
   resize();
+  const tk = TV.TIME.on ? TV.TIME.year : 0;
+  if (drawnFor !== null && tk !== drawnFor) { renderBase0(); renderCache(); }
+  drawnFor = tk;
   const id = rest.startsWith("net/") ? rest.slice(4) : "";
   let nf = { lvl: 0, c: -1, k: -1 };
   if (id) {
