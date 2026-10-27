@@ -52,7 +52,43 @@ def day_after(d: str) -> str:
 
 
 def read_md(p: Path) -> str:
-    return gzip.open(p, "rt", encoding="utf-8").read()
+    return clean_headings(gzip.open(p, "rt", encoding="utf-8").read())
+
+
+CALL = re.compile(r"\[\^[^\]\s]+\](?!:)")
+SUP_CALLS = re.compile(r"<sup>\s*((?:\[\^[^\]\s]+\]\s*)+)</sup>")
+
+
+def clean_headings(md: str) -> str:
+    """A heading holds the designation only. GitHub takes a heading's anchor from its rendered text, footnote numbers
+    included ("#### Art. 6a[^6a-1]" → #art-6a1, the number set by the note's place in the file): the calls move to the
+    article's marginal title below it, after the line below the act's title, or onto a line of their own, so
+    ch/2/220/de.md#art-6a always works. A call set raised (<sup>[^…]</sup>) is written as a plain call."""
+    lines = SUP_CALLS.sub(lambda m: re.sub(r"\s+", "", m.group(1)), md).split("\n")
+    out, k = [], 0
+    while k < len(lines):
+        line = lines[k]
+        if not (line.startswith("#") and re.match(r"#{1,6} ", line) and CALL.search(line)):
+            out.append(line)
+            k += 1
+            continue
+        calls = "".join(CALL.findall(line))
+        head = re.sub(r"\s{2,}", " ", CALL.sub("", line)).rstrip()
+        out.append(head)
+        j = k + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+        nxt = lines[j].strip() if j < len(lines) else ""
+        if head.startswith("#### ") and re.fullmatch(r"\*\*.+?\*\*(?:\[\^[^\]\s]+\])*", nxt):    # the marginal title
+            out += lines[k + 1:j] + [re.sub(r"^(\s*\*\*.+?\*\*)", lambda x: x.group(1) + calls, lines[j], count=1)]
+            k = j + 1
+        elif head.startswith("# ") and nxt and not re.match(r"[#|<>\-]", nxt):                  # the act's title
+            out += lines[k + 1:j] + [lines[j].rstrip() + calls]
+            k = j + 1
+        else:
+            out += ["", calls]
+            k += 1
+    return "\n".join(out)
 
 
 # ---- federal

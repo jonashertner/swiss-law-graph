@@ -81,6 +81,20 @@ function decRows(ids, dec) {
   }, 6);
 }
 const later = (id, html) => `<div id="${id}"><p class="spin">${esc(t("loading"))}</p></div>`;
+// the act's text in the law repository (decision 36): the file in the reader's language, its versions; an article's heading
+const REPO = "https://github.com/jonashertner/swisslaw-git";
+let repoP = null;
+const loadRepo = () => repoP || (repoP = getJSON("data/repo.json").catch(() => ({})));
+const slug = (s) => s.replace(/<[^>]+>/g, "").toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, "").trim().replace(/\s+/g, "-");   // GitHub's anchors
+function repoHTML(R, i, artNo) {
+  const r = R[idOf(i)];
+  if (!r) return "";
+  const [path, langs] = r.split("|"), ls = langs.split(",");
+  const lg = ls.includes(lang()) ? lang() : ls.includes("de") ? "de" : ls[0];
+  const file = `${path}/${lg}.md`, anchor = artNo ? "#" + slug(`Art ${artNo}`) : "";
+  return `<div class="repo"><a class="src" href="${esc(`${REPO}/blob/main/${file}${anchor}`)}" target="_blank" rel="noopener">${esc(t("repoText"))} ${ICON.ext}</a>` +
+    `<a class="src" href="${esc(`${REPO}/commits/main/${file}`)}" target="_blank" rel="noopener">${esc(t("repoHist"))} ${ICON.ext}</a></div>`;
+}
 function fill(id, html, my) {
   if (my !== token) return;
   const x = $(id);
@@ -186,12 +200,14 @@ export async function node(i, o = {}) {
     (lede && lede !== h1 ? `<p class="lede">${esc(lede)}</p>` : "") +
     (pooled ? `<p class="lede">${esc(t("pooledNote", num(M.MM[i])))}</p>` : k === KIND.x ? `<p class="lede">${esc(t("codeNote"))}</p>` : "") +
     (u ? `<a class="src" href="${esc(u)}" target="_blank" rel="noopener">${esc(ct && !u.includes("fedlex") ? t("cantonText") : t("fedlex"))} ${ICON.ext}</a>` : "") +
+    (k === KIND.a ? `<div class="repo" id="d-repo"></div>` : "") +
     (!linker && extra(i) ? `<div class="btnrow">${extra(i)}</div>` : "") +
     (facts.length ? `<dl class="facts">${facts.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${b}</dd>`).join("")}</dl>` : "") +
     (M.D[i] ? `<div class="stat"><b>${esc(num(M.D[i]))}</b><span>${esc(t("referring"))}</span></div>` : "");
   const hasArts = M.PK[i] >= 0;
   open(head + later("d-years") + (hasArts ? later("d-arts") : "") + later("d-basis") + later("d-imp") + later("d-down") + later("d-co") + later("d-legis") +
     (hasArts ? later("d-dec") : "") + later("d-ing"), o);
+  if (k === KIND.a) loadRepo().then((R) => fill("d-repo", repoHTML(R, i), my));
   // decisions per year
   loadYears().then((y) => fill("d-years", y[i] ? section(t("perYear"), yearsChart(y[i][0], y[i][1])) : "", my)).catch(() => fill("d-years", "", my));
   // articles and decisions
@@ -271,9 +287,11 @@ export async function article(oa, aid, o = {}) {
     (headingOf(a) ? `<p class="lede">${esc(headingOf(a))}</p>` : "") +
     (path.length ? `<p class="path">${path.map((p) => `<span>${esc(p)}</span>`).join("")}</p>` : "") +
     (u ? `<a class="src" href="${esc(u)}#${esc(eid)}" target="_blank" rel="noopener">${esc(t("fedlex"))} ${ICON.ext}</a>` : "") +
+    `<div class="repo" id="a-repo"></div>` +
     `<div class="stat"><b>${esc(num(nd))}</b><span>${esc(t("referring"))}</span></div>`;
   open(head + section(t("perYear"), yearsChart(y0, ys)) + later("a-imp") + later("a-dec") + later("a-co"), o);
   wireCharts(el());
+  loadRepo().then((R) => fill("a-repo", repoHTML(R, i, n), my));
   loadLinks().then((L) => {                                   // acts naming this article as their basis, and what rests on them
     const dep = dependents(L, i, normArt(eid));
     const named = (L.down.get(i) || []).filter((x) => M.K[x.j] === KIND.a && (x.arts || []).some((z) => normArt(z) === normArt(eid)));

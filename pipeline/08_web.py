@@ -699,6 +699,18 @@ def main():
 
     # ---- the catalogue: every act on the site as one CSV row, for people and programs (and llms.txt to describe the data)
     catalogue(out_nodes, names, born, died, meta_run=tree["method"].get("run_date") or "")
+    # where each act in force lives in the law repository (decision 36; written by lawgit/build_repo.py): its panel links there
+    rp = ROOT / "build/lawgit/repo_paths.json"
+    if rp.exists():
+        R, repo = json.load(open(rp)), {}
+        for n in out_nodes:
+            if n["k"] == "a":
+                sid = f"{n['ct']}/{n['s']}" if n.get("ct") else n["s"]
+                hit = (R["kt"] if n.get("ct") else R["ch"]).get(sid)
+                if hit:
+                    repo[sid] = f"{hit[0]}|{','.join(hit[1])}"
+        json.dump(repo, open(OUT / "repo.json", "w"), separators=(",", ":"), ensure_ascii=False)
+        print(f"repo: {len(repo)} acts in force linked to the law repository")
 
     # ---- the index and the names
     FED = "https://www.fedlex.admin.ch/eli/"
