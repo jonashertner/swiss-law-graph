@@ -642,7 +642,10 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     the canton. Now one strip at its bottom (`M.XG`, layout values `M.val.dl`, 5 %; a block under 80 px gets a thin strip
     without text): "Nicht in der Sammlung · 317 Codes · 21 % der Verweise" — the share of the canton's references (decisions
     per act, summed) that go to these codes, in the time view up to the year (1995: VD 67 %, GE 60 %); the panel lists the
-    codes by decisions.
+    codes by decisions. (f) Dated and signed (Jonas: "shall we date the atlas?", "a minimalist footer made with ❤️ by
+    jonashertner.com (monochrome)"): one footer line on every view, "Stand 26. Oktober 2026 · Fedlex, kantonale Sammlungen,
+    OpenCaseLaw · Mit ♥ gemacht von jonashertner.com" (the date is the pipeline's run, `meta.run`; the sources link to the
+    method page; ♥ is the text glyph U+2665 + VS15 in the ink of the page, not the emoji; phones drop the sources).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.

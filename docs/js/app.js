@@ -7,7 +7,7 @@ import * as DOS from "./dossier.js";
 import { initSearch, refreshSearch } from "./search.js";
 import * as NET from "./net.js";
 import * as TV from "./time.js";
-import { $, esc, num, sw, href, ICON, store } from "./util.js";
+import { $, esc, num, sw, href, ICON, store, date } from "./util.js";
 
 const wide = matchMedia("(min-width: 1181px)"), phone = matchMedia("(max-width: 720px)");
 const S = { view: "map", target: "", sel: null, booted: false };
@@ -22,7 +22,16 @@ function pickLang() {
   for (const l of navigator.languages || [navigator.language || ""]) { const c = (l || "").slice(0, 2).toLowerCase(); if (LANGS.includes(c)) return c; }
   return "de";
 }
+// the footer: when the data were read (the run of the pipeline), from where, and who made it
+function renderFoot() {
+  const run = M.meta && M.meta.run;
+  $("footdate").textContent = run ? t("dataAsOf", date(run)) : "";
+  $("footsrc").textContent = t("footSrc"); $("footsrc").href = href("method");
+  const [a, b] = t("made");
+  $("footmade").innerHTML = `${esc(a)} <span class="heart" aria-label="♥">♥\uFE0E</span> ${esc(b)} <a href="https://jonashertner.com" rel="author">jonashertner.com</a>`;
+}
 function staticText() {
+  renderFoot();
   document.documentElement.lang = lang();
   document.title = t("title");
   document.querySelector('meta[name="description"]').setAttribute("content", t("description"));
@@ -317,6 +326,7 @@ async function boot() {
   staticText();
   const [atlas] = await Promise.all([getJSON("data/atlas.json"), loadNames(lang())]);
   build(atlas);
+  renderFoot();
   const sm = store("atlas-mode");
   TM.initTreemap($("tm"), {
     select: (id) => go(targetOf(id), true),
