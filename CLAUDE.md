@@ -398,6 +398,28 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     canton, 1,978 federal ↔ federal. Bridges (federal acts most cantons rest on, BV aside): OR, WaG,
     GSchG, SVG, BGS, AIG, ArG — 25 cantons each (TG publishes mostly no preamble); ZGB 24 cantons with
     261 cantonal acts, KVG 24/181, StGB 24/159. The panel of every act in the network offers "Im Netz zeigen".
+30. Navigating the network (2026-10-27, Jonas: "pretty but navigation not yet intuitive. must be magical"). Three
+    steps, each a route: the whole network (`#de/net`), one jurisdiction (`#de/net/ZH`, `fed`, `int`), one act
+    (`#de/net/ZH/700.1`). The camera flies between views on the van Wijk–Nuij path (2003; d3's interpolateZoom,
+    ρ = √2): out, across, in, so the eye keeps its place; the destination is rendered before the flight starts and
+    re-framed if the panel opens on the way. The pointer finds what can be told apart: on the whole network a
+    jurisdiction (and the largest acts), inside a jurisdiction shown ≥ 130 px wide its acts; with an act open its
+    partners and chain first (12 px, touch 22 px). Pointing rests 140 ms before a preview (an act's links, a
+    jurisdiction's links to the rest), so sweeping the pointer does not flicker. A jurisdiction opens with the rest
+    veiled, its links to the rest kept, its levels named on the rings and its acts labelled; the panel gives acts
+    in force with a link of all in force, links outside by layer, by level, the jurisdictions most linked with and,
+    for a canton, the federal acts its acts name most. An act opens with its links growing out of it (650 ms), its
+    chain of primary bases up to the Constitution as one cased line (KV → BV dashed: Art. 51 BV, not an Ingress), and
+    for 14 s points moving from the act that names to the act named (bases and legislation; co-citation has no
+    direction; 320 strongest links); the chain is also the breadcrumb ("Netz › BV › KV ZH › PBG ZH"; without a
+    chain to a constitution the jurisdiction stands first). Following a partner keeps the link travelled lit
+    during the flight. Pointing at a partner, a panel row or a crumb lights it and its links; the tooltip says
+    what links them in words, with the articles named ("PBG ZH stützt sich darauf (Art. 25)", "Nennt RPG in 4
+    Bestimmungen", "Mit RPG zusammen zitiert in 390 Entscheiden"). A click elsewhere goes one step up (an act →
+    its jurisdiction, without moving the camera); Esc goes up with a flight; arrows move to the nearest item that
+    way, Enter opens. A hint per step until the visitor has done it once (`slm-net-learnt`), an overview map in
+    the corner once the view is closer than 1.8× the whole. Found on the way: while dragging, the cached picture
+    moved against the hand until it was redrawn (sign of the pan term in the blit).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -466,6 +488,9 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - [x] Step 12 network view (decision 29): `layout/net.mjs` (graphology 0.25.4 + graphology-layout-forceatlas2
       0.10.1) → `docs/data/net.json` (0.3 MB); `docs/js/net.js` (canvas, layer chips, ego network, labels
       with collision, pinch/wheel/keys). MIT `LICENSE`. Both previews show the public site.
+- [x] Step 12′ network navigation (decision 30): routes per step, van Wijk flights, previews after a dwell, growth,
+      chain as breadcrumb, moving points, brushing from panel and crumbs, keyboard, overview map; walk-throughs
+      in headless Chromium at 1440×900 (DE, IT) and 390×844 (FR), no console errors.
 
 ## Reports
 - `reports/opencaselaw-anomalies.md` — anomalies in OpenCaseLaw for Jonas to fix there (duplicates,

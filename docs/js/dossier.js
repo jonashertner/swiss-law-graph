@@ -197,7 +197,7 @@ export async function node(i, o = {}) {
       section(t("ingress"), `<p class="note">${esc(t("noIngress"))}</p>`), my);
   }).catch(() => { fill("d-basis", "", my); fill("d-ing", "", my); });
 }
-function fmtArts(arts, j) {                           // "Art. 41, 42" — or "§ 3" where the canton writes §
+export function fmtArts(arts, j) {                           // "Art. 41, 42" — or "§ 3" where the canton writes §
   if (!arts || !arts.length) return "";
   const nums = arts.map(artNum).filter(Boolean);
   if (!nums.length) return "";

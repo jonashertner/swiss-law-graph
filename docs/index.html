@@ -46,8 +46,13 @@
     <div class="legend"><div class="seg" id="mode" role="group"></div><div class="keys" id="legend"></div></div>
   </section>
   <section class="view" id="v-net" hidden>
-    <div class="vhead"><h1 id="ntitle"></h1><div class="chips" id="nlayers" role="group"></div></div>
-    <div class="stage" id="nstage"><canvas id="nc" tabindex="0" role="img"></canvas></div>
+    <div class="vhead"><div class="ntitle" id="ntitle"></div><div class="chips" id="nlayers" role="group"></div></div>
+    <div class="stage" id="nstage">
+      <canvas id="nc" tabindex="0" role="application"></canvas>
+      <canvas id="nmini" hidden></canvas>
+      <p class="nhint" id="nhint" hidden></p>
+      <div class="sr" id="nlive" aria-live="polite"></div>
+    </div>
     <div class="legend" id="nfoot"></div>
   </section>
   <section class="view" id="v-hier" hidden>

@@ -256,6 +256,26 @@ details.more[open] > summary::before { content: "− "; }
 .chip:hover { border-color: var(--ink); color: var(--ink); }
 .chip.fit { width: 30px; padding: 0; justify-content: center; color: var(--ink-2); }
 #nfoot .it { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+#nfoot .it.end { margin-left: auto; }
+#nfoot i.ln { display: block; width: 18px; height: 3px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 1.5px #fff; }
+#nfoot i.pt { display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-2); }
+.ntitle { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
+.ntitle .crumbs { font-size: var(--t-b); }
+.ntitle .crumbs [aria-current] { max-width: 28em; overflow: hidden; text-overflow: ellipsis; }
+.ntitle .crumbs a { min-width: 0; }
+.nhint {
+  position: absolute; left: 10px; top: 8px; z-index: 2; margin: 0; pointer-events: none; max-width: calc(100% - 20px);
+  font-size: var(--t-s); color: var(--ink-2); background: rgba(255,255,255,.92); border: 1px solid var(--rule);
+  padding: 6px 10px; border-radius: 6px; animation: nhint .5s ease-out both; max-width: min(300px, calc(100% - 20px)); line-height: 1.4;
+}
+@keyframes nhint { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nhint { animation: none; } }
+#nmini {
+  position: absolute; inset: auto auto 10px 10px; width: 112px; height: 112px; z-index: 2; cursor: pointer;
+  background: rgba(255,255,255,.94); border-radius: 8px; box-shadow: 0 0 0 1px var(--rule), 0 2px 8px rgba(14,17,22,.08);
+}
+.tip .t4 { display: block; margin-top: 5px; color: #fff; }
+.tip .t4::before { content: "→ "; color: #9aa0a8; }
 #nfoot .it.num { margin-left: auto; color: var(--ink-3); font-size: var(--t-xs); }
 
 /* ---------- hierarchy (SVG) */
@@ -401,6 +421,10 @@ details.more[open] > summary::before { content: "− "; }
   #nfoot .it.num { margin-left: 0; width: 100%; white-space: normal; }
   body.sheet #v-net { padding-bottom: 46dvh; }
   body.sheet #v-net .legend { display: none; }
+  .ntitle .crumbs { font-size: var(--t-m); }
+  .ntitle .crumbs .upbtn { margin-right: 4px; }
+  #nmini { width: 84px; height: 84px; inset: auto auto 6px 6px; }
+  .nhint { font-size: var(--t-xs); left: 6px; right: 6px; top: 6px; max-width: none; text-align: center; }
   .hkey, .hfoot { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; scrollbar-width: none; font-size: var(--t-xs); }
   .hkey::-webkit-scrollbar, .hfoot::-webkit-scrollbar { display: none; }
   .hkey button, .hfoot > span { flex: none; }
