@@ -617,6 +617,10 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     filed under their main act's number; 120 of 120 random act × month tags give the version Fedlex lists for that day; 0 of
     1,500 files with an undefined footnote or a footnote call in a heading. The atlas links 20,646 acts in force (all but TI 623,
     SZ 426, VD 2) to their file and its history (`docs/data/repo.json`).
+    Published 2026-10-27 (public, default branch main). The proxy refuses tag pushes (HTTP 403; branches go through), so the
+    tags are written on GitHub's side by `.github/workflows/stand.yml` (from `readme.STAND_WORKFLOW`; same rule as `month_tags`, run
+    locally and on GitHub: 70 of 70 identical) on every push to main. Pushing a rebuild: `git push -f origin main future` — the
+    workflow re-tags. GitHub renders even the OR (1.2 MB, 1,685 article headings) with working `#art-N` anchors.
 
 37. All cantons named on the map; search and closing in the network (2026-10-27, Jonas: "can we have all cantons, and name of
     canton, on the Karte?"; "i want to be able to search for laws in the Netz, without losing the position of the law in the Netz

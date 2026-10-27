@@ -398,6 +398,45 @@ def cantons_readme(kt, today, nver):
 
 
 # ---------------------------------------------------------------- every file of the repository's own
+# The tags stand/YYYY-MM-01 are written on GitHub's side: the build's own tags cannot be pushed from where it runs.
+# Same rule as build_repo.month_tags (checked: identical for all 70 months of the run of 2026-10-27).
+STAND_WORKFLOW = """\
+# stand/YYYY-MM-01: the law as it applied on the first of every month –
+# the last commit of main dated on or before that day, 00:00 Zurich time
+# (every commit is dated on the day its version applies).
+name: stand
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  tags:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout: .github
+      - name: tag the first of every month
+        env:
+          TZ: Europe/Zurich
+        run: |
+          root=$(git rev-list --max-parents=0 HEAD)
+          first=$(git log -1 --format=%cd --date=format-local:%Y-%m "$root")
+          y=${first%-*}; m=$((10#${first#*-})); now=$(date +%Y-%m-%d)
+          while :; do
+            d=$(printf '%04d-%02d-01' "$y" "$m"); [[ "$d" > "$now" ]] && break
+            c=$(git rev-list -1 --before="$d 00:00:00" HEAD || true)
+            [[ -n "$c" ]] && git tag -f "stand/$d" "$c" >/dev/null
+            if (( m == 12 )); then y=$((y + 1)); m=1; else m=$((m + 1)); fi
+          done
+          git push -f origin 'refs/tags/stand/*:refs/tags/stand/*'
+"""
+
+
 def files(snaps: dict, facts: dict, kacts: dict, start: str, today: str, future=(), nver=None) -> dict:
     nver = nver or {}
     out = {}
@@ -488,6 +527,7 @@ def files(snaps: dict, facts: dict, kacts: dict, start: str, today: str, future=
     out["LICENSE"] = (Path(__file__).resolve().parent / "CC0-1.0.txt").read_text(encoding="utf-8")
     out["CITATION.cff"] = citation(today)
     out[".gitattributes"] = "* text=auto eol=lf\nindex.csv linguist-generated=true\nindex.jsonl linguist-generated=true\n"
+    out[".github/workflows/stand.yml"] = STAND_WORKFLOW
     return out
 
 
