@@ -76,8 +76,8 @@ def segment(seg: str) -> dict[str, dict]:
         for k, key in (("n", "n"), ("hid", "hid"), ("doc", "date"), ("eif", "in_force"), ("enlif", "repealed")):
             if v.get(k) and not a.get(key):
                 a[key] = v[k][:10] if key in ("date", "in_force", "repealed") else v[k]
-        if v.get("st"):
-            a["status"] = int(v["st"].rsplit("/", 1)[1])
+        if v.get("st"):                                  # some acts carry two (temporary acts: 0 and 3): all kept,
+            a.setdefault("statuses", []).append(int(v["st"].rsplit("/", 1)[1]))   # the lowest is the status
         if v.get("ty"):
             a["type"] = int(v["ty"].rsplit("/", 1)[1])
     for v in sparql(Q_TITLE % (PAGE % seg)):
@@ -86,6 +86,12 @@ def segment(seg: str) -> dict[str, dict]:
         a["title"].setdefault(lg, " ".join(v["t"].split()))
         if v.get("s"):
             a["abbr"].setdefault(lg, " ".join(v["s"].split()))
+    for a in acts.values():
+        if a.get("statuses"):
+            a["statuses"] = sorted(set(a["statuses"]))
+            a["status"] = a["statuses"][0]
+            if len(a["statuses"]) == 1:
+                del a["statuses"]
     CACHE.mkdir(parents=True, exist_ok=True)
     json.dump(acts, open(f, "w"), ensure_ascii=False)
     return acts

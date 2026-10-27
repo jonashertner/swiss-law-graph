@@ -27,6 +27,8 @@ import csv
 import json
 import re
 import shutil
+import sys
+import urllib.request
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 from pathlib import Path
@@ -700,9 +702,8 @@ def main():
     # ---- the catalogue: every act on the site as one CSV row, for people and programs (and llms.txt to describe the data)
     catalogue(out_nodes, names, born, died, meta_run=tree["method"].get("run_date") or "")
     # where each act in force lives in the law repository (decision 36; written by lawgit/build_repo.py): its panel links there
-    rp = ROOT / "build/lawgit/repo_paths.json"
-    if rp.exists():
-        R, repo = json.load(open(rp)), {}
+    R, repo = repo_paths(), {}
+    if R:
         for n in out_nodes:
             if n["k"] == "a":
                 sid = f"{n['ct']}/{n['s']}" if n.get("ct") else n["s"]
@@ -761,6 +762,31 @@ LEVEL = {0: "constitution", 4: "constitution", 1: "parliament", 5: "parliament",
 KINDS = {"a": "in_force", "o": "earlier", "x": "not_in_collection"}
 CAT_COLS = ["id", "kind", "jurisdiction", "number", "abbreviation", "title_de", "title_fr", "title_it", "title_en", "level",
             "enacted_by", "adopted", "from_year", "until", "decisions", "source"]
+
+
+def repo_paths() -> dict:
+    """Where each act lives in the law repository: build/lawgit/repo_paths.json where the repository is built (decision 36),
+    else derived from its published index.jsonl (the weekly workflow, decision 39: the same 5,338 + 16,437 entries,
+    checked on 2026-10-27). An act under one number in two paths at once (`…@<year>`): the one without the year."""
+    rp = ROOT / "build/lawgit/repo_paths.json"
+    if rp.exists():
+        return json.load(open(rp))
+    url = "https://raw.githubusercontent.com/jonashertner/swisslaw-git/main/index.jsonl"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "swiss-law-graph"}), timeout=120) as r:
+            lines = r.read().decode("utf-8").splitlines()
+    except Exception as e:                               # noqa: BLE001 — the atlas then has no links to the texts
+        print(f"repo: index.jsonl not read ({e}); no links to the law repository", file=sys.stderr)
+        return {}
+    by: dict = {"ch": defaultdict(dict), "kt": defaultdict(dict)}
+    for line in lines:
+        r = json.loads(line)
+        if r["file"].startswith("ch/"):
+            by["ch"][r["number"]].setdefault(r["act"], set()).add(r["language"])
+        elif r["file"].startswith("cantons/"):
+            by["kt"][f"{r['jurisdiction']}/{r['number']}"].setdefault(r["act"], set()).add(r["language"])
+    pick = lambda d: (lambda p: [p, sorted(d[p])])(sorted(d, key=lambda q: ("@" in q, q))[0])
+    return {k: {n: pick(d) for n, d in v.items()} for k, v in by.items()}
 
 
 def catalogue(out_nodes, names, born, died, meta_run):

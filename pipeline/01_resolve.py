@@ -136,7 +136,7 @@ DATED_ALIASES = {"KLV": ("832.112.31", "2025-01-01")}
 # Same act, earlier edition with different numbering: references dated before the
 # cut-over go to `SR <n>@a`.
 EDITION_CUTOVERS = {"311.0": "2007-01-01"}   # StGB general part revision in force 1.1.2007
-SNAPSHOT = "2026-10-26"
+from inforce import RUN_DATE as SNAPSHOT  # noqa: E402  (the day of the OpenCaseLaw snapshot and of the run)
 
 
 def strip_year(a: str) -> str:
@@ -384,9 +384,9 @@ def main() -> None:
                        where act_id like 'SR %@%' group by 1 order by 2 desc""").df()
     print(regimes.head(30).to_string())
     dups = c.sql("select rule, count(*) n from alias_map group by 1").df()
-    dates = c.sql("""select count(*) decisions, count(*) filter (where dt_src is null) no_date,
+    dates = c.sql(f"""select count(*) decisions, count(*) filter (where dt_src is null) no_date,
                         count(*) filter (where dt_src is not null and not dt_ok) implausible_date,
-                        count(*) filter (where dt_src > date '2026-10-26') future_date from meta""").df()
+                        count(*) filter (where dt_src > date '{SNAPSHOT}') future_date from meta""").df()
     print(dates.to_string())
     print(dups.to_string())
     json.dump({"total_references": int(tot),

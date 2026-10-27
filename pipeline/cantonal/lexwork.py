@@ -27,6 +27,9 @@ from urllib.parse import quote
 
 import requests
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh import fresh  # noqa: E402  (weekly refresh)
+
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "build" / "cantonal"
 UA = "swiss-law-graph/1.0 (legal research; +https://opencaselaw.ch)"
@@ -129,7 +132,7 @@ def parse_lang(header, fns):
 def fetch_act(ct, host, lang, stub):
     sr = stub["systematic_number"]
     raw = OUT / "raw" / ct / (re.sub(r"[^\w.\-]", "_", sr) + ".json")
-    if raw.exists():
+    if fresh(raw):                                       # the act's header changes: re-read in a weekly refresh
         return json.loads(raw.read_text())
     try:
         d = get(f"https://{host}/api/{lang}/texts_of_law/{quote(sr, safe='')}/show_as_json")
@@ -190,7 +193,7 @@ def pdf_ingress(txt):
 def canton(ct):
     host, lang = HOSTS[ct], LANG.get(ct, "de")
     idx_path = OUT / "raw" / ct / "_index.json"
-    if idx_path.exists():
+    if fresh(idx_path):
         idx = json.loads(idx_path.read_text())
     else:
         idx = get(f"https://{host}/api/{lang}/texts_of_law/lightweight_index")

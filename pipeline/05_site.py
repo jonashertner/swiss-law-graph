@@ -530,7 +530,7 @@ def main() -> None:
                                               ("validation", BUILD / "validation_report.json"),
                                               ("citations", G / "citations_report.json"))}
     method = {
-        "snapshot": "2026-10-26",
+        "snapshot": inforce.RUN_DATE,
         "resolution": rep["resolution"]["by_resolution"],
         "total_references": rep["resolution"]["total_references"],
         "duplicates": rep["resolution"]["duplicate_decisions"],

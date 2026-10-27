@@ -20,7 +20,8 @@ from pathlib import Path
 import artnum
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN_DATE = "2026-10-26"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from inforce import RUN_DATE  # noqa: E402  (one run date: decision 39)
 SPARQL = "https://fedlex.data.admin.ch/sparqlendpoint"
 
 Q = """PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>

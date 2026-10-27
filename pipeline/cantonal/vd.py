@@ -41,6 +41,9 @@ from urllib.parse import quote
 
 import requests
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh import fresh  # noqa: E402  (weekly refresh)
+
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "build" / "cantonal" / "raw" / "VD"
 OUT = ROOT / "build" / "cantonal" / "VD.json"
@@ -84,8 +87,9 @@ def fetch(url, offline, delay=0.25, tries=6):
 
 
 def cached(path, url, offline, gz=False):
-    """Bytes of url, from path if present, else fetched and written there."""
-    if path.exists():
+    """Bytes of url, from path if present, else fetched and written there. In a weekly refresh the lists are read
+    again (refresh.py); a version's XHTML (html/<id>) never changes."""
+    if path.exists() and (offline or path.parent.name == "html" or fresh(path)):
         data = path.read_bytes()
         return gzip.decompress(data) if gz else data
     data = fetch(url, offline)
