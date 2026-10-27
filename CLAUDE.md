@@ -70,8 +70,11 @@ Fedlex fetchers (only when refreshing data): `fetch_fedlex_acts.py`, `fetch_fedl
 `fetch_fedlex_xrefs.py` and `fetch_fedlex_basis.py` for the two legislative layers.
 Cantonal collections (only when refreshing): `python3 pipeline/cantonal/lexwork.py` (~15 min), `zh.py`
 (~15 min), `vd.py` (~30 min), `ge.py`, `ne.py`, `ju.py`, `ti.py`, `sz.py` (minutes each), then `cantonal_basis.py`.
-Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republish from
-`site/artifact.html` with root `site` and the files under `site/data`.
+Preview (private): the public site (decision 28) at https://claude.ai/artifact/XBRDshccV9KQwnf8qdaqo9 —
+republish from `docs/index.html` without its doctype/html/head/body wrapper, with root `docs` and every file
+under it, in two publishes (≤ 64 MB each: first all but `data/art/`, then `data/art/`). The 3D page:
+https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republish from `site/artifact.html` with root `site`
+and the files under `site/data`.
 
 ## Decisions taken (each disclosed on the page's method panel)
 1. Language variants collapse onto one SR number (OR = CO, BGG = LTF, EMRK = CEDH).
