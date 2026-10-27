@@ -14,7 +14,8 @@ contradictions and lacunae. Owner: Jonas Hertner (also owner of opencaselaw.ch).
 - `data/structure.parquet` — CC0, per-decision court/language/structure flags.
 - `data/cite-index-*.tsv.gz` — CC0: col0 label, col1 court, col2 canton, col3 date, col5 decision_id.
 - `data/sr_taxonomy.csv` — Fedlex SPARQL legal taxonomy: SR tree + titles DE/FR/IT (+ some EN/RM).
-- `data/sr_eli.csv` — Fedlex SR number → ELI + enforcement status (`…/0` = in force).
+- `data/sr_eli.csv` — Fedlex SR number → ELI + enforcement status (`…/0` = in force). Read only through
+  `pipeline/inforce.py` (decision 33): the status corrected by Fedlex's own dates.
 - `data/fedlex_acts.json` — every act that ever carried a cited SR number, with dateDocument,
   entry into force, repeal, titles and short titles per language (`fetch_fedlex_acts.py`).
 - `data/fedlex_articles.json` — flat article list per cited act (`fetch_fedlex_articles.py`; fallback only).
@@ -25,17 +26,18 @@ contradictions and lacunae. Owner: Jonas Hertner (also owner of opencaselaw.ch).
   published text (mostly PDF/A, parsed by bold "Art." headings) (`fetch_fedlex_regimes.py`, needs
   `build/act_nodes.json` from step 1). 171/230 earlier acts have a text.
 - `data/fedlex_xrefs.json` — legislative cross-references: for every act in force plus every cited
-  act (5,145), the current consolidated DE XML read once; an SR-number footnote (not inside an
+  act (5,359 since decision 33; 5,145 before), the current consolidated DE XML read once; an SR-number footnote (not inside an
   article heading, not an AS amendment note) or an `eli/cc` link names another act
-  (`fetch_fedlex_xrefs.py`, ~50 min). 28,075 references, 12,167 act pairs, 0 texts failed.
+  (`fetch_fedlex_xrefs.py`, ~50 min; `--missing` reads only numbers not read yet, from the XML cache of
+  fetch_fedlex_basis.py: seconds). 28,788 references, 12,447 act pairs, 0 texts failed (28,075 / 12,167 before decision 33).
   Drafting rules put the footnote at the first mention only: 76 % of pairs have weight 1.
-- `data/fedlex_basis.json` — the Ingress of every act in force plus every cited act (5,147, current
+- `data/fedlex_basis.json` — the Ingress of every act in force plus every cited act (5,378 since decision 33; 5,147 before; current
   consolidated DE XML): issuer, verbatim Ingress, stated bases (target SR from the footnote, article
   numbers, the clause verbatim), adoption date, editorial notes, body article eIds
   (`fetch_fedlex_basis.py`, ~6 min; SPARQL by ELI URI, cached in build/fedlex_xml_urls.json).
   Only a footnote that *is* an SR reference marks a basis ("SR …", "[BS …]"); editorial notes
   ("Der Titel wurde … PublG (SR 170.512) angepasst") let the clause run on.
-- `data/cantonal_basis.json` — all 26 cantonal collections in force (16,384 acts; `cantonal_basis.py`):
+- `data/cantonal_basis.json` — all 26 cantonal collections in force (16,385 acts since decision 33; `cantonal_basis.py`):
   title, abbreviation, URL, adoption date, issuer, verbatim Ingress, floor, and every stated basis resolved
   to `SR <n>` / `SR <n>@<year>` / `KV` (+ articles) / `CT:<n>` / `?` with the clause verbatim. Read by the
   adapters in `pipeline/cantonal/` (contract: `SPEC.md`; raw caches in build/cantonal/raw, 705 MB):
@@ -66,7 +68,8 @@ node layout/net.mjs                                 # 40 s -> docs/data/net.json
 python3 -m http.server -d docs 8766                 # the public site: http://localhost:8766
 python3 -m http.server -d site 8765                 # local view: http://localhost:8765
 ```
-Fedlex fetchers (only when refreshing data): `fetch_fedlex_acts.py`, `fetch_fedlex_articles.py`,
+Fedlex fetchers (only when refreshing data; `fetch_fedlex_history.py` first, since `pipeline/inforce.py` reads its dates):
+`fetch_fedlex_acts.py`, `fetch_fedlex_articles.py`,
 `fetch_fedlex_structure.py` (`--missing` adds new acts only), then step 1, then `fetch_fedlex_regimes.py`;
 `fetch_fedlex_xrefs.py` and `fetch_fedlex_basis.py` for the two legislative layers; `fetch_fedlex_history.py` (~10 min,
 cached per segment in build/fedlex_history) for decision 32, then 08 and layout/net.mjs; `fetch_fedlex_dates.py` (~25 min,
@@ -352,9 +355,10 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     (largest first; earlier acts and codes not in the collection appear, hatched). Colour = who enacted it
     (Ingress floor): one blue ramp Verfassung → Parlament → Regierung → Verwaltung, treaties ochre (#d8b679,
     checked with the dataviz validator: CVD ΔE ≥ 15 against the ramp), the one federal act without a
-    recorded level (SR 173.110.3) grey; inside an act, articles by decisions (log ramp). The 26 cantonal
+    recorded level (SR 173.110.3) grey (since decision 33 the two acts without a text, SR 173.110.3 and 974.4, take the
+    level of their document type: Bundesgesetz → Parlament); inside an act, articles by decisions (log ramp). The 26 cantonal
     constitutions sit in their canton only (no longer twice: SR 131.2 is skipped in the federal block),
-    so federal law in force = 2,013 (= decision 16's floors), total 21,495. An act heading its own SR
+    so federal law in force = 2,013 (= decision 16's floors), total 21,495 (since decision 33: 2,125 and 21,697). An act heading its own SR
     group (412.10 BBG with BBV and the 190 EFZ/EBA ordinances) is moved into that group, which takes its
     abbreviation as name. Labels: abbreviation; an abbreviation three siblings share ("EFZ") is no name;
     without one, the title without its date, without the words it shares with ≥ 2 siblings (prefix and
@@ -482,6 +486,34 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     the first act, shown only in the last year): matched by date prefix and ELI now; an earlier act without a repeal
     date on Fedlex ends when its successor starts (VEZL 2002 → 2013).
 
+33. In force, and are the counts right? (2026-10-27, Jonas: "fix the in-force gap"; "are we sure about the number of laws,
+    federal and cantonal? must be accurate"; `pipeline/inforce.py`, `reports/counts-check.md`). Fedlex's inforceStatus
+    lags behind its own dates both ways: 265 acts in force have no status (263 entered into force 2024–2026, two treaties
+    published late), 29 marked in force carry a repeal date or an end of applicability in the past (EU note exchanges
+    SR 0.142.392.680.01–03 repealed 26 January 2026; predecessors of the 2024–2025 revisions). Rule, in one module that
+    04, 05, 07, 08 and the basis/xref fetchers read instead of sr_eli.csv: in force = entered into force on or before
+    RUN_DATE (2026-10-26), no repeal on or before it, no end of applicability before it, and status 0 or no status (no
+    status: entry into force from 2000 on). Statuses 1–4 stand (no act marked 4 has entered into force; no act marked 0
+    enters later). Also: a number courts cite whose acts are all repealed or lapsed is an earlier act ("Früherer Erlass",
+    with its end), not an act in force (21: SR 235.3 SDSG 2018, 831.232.21 GgV, 832.103 VEZL 2013, 120.4 …; 07 drops them
+    from the federal tree too); the title and dates of an act in force are those of the act in force under the number
+    (by ELI), not of the number's last act (232.141 showed the PatV of 2026, in force 2027). Checked: Fedlex's own pages
+    ("Dieser Text ist (nicht) in Kraft") agree in 35 of 35 rendered (29 ended, 6 by dates; 34 did not render in 25 s);
+    LexFind's federal entity lists 5,339 active acts under exactly our 5,338 SR numbers (one listed twice). Map: 2,125
+    federal acts + 3,187 treaties (5,312 = 5,338 − 26 constitutions); before 5,111, of which 49 not in force, with 250 in
+    force missing. Cantonal: LexFind per canton (all 26, `reports/counts-check.md`): 22 identical; FR −2, SZ −4, VD −5 are
+    LexFind's stale entries, pointers, non-acts and two VD "mineur" décrets; JU −1 was ours — RSJU writes /scripts/ in
+    places and the crawler's pattern was case-sensitive (category 144 missed; fixed, 144.1 added): 16,385. TI and SZ come
+    from LexFind, so LexFind does not check them. Effects: federal tree 2,011 → 2,122 acts (floors 431 / 946 / 745), 3,235
+    bases (83 acts without a basis in the tree, 12 dangling), legislation 12,239 pairs on the map (11,693 before), agg
+    18,507 acts in force, 936,904 decisions refer to an act in force (936,927 before: the 21 cited numbers no longer count),
+    network 18,212 acts (4,333 in force without a link). The method page states the rule with the counts from method.json.
+34. The entry (2026-10-27, Jonas: "make the entry on the site run the Karte and the Zeit animation"): the bare address (no
+    hash) opens the map and plays the time view from 1848 to today at 16 years per second (~11 s), holds 1.4 s, then gives
+    today's map (the layout of every act ever in force eases into today's). The first click, scroll, key or touch hands
+    over: playback stops and the year stays (the bar's own buttons act as usual). Deep links and prefers-reduced-motion
+    do not play it. `time.js::playIntro`, called from `app.js` boot.
+
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
       Deterministic (ties broken explicitly); two runs give identical reports.
@@ -570,13 +602,10 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - Time view: cantonal history (repealed cantonal acts) is not published as data by the cantons; the network and
   matrix show repealed federal acts only where courts cite them (fetching the consolidated texts of repealed acts
   would add their bases and references).
-- In force without a status (found 2026-10-27, decision 32): 276 acts on Fedlex have no inForceStatus although their
-  dates say in force — 252 entered into force 2024–2026 (147 federal acts, e.g. SR 122.1 Hamas-Gesetz in force
-  2025-05-15, SR 745.13 FPV 2024 whose predecessor is marked repealed on 2025-02-01; 114 treaties), 21 acts of
-  1875–1897 without SR number (end unknown). The map takes "in force" from status 0 (`sr_eli.csv`), so the recent ones
-  are missing (unless courts cite them), and 8 numbers show the older act with status 0 beside a newer one without
-  status. Fix: in force = status 0, or no status with entry into force before the run and no end, for acts since
-  2000; then fetch their Ingress (basis), cross-references and structure and rerun the pipeline.
+- Counts (decision 33): VD's 1,852 "mineur" acts are not on the map (a choice to confirm with Jonas); TI and SZ cannot be
+  checked against their own portals from the sandbox; 21 status-less federal acts of 1875–1897 without SR number have
+  no end date. Refreshing: rerun fetch_fedlex_history.py before the other fetchers, then `reports/counts-check.md`'s
+  LexFind comparison (scratchpad script `lexfind_counts.py`; move it to pipeline/ if it is to be rerun).
 - Network: the angle inside a ring is a force-layout position (designed); a measured alternative would be
   community detection (Leiden) per canton with communities as sectors. Treaties are a dense legislative
   cluster of their own (3,304 pairs) with few links to the rest; a "law in force only" filter and a time

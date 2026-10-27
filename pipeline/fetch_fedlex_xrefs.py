@@ -13,7 +13,6 @@ consolidated German XML applicable on RUN_DATE is read once.
 Output: data/fedlex_xrefs.json
     {"run_date", "acts": {sr: {"date", "refs": [[article eId or "", target sr], ...]}}}
 """
-import csv
 import json
 import re
 import sys
@@ -23,9 +22,10 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import inforce
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN_DATE = "2026-10-26"
+RUN_DATE = inforce.RUN_DATE
 SPARQL = "https://fedlex.data.admin.ch/sparqlendpoint"
 SR_NOTE = re.compile(r"^\s*SR\s+(0\.\d[\d.]*\d|\d[\d.]*\d|\d)\b")
 SR_ANY = re.compile(r"\bSR\s+(0\.\d[\d.]*\d|\d[\d.]*\d|\d)\b")
@@ -111,13 +111,25 @@ def refs_of(blob: bytes, eli_to_sr: dict[str, str]) -> list[list[str]]:
 
 def main() -> None:
     srs, eli_to_sr = set(), {}
-    for r in csv.DictReader(open(ROOT / "data/sr_eli.csv", encoding="utf-8")):
+    for r in inforce.rows():                      # Fedlex status corrected by its dates (decision 33)
         eli_to_sr[r["act"].rstrip("/")] = r["notation"]
-        if (r["inForce"] or "").endswith("/0"):
+        if inforce.in_force(r):
             srs.add(r["notation"])
     srs |= {l.strip() for l in open(ROOT / "pipeline/acts_to_validate.txt") if l.strip()}
     srs = sorted(srs)
     latest: dict[str, tuple[str, str]] = {}
+    out = ROOT / "data/fedlex_xrefs.json"
+    kept = {}
+    if "--missing" in sys.argv and out.exists():
+        # RUN_DATE is fixed, so a text read before is today's text still: read only numbers not read yet, taking
+        # their XML from the cache fetch_fedlex_basis.py fills (the same consolidation: latest DE XML before RUN_DATE)
+        kept = {sr: r for sr, r in json.load(open(out))["acts"].items() if sr in srs and r.get("refs") is not None}
+        urls = ROOT / "build/fedlex_xml_urls.json"
+        cache = json.load(open(urls)) if urls.exists() else {}
+        srs = [sr for sr in srs if sr not in kept]
+        latest = {sr: tuple(cache[sr]) for sr in srs if sr in cache}
+        srs = [sr for sr in srs if sr not in latest]
+        print(f"--missing: {len(kept)} kept, {len(latest)} from the XML cache, {len(srs)} by SPARQL", file=sys.stderr)
     for i in range(0, len(srs), 40):
         chunk = srs[i:i + 40]
         for b in sparql(Q % (" ".join(json.dumps(s) for s in chunk), RUN_DATE)):
@@ -135,7 +147,7 @@ def main() -> None:
         except Exception as e:  # recorded, never silently dropped
             return sr, {"date": d, "refs": None, "error": str(e)[:200]}
 
-    result = {}
+    result = dict(kept)
     todo = sorted(latest)
     with ThreadPoolExecutor(max_workers=6) as ex:
         for k, (sr, rec) in enumerate(ex.map(work, todo)):
@@ -143,7 +155,7 @@ def main() -> None:
             if k % 250 == 0:
                 print(f"xml {k}/{len(todo)}", file=sys.stderr)
     json.dump({"run_date": RUN_DATE, "source": "Fedlex consolidated DE XML: SR-number footnotes and eli/cc links",
-               "acts": result}, open(ROOT / "data/fedlex_xrefs.json", "w"), ensure_ascii=False, separators=(",", ":"))
+               "acts": dict(sorted(result.items()))}, open(out, "w"), ensure_ascii=False, separators=(",", ":"))
     n_refs = sum(len(r["refs"] or []) for r in result.values())
     print(f"done: {len(result)} acts read, {n_refs} references", file=sys.stderr)
 

@@ -32,7 +32,6 @@ build/fedlex_xml_urls.json (rerun reuses it).
 
 Output: data/fedlex_basis.json {"run_date", "source", "acts": {sr: {...}}}
 """
-import csv
 import json
 import re
 import sys
@@ -43,9 +42,10 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import inforce
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN_DATE = "2026-10-26"
+RUN_DATE = inforce.RUN_DATE
 SPARQL = "https://fedlex.data.admin.ch/sparqlendpoint"
 FX = "{http://fedlex.admin.ch/}"
 LATIN = r"(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies|undecies|duodecies)"
@@ -300,10 +300,10 @@ def _text_no_notes(el):
 
 def main() -> None:
     srs, eli_to_sr, uris = set(), {}, defaultdict(list)     # uris: SR -> [(in force, act URI)]
-    for r in csv.DictReader(open(ROOT / "data/sr_eli.csv", encoding="utf-8")):
+    for r in inforce.rows():                      # Fedlex status corrected by its dates (decision 33)
         a = r["act"].rstrip("/")
         eli_to_sr[a] = r["notation"]
-        force = (r["inForce"] or "").endswith("/0")
+        force = inforce.in_force(r)
         uris[r["notation"]].append((force, a))
         if force:
             srs.add(r["notation"])
@@ -311,9 +311,14 @@ def main() -> None:
     srs = sorted(srs)
     cache = ROOT / "build/fedlex_xml_urls.json"
     latest: dict[str, list[str]] = json.load(open(cache)) if cache.exists() else {}
-    todo = [s for s in srs if s not in latest]
     # the act in force under that SR number; otherwise (a cited act no longer in force) all of them
-    pick = {s: [a for f, a in uris[s] if f] or [a for _, a in uris[s]] for s in todo}
+    pick = {s: [a for f, a in uris[s] if f] or [a for _, a in uris[s]] for s in srs}
+    # a cached text of another act than the one now picked is stale (decision 33: a successor without status)
+    eli_path = lambda a: a.split("/eli/")[-1].replace("/", "-")
+    for s in srs:
+        if s in latest and not any(eli_path(a) + "-" in latest[s][1].replace("/", "-") for a in pick[s]):
+            del latest[s]
+    todo = [s for s in srs if s not in latest]
     flat = [(s, a) for s in todo for a in pick[s]]
     chunks = [flat[i:i + 40] for i in range(0, len(flat), 40)]
 

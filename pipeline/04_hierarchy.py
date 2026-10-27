@@ -22,6 +22,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import duckdb
+import inforce
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build"
@@ -46,7 +47,7 @@ def main() -> None:
         labels[r["notation"]][r["lang"]] = r["label"]
         parent[r["notation"]] = r["broader"] or None
     status = {}
-    for r in csv.DictReader(open(ROOT / "data/sr_eli.csv", encoding="utf-8")):
+    for r in inforce.rows():                      # Fedlex status corrected by its dates (decision 33)
         s = (r["inForce"] or "").rsplit("/", 1)[-1]
         status[r["notation"]] = min(status.get(r["notation"], "9"), s or "9")
     is_act = set(status)

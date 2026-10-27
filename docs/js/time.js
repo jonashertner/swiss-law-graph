@@ -102,15 +102,14 @@ export function setYear(y) {
   TIME.year = y;
   drawBar(); emit();
 }
-function start() {
+function start(rate = 13, done = null) {                   // years per second; done: reached today
   if (TIME.year >= TIME.y1) TIME.year = TIME.y0;
-  const rate = 13;                                         // years per second
   play = { t0: performance.now(), from: TIME.year };
   const step = (now) => {
     if (!play) return;
     const y = clamp(play.from + ((now - play.t0) / 1000) * rate);
     if (y !== TIME.year) setYear(y);
-    if (y >= TIME.y1) { stop(); return; }
+    if (y >= TIME.y1) { stop(); if (done) done(); return; }
     play.raf = requestAnimationFrame(step);
   };
   play.raf = requestAnimationFrame(step);
@@ -118,6 +117,24 @@ function start() {
 }
 function stop() { const was = !!play; if (play) { cancelAnimationFrame(play.raf); play = null; } playButton(); if (was) emit(); }
 export const playing = () => !!play;
+
+// The entry (a visit without a hash): the law growing from 1848 to today, then today's map. The first click,
+// scroll or key hands over: playback stops where it is and the year stays (the bar's own buttons act as usual).
+let intro = null;
+export async function playIntro() {
+  if (!motion()) return;
+  await enter(TIME.y0);
+  const take = (e) => {
+    if (!intro) return;
+    const own = e.target && e.target.closest && e.target.closest("#timebar");
+    clearTimeout(intro.t); intro.off(); intro = null;
+    if (!own) stop();
+  };
+  const EV = ["pointerdown", "wheel", "keydown", "touchstart"];
+  intro = { t: 0, off: () => EV.forEach((ev) => removeEventListener(ev, take, true)) };
+  EV.forEach((ev) => addEventListener(ev, take, { capture: true, passive: true }));
+  start(16, () => { if (intro) intro.t = setTimeout(() => { if (intro) { intro.off(); intro = null; exit(); } }, 1400); });
+}
 
 // ---------- the bar
 const ICON_PLAY = `<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4L13 8z" fill="currentColor"/></svg>`;

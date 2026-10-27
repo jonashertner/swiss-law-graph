@@ -324,8 +324,10 @@ async function boot() {
     if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); $("q").focus(); }
   });
   S.booted = true;
+  const entry = !location.hash.slice(1);             // the bare address: the map, then the time view plays (decision 33)
   await route();
   $("loading").hidden = true;
+  if (entry && S.view === "map") TV.playIntro().catch(() => {});
 }
 boot().catch((e) => { console.error(e); $("loadtxt").textContent = "Error: " + e.message; });
 export { go };

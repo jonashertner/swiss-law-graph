@@ -30,6 +30,7 @@ import duckdb
 
 from artnum import parse_eid
 from cantons import CANTON_CONSTITUTION
+import inforce
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build"
@@ -155,8 +156,8 @@ def main() -> None:
     for r in csv.DictReader(open(ROOT / "data/sr_taxonomy.csv", encoding="utf-8")):
         tax[r["notation"]][r["lang"]] = r["label"]
     eli = {}
-    for r in csv.DictReader(open(ROOT / "data/sr_eli.csv", encoding="utf-8")):
-        if r["notation"] not in eli or (r["inForce"] or "").endswith("/0"):
+    for r in inforce.rows():
+        if r["notation"] not in eli or inforce.in_force(r):
             eli[r["notation"]] = r["act"]
     fed_abbr = {e["sr_number"]: {k: e.get("abbr_" + k) for k in ("de", "fr", "it") if e.get("abbr_" + k)}
                 for e in lc["federal"]}

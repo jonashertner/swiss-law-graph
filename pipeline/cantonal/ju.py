@@ -88,7 +88,8 @@ def fetch(url, path):
     return None
 
 
-LIST_RE = re.compile(r'href="(/Scripts/Modules/CustomView/List\.aspx\?idn=(\d+)&(?:amp;)?name=SubCategories)"')
+# RSJU writes the path as /Scripts/ and, in places, /scripts/ (category 144 was missed until 2026-10-27)
+LIST_RE = re.compile(r'href="(/Scripts/Modules/CustomView/List\.aspx\?idn=(\d+)&(?:amp;)?name=SubCategories)"', re.I)
 FILE_RE = re.compile(r'<li class="file_(\d+)"><a href="(/fr/viewdocument\.html\?idn=(\d+)&(?:amp;)?id=\d+)">'
                      r'<strong>(.*?)</strong><span>(.*?)</span></a>', re.S)
 

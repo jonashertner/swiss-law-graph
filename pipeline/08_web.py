@@ -30,6 +30,7 @@ import shutil
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 from pathlib import Path
+import inforce
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "site" / "data"
@@ -94,10 +95,17 @@ def main():
         tax[r["notation"]][r["lang"]] = plain(r["label"])
         tax[r["notation"]]["_b"] = r["broader"]
     eli_in, eli_any = {}, {}
-    for r in csv.DictReader(open(ROOT / "data/sr_eli.csv", encoding="utf-8")):
+    for r in inforce.rows():                          # Fedlex status corrected by its dates (decision 33)
         eli_any.setdefault(r["notation"], r["act"])
-        if r["inForce"].endswith("/0"):
+        if inforce.in_force(r):
             eli_in[r["notation"]] = r["act"]
+    hist_path = ROOT / "data/fedlex_history.json"     # every act Fedlex has carried, by ELI (decision 32)
+    hist = json.load(open(hist_path)) if hist_path.exists() else {}
+    day_after = lambda d: (date.fromisoformat(d) + timedelta(days=1)).isoformat()
+    TYPE_FLOOR = {21: 1, 22: 1, 28: 1, 8: 1, 9: 1, 7: 1, 36: 1, 10: 1, 4: 1, 5: 1, 19: 1,   # the Federal Assembly
+                  29: 2, 3: 2, 15: 2,                                                  # Federal Council, courts, contracts with cantons
+                  26: 3, 27: 3, 1: 3, 2: 3, 81: 3, 14: 3,                              # departments, offices, other bodies
+                  31: 8, 32: 8, 16: 4}                                                 # treaties; cantonal constitutions
 
     nodes, names = [], {lg: {"l": [], "t": []} for lg in LANGS}
 
@@ -156,20 +164,28 @@ def main():
         base = n.split("@")[0]
         fa = (fedacts.get(base) or [{}])
         at = n.split("@")[1] if "@" in n else ""         # "1967", or "1986-11" when two acts of the number share a year
-        fv = fa[-1] if not at else next((v for v in fa if (v.get("date") or "")[:len(at)] == at), fa[0])
+        cur = (eli_in.get(base) or "").rstrip("/")     # the act in force: by its ELI, not the last act of the number
+        fv = (next((v for v in fa if (v.get("eli") or "").rstrip("/") == cur), None) or hist.get(cur) or fa[-1]) if not at \
+            else next((v for v in fa if (v.get("date") or "")[:len(at)] == at), fa[0])
         title = {lg: plain((fv.get("title") or {}).get(lg)) or tax[base].get(lg) or tax[base].get("de", "") for lg in LANGS}
         ab = {lg: ((cn.get("a") or {}).get(lg) or (fv.get("abbr") or {}).get(lg) or abbr_of(tax[base].get(lg)) or
                    abbr_of(tax[base].get("de")) or "") for lg in LANGS}
         if not ab["en"]:
             ab["en"] = ab["de"]
-        if kind == "o":                       # an earlier act: "BV 1874", "aOR"
-            y = n.split("@")[1]
+        if kind == "o":                       # an earlier act: "BV 1874", "aOR"; a cited number with no act in force: its last act
+            y = at or (fv.get("date") or fv.get("in_force") or "0000")[:4]
             ab = {lg: ("a" + (ab[lg] or base) if y == "a" else (ab[lg] or base) if y in (ab[lg] or "") else
                        f"{ab[lg] or base} {y}" if y != "0000" else (ab[lg] or base)) for lg in LANGS}
-        url = (cn.get("e") or eli_in.get(base) or eli_any.get(base) or "").replace("https://fedlex.data.admin.ch/", "https://www.fedlex.admin.ch/")
+        url = ((fv.get("eli") if kind == "o" and not at else None) or cn.get("e") or eli_in.get(base) or eli_any.get(base) or ""
+               ).replace("https://fedlex.data.admin.ch/", "https://www.fedlex.admin.ch/")
+        hr = hist.get((fv.get("eli") or "").rstrip("/")) or (hist.get(cur, {}) if kind == "a" else {})   # its own record
+        if fl == -1 and kind == "a" and hr.get("type") in TYPE_FLOOR:   # no text, so no Ingress (SR 974.4): the document type
+            fl = TYPE_FLOOR[hr["type"]]
+        end = None if kind != "o" or fv.get("repealed") or hr.get("repealed") else hr.get("end")
+        rp = (fv.get("repealed") or hr.get("repealed") or (day_after(end) if end else None)) if kind == "o" else None
         k = add(kind, parent, base if kind == "a" else n, {lg: ab[lg] or title[lg] for lg in LANGS}, title,
                 id=n, f=fl, d=cn.get("n", 0), n=art_count.get(aid), pk=cn.get("pk") if "pk" in cn else None,
-                ad=tn.get("ad") or fv.get("date"), by=tn.get("by"), u=url, rp=fv.get("repealed") if kind == "o" else None,
+                ad=tn.get("ad") or fv.get("date"), by=tn.get("by"), u=url, rp=rp, le=end,
                 ab={lg: ab[lg] for lg in LANGS if ab[lg]} if any(ab.values()) else None)
         act_idx[aid] = k
         return k
@@ -194,7 +210,8 @@ def main():
             here = act_idx.get("SR " + base)
             parent = nodes[here]["p"] if here is not None else cat(tax[base]["_b"]) if tax.get(base, {}).get("_b") else \
                 blk["int" if base.startswith("0") else "fed"]
-            fed_act(n, parent, kind="o" if "@" in n else "a")
+            # a number courts cite whose acts are all repealed or lapsed (SR 235.3, 831.232.21) is an earlier act too
+            fed_act(n, parent, kind="o" if "@" in n or base not in eli_in else "a")
 
     # ---- cantonal law: the 26 collections in force, then codes courts cite that no act in force carries
     ct_order = tree["method"].get("ct_order") or sorted(cb)
@@ -238,15 +255,9 @@ def main():
     # ---- the federal history (decision 32): every act the federal compilations carried in the SR and repealed
     # since (Fedlex; from the cleaned-up collection of 1948 on), placed by the SR number it carried; the earlier
     # acts courts cite are among them and keep their node. Shown only in the time view (no value today).
-    hist_path = ROOT / "data/fedlex_history.json"
-    hist = json.load(open(hist_path)) if hist_path.exists() else {}
     path = lambda u: (u or "").split("/eli/")[-1]
-    TYPE_FLOOR = {21: 1, 22: 1, 28: 1, 8: 1, 9: 1, 7: 1, 36: 1, 10: 1, 4: 1, 5: 1, 19: 1,   # the Federal Assembly
-                  29: 2, 3: 2, 15: 2,                                                  # Federal Council, courts, contracts with cantons
-                  26: 3, 27: 3, 1: 3, 2: 3, 81: 3, 14: 3,                              # departments, offices, other bodies
-                  31: 8, 32: 8, 16: 4}                                                 # treaties; cantonal constitutions
     have = {path(n.get("u")) for n in nodes if n["k"] in ("a", "o") and n.get("u")} | {path(u) for u in eli_in.values()}
-    cited = {(n["s"].split("@")[0], n["s"].split("@")[1]) for n in nodes if n["k"] == "o"}
+    cited = {tuple((n["s"].split("@") + [""])[:2]) for n in nodes if n["k"] == "o"}
     kv_ct = {n["sr"]: n["ct"] for n in nodes if n["k"] == "a" and n.get("ct") and n.get("sr")}
     codes = {n["s"] for n in nodes if n["k"] == "o"}
     hstat = Counter()
@@ -281,19 +292,19 @@ def main():
             nosr[b] = add("g", blk[b], "", NO_SR, id=f"{b}/-", hg=1)
         return nosr[b]
     run = (tree["method"].get("run_date") or f"{y_run}-12-31")[:10]
-    day_after = lambda d: (date.fromisoformat(d) + timedelta(days=1)).isoformat()
     for eli, h in hist.items():
         sr = h.get("hid") or h.get("n") or ""
         st = h.get("status")
         # the end of its force: the repeal, else the day after the end of applicability a temporary act states
         rep = h.get("repealed") or (day_after(h["end"]) if h.get("end") else None)
         y = (h.get("date") or h.get("in_force") or "")[:4]
-        if st in (0, 4) or path(eli) in have:
-            hstat["in force, not yet, or on the map"] += 1
+        if path(eli) in have:
+            hstat["on the map"] += 1
             continue
-        if not rep or rep > run:                       # no end before the run: Fedlex gives no date, or no status
-            hstat["no date of its end" if st in (1, 2, 3) else "no status: draft or placeholder" if not h.get("in_force")
-                  else "no status: enters into force later" if h["in_force"] > run else "no status: in force by its dates"] += 1
+        if not rep or rep > run:                       # no end before the run (an act marked in force may have one: decision 33)
+            hstat["in force or not yet" if st in (0, 4) else "no date of its end" if st in (1, 2, 3) else
+                  "no status: draft or placeholder" if not h.get("in_force") else
+                  "no status: enters into force later" if h["in_force"] > run else "no status: in force by its dates"] += 1
             continue
         if not (sr or y):
             hstat["undated"] += 1
@@ -495,12 +506,15 @@ def main():
             born[k], died[k] = n["_y"]
             how["history"] += 1
         elif kind == "o":                              # an earlier federal act: while it was in force
-            base, at = s.split("@")
-            fv = next((v for v in fedacts.get(base, []) if (v.get("date") or "")[:len(at)] == at), None)
+            base, at = (s.split("@") + [""])[:2]
+            fa_ = fedacts.get(base, [])
+            fv = next((v for v in fa_ if (v.get("date") or "")[:len(at)] == at), None) if at else (fa_[-1] if fa_ else None)
             if fv:
                 born[k] = year(fv.get("in_force") or fv.get("date"))
-                nxt = [v["in_force"] for v in fedacts.get(base, []) if (v.get("in_force") or "") > (fv.get("in_force") or "9")]
-                if year(fv.get("repealed")):
+                nxt = [v["in_force"] for v in fa_ if (v.get("in_force") or "") > (fv.get("in_force") or "9")]
+                if year(n.get("rp")):                   # repeal, else the day after its end of applicability
+                    died[k] = year(n.get("rp"))
+                elif year(fv.get("repealed")):
                     died[k] = year(fv.get("repealed"))
                 elif nxt:                               # no repeal date on Fedlex (VEZL 2002): until its successor started
                     died[k] = year(min(nxt))
@@ -510,7 +524,8 @@ def main():
             path = (n.get("u") or "").split("/eli/")[-1]
             recs = fdates.get(s, [])
             r = next((v for v in recs if v["eli"].split("/eli/")[-1] == path), None) or \
-                next((v for v in reversed(recs) if not v.get("repealed")), None)
+                hist.get("https://fedlex.data.admin.ch/eli/" + path) or \
+                next((v for v in reversed(recs) if not v.get("repealed")), None)      # a treaty new to the map: its own record
             born[k] = year((r or {}).get("in_force")) or year((r or {}).get("date")) or year(n.get("ad"))
             how["treaty in force" if r and r.get("in_force") else "treaty adopted" if born[k] else "treaty undated"] += 1
         else:                                          # federal and cantonal acts: adopted
@@ -615,7 +630,10 @@ def main():
     method = dict(tree["method"])
     for k in ("tours", "plates"):
         method.pop(k, None)
-    json.dump({"tree": method, "core": core.get("method", {})}, open(OUT / "method.json", "w"), separators=(",", ":"), ensure_ascii=False)
+    why = Counter(r["why"] for r in inforce.rows() if r["why"])     # the dates against Fedlex's status (decision 33)
+    json.dump({"tree": method, "core": core.get("method", {}),
+               "inforce": {"run": inforce.RUN_DATE, "dates": why["dates"], "ended": why["ended"]}},
+              open(OUT / "method.json", "w"), separators=(",", ":"), ensure_ascii=False)
     size = sum(f.stat().st_size for f in OUT.rglob("*.json"))
     print(json.dumps(meta["counts"]), dict(stats), f"{size / 1e6:.1f} MB in docs/data")
 

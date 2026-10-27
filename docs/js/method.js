@@ -14,7 +14,7 @@ const foot = {
 };
 function render() {
   const shim = { method: t("method"), decisions: t("decisions"), lv1: t("row1"), lv2: t("row2"), lv3: t("row3") };
-  let body = methodHTML(data.core, lang(), shim, num, esc, data.tree);
+  let body = methodHTML({ ...data.core, inforce: data.inforce }, lang(), shim, num, esc, data.tree);
   body = body.replace(/^\s*<button[^>]*id="mclose"[^>]*>.*?<\/button>\s*<h2[^>]*>.*?<\/h2>\s*<p>.*?<\/p>/s, "");
   $("mdoc").innerHTML = `<h1>${esc(t("method"))}</h1><p class="lead">${esc(t("methodLead"))}</p>` +
     `<p class="note">${esc(t("nActsInForce", num(M.meta.counts.fed_in_force + M.meta.counts.int_in_force + M.meta.counts.kt_in_force)))} · ${esc(t("nDec", num(M.meta.decisions)))} · ${esc(t("asOf"))} ${esc(M.meta.run || "")}</p>` +

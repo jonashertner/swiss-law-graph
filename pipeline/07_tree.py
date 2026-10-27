@@ -54,6 +54,7 @@ from pathlib import Path
 
 from artnum import LATIN, expand_range, sort_key, split
 from cantons import CANTON_CONSTITUTION
+import inforce
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site" / "data"
@@ -137,8 +138,12 @@ def main() -> None:
 
     # ---- members: federal acts in force (SR not 0.x), on the map, with a readable text
     members, excluded = {}, defaultdict(int)
+    live = {r["notation"] for r in inforce.rows() if inforce.in_force(r)}   # basis.json also holds cited acts no longer in force
     for sr, rec in acts.items():
         if sr == "101" or sr.startswith("0.") or "error" in rec:
+            continue
+        if sr not in live:
+            excluded["cited, no act in force"] += 1
             continue
         if sr.startswith("131.2"):          # cantonal constitutions (guaranteed, Art. 51 BV): cantonal law
             excluded["cantonal_constitutions"] += 1
@@ -639,8 +644,8 @@ def main() -> None:
         ksym[ct] = c.most_common(1)[0][0] if c else "Art."
     # the constitutions on Fedlex (guaranteed by the Federal Assembly, published in SR 131.2)
     eli = {}
-    for r in csv.DictReader(open(ROOT / "data/sr_eli.csv", encoding="utf-8")):
-        if r["notation"] not in eli or (r.get("inForce") or "").endswith("/0"):
+    for r in inforce.rows():
+        if r["notation"] not in eli or inforce.in_force(r):
             eli[r["notation"]] = r["act"]
     for ct, t in kv_node.items():
         e = eli.get(CANTON_CONSTITUTION[ct])
