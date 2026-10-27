@@ -27,8 +27,7 @@ function renderFoot() {
   const run = M.meta && M.meta.run;
   $("footdate").textContent = run ? t("dataAsOf", date(run)) : "";
   $("footsrc").textContent = t("footSrc"); $("footsrc").href = href("method");
-  const [a, b] = t("made");
-  $("footmade").innerHTML = `${esc(a)} <span class="heart" aria-label="♥">♥\uFE0E</span> ${esc(b)} <a href="https://jonashertner.com" rel="author">jonashertner.com</a>`;
+  $("footmade").innerHTML = `built with <span class="heart" role="img" aria-label="love">♥\uFE0E</span> by <a href="https://jonashertner.com" rel="author">Jonas Hertner</a>`;
 }
 function staticText() {
   renderFoot();
