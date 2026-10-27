@@ -25,6 +25,7 @@ const S = {
   q4: ["Wo zeigt das Recht Lücken und Veraltetes?", "Où le droit présente-t-il des lacunes et des archaïsmes ?", "Dove il diritto presenta lacune e parti superate?", "Where does the law show gaps and dead wood?"],
   q5: ["Was ist neu in Kraft?", "Qu’est-ce qui vient d’entrer en vigueur ?", "Che cosa è appena entrato in vigore?", "What has just come into force?"],
   q6: ["Wie hängt alles zusammen?", "Comment tout est-il lié ?", "Come è tutto collegato?", "How does it all connect?"],
+  q7: ["Was steht im Wortlaut – und was hat sich seit 2021 geändert?", "Que dit le texte – et qu’est-ce qui a changé depuis 2021 ?", "Che cosa dice il testo – e che cosa è cambiato dal 2021?", "What does the text say – and what has changed since 2021?"],
   // what depends on an act
   impact: ["Was hängt daran?", "Qu’est-ce qui en dépend ?", "Che cosa ne dipende?", "What depends on it?"],
   impLede: [(d, a) => `${d} ${d === "1" ? "Erlass stützt" : "Erlasse stützen"} sich direkt darauf, ${a} über die ganze Kette der Delegation.`,
@@ -317,6 +318,7 @@ const S = {
   repoHist: ["Fassungen seit 2021", "Versions depuis 2021", "Versioni dal 2021", "Versions since 2021"],
   dataAsOf: [(d) => `Stand ${d}`, (d) => `État au ${d}`, (d) => `Stato al ${d}`, (d) => `Data as of ${d}`],
   footSrc: ["Fedlex, kantonale Sammlungen, OpenCaseLaw", "Fedlex, recueils cantonaux, OpenCaseLaw", "Fedlex, raccolte cantonali, OpenCaseLaw", "Fedlex, cantonal collections, OpenCaseLaw"],
+  footGit: ["Wortlaut auf GitHub", "Textes sur GitHub", "Testi su GitHub", "Full text on GitHub"],
   xgNote: ["Abkürzungen, die Gerichte dieses Kantons zitieren, für die seine geltende Sammlung keinen Erlass führt – meist aufgehobene Erlasse (etwa die kantonalen Prozessordnungen vor 2011) oder kommunales Recht. Die Karte zeigt sie als einen Balken (nicht flächentreu); er zeigt ihren Anteil an den Verweisen des Kantons. Hier die Codes nach Entscheiden.",
     "Abréviations que les tribunaux de ce canton citent et pour lesquelles son recueil en vigueur ne contient aucun acte – pour la plupart des actes abrogés (ainsi les codes de procédure cantonaux d’avant 2011) ou du droit communal. La carte les montre comme une seule barre (pas à l’échelle), qui indique leur part des renvois du canton. Ici les codes par décisions.",
     "Abbreviazioni citate dai tribunali di questo Cantone per le quali la raccolta in vigore non contiene alcun atto – per lo più atti abrogati (così i codici di procedura cantonali prima del 2011) o diritto comunale. La carta le mostra come un’unica barra (non in scala), che indica la loro quota dei rinvii del Cantone. Qui i codici per decisioni.",

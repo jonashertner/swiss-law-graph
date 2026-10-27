@@ -108,9 +108,10 @@ function fill(id, html, my) {
 function asks() {
   const rpg = M.byId.get("700");
   const q = [["q1", rpg != null ? href("700") : href("net"), rpg != null ? label(rpg) : ""], ["q2", href("cantons/700"), rpg != null ? label(rpg) : ""],
-    ["q3", null, "1848–"], ["q4", href("check"), ""], ["q5", href("new"), ""], ["q6", href("net"), ""]];
-  return section(t("ask"), `<ul class="rows asks">${q.map(([k, h, v]) => `<li>${h ? `<a class="r" href="${h}">` : `<button class="r" data-act="time">`}` +
-    `<span class="a">${esc(t(k))}</span>${v ? `<span class="v">${esc(v)}</span>` : ""}${h ? "</a>" : "</button>"}</li>`).join("")}</ul>`);
+    ["q3", null, "1848–"], ["q4", href("check"), ""], ["q5", href("new"), ""], ["q6", href("net"), ""], ["q7", REPO, "GitHub"]];
+  const ext = (h) => h && h.startsWith("https:");   // the law repository: the text of every act, every version since 2021
+  return section(t("ask"), `<ul class="rows asks">${q.map(([k, h, v]) => `<li>${h ? `<a class="r" href="${h}"${ext(h) ? ' target="_blank" rel="noopener"' : ""}>` : `<button class="r" data-act="time">`}` +
+    `<span class="a">${esc(t(k))}</span>${v ? `<span class="v">${esc(v)}${ext(h) ? ` ${ICON.ext}` : ""}</span>` : ""}${h ? "</a>" : "</button>"}</li>`).join("")}</ul>`);
 }
 
 // ---------- what depends on it: counts by depth and by jurisdiction, from the stated bases

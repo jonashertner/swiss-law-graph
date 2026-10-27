@@ -26,7 +26,7 @@ B = ROOT / "build/lawgit"
 START = "2021-01-01"
 TODAY = dt.date.today().isoformat()
 TZ = ZoneInfo("Europe/Zurich")
-WHO = "swiss-law · jonashertner.com <noreply@jonashertner.com>"
+WHO = "swiss-law · jonashertner.com <130315719+jonashertner@users.noreply.github.com>"   # GitHub noreply address: commits link to the account
 FOOT = ("\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n"
         "Claude-Session: https://claude.ai/code/session_01MYoE3wkJdqwAeR8TTwc1B4")
 MONTHS = "Januar Februar März April Mai Juni Juli August September Oktober November Dezember".split()

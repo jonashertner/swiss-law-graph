@@ -25,8 +25,9 @@ function pickLang() {
 // the footer: when the data were read (the run of the pipeline), from where, and who made it
 function renderFoot() {
   const run = M.meta && M.meta.run;
-  $("footdate").textContent = run ? t("dataAsOf", date(run)) : "";
+  $("footdate").innerHTML = run ? `<span class="gl">${esc(t("dataAsOf", "").trim())} </span>${esc(date(run))}` : "";   // phones: the date alone
   $("footsrc").textContent = t("footSrc"); $("footsrc").href = href("method");
+  $("footgit").innerHTML = `<span class="gl">${esc(t("footGit").replace(/GitHub$/, ""))}</span>GitHub`;   // phones: "GitHub" alone
   $("footmade").innerHTML = `built with <span class="heart" role="img" aria-label="love">♥\uFE0E</span> by <a href="https://jonashertner.com" rel="author">Jonas Hertner</a>`;
 }
 function staticText() {
