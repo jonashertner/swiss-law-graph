@@ -13,7 +13,8 @@ footnotes and the issuer of the target.
 | … our errors, now fixed: basis misread | 17 |
 | … genuine readings, kept | 47 |
 | Newly exposed by the floor fixes (agreements now on floor 5) | 8 |
-| **Lower-floor bases now** | **55** |
+| **Lower-floor bases after the review** | **55** |
+| … after decision 27 (acts of intercantonal bodies on floor 5; UR 20.2715 → ZBSA rules no longer lower) | **54** |
 
 Of the 55, **one** inverts the delegation (ZG 413.123). The other 54 are structural. They are preamble
 lists, agreements naming each party's norm, approvals and successor numbers, plus 12 whose floor is
@@ -89,14 +90,12 @@ A lower act stated as the basis ("gestützt auf"): the delegation chain runs upw
 - **ZG 413.123 — Verordnung betreffend die Entschädigung für Experten- und Referententätigkeit in der Berufsbildung** → ZG 413.112 — Ausführungsbestimmungen 2 zum Einführungsgesetz Berufsbildung (Regelung des Qualifikationsverfahrens).
   The Regierungsrat's ordinance on fees for examiners rests "gestützt auf" § 20 of the Ausführungsbestimmungen 2 zum EG Berufsbildung, issued by the Amt für Berufsbildung. A government ordinance resting on an office's provisions inverts the chain, unless § 20 only refers back to the government. Read § 20.
 
-### Floor of the act named unknown (12)
+### Floor of the act named unknown (11)
 
 The target's floor is not stated: the collection gives no issuer and the title says nothing, so floor 7 is a default, not a finding. Read by hand, the inversion may disappear.
 
 - **SR 414.110.12** → SR 414.110.1.
   Agreement of the Federal Council and the Zurich government executing Art. 6 Ziff. III of the 1905 Aussonderungsvertrag; that contract was approved by the Federal Assembly (SR 414.110.11) and sits on floor 3 by its title only.
-- **UR 20.2715 — Reglement zum Bundesgesetz über die berufliche Alters-, Hinterlassenen- und Invalidenversicherung** → UR 9.3103 — Zentralschweizer BVG- und Stiftungsaufsicht (ZBSA): Ausführungsbestimmungen über die berufliche Vorsorge.
-  The ZBSA's implementing provisions are published by reference only (no Ingress, no issuer in the collection). They are an act of the concordat's body: whether this is an inversion depends on how acts of intercantonal bodies are ranked (open question).
 - **ZG 1021.018 — Kantonsratsbeschluss betreffend einen Objektkredit Kostenbeteiligung Erdverkabelung auf dem Trassee zwischen den Unterwerken Sins und Langacher** → ZG 711.31 — Kantonaler Richtplan, Richtplantext.
   Names chapter E 15.2.1 of the cantonal Richtplan of 1 September 1988. The collection states no issuer for the Richtplan; floor 7 is the default.
 - **ZG 1021.020 — Kantonsratsbeschluss betreffend Objektkredit für Soft-Massnahmen zur Förderung des Velofahrens** → ZG 711.31 — Kantonaler Richtplan, Richtplantext.
@@ -223,9 +222,12 @@ An approval decree names the contract it approves; the contract sits on a lower 
   Approval of the agreement of 23 May 1958 with Vaud and Valais on the Great St Bernard road tunnel ("in Anbetracht des Abkommens").
 
 
-## Open question
+## Decided (2026-10-27, decision 27)
 
-How should acts of intercantonal bodies be ranked? Today a Konkordatsrat or a Konferenz → 5, and a
-concordat's Verwaltungsrat → 7. Art. 48 Abs. 4/5 BV argue for 5 throughout: law-making by
-intercantonal bodies is intercantonal law and prevails over cantonal law. It affects few of the 55
-(UR's ZBSA rules) but more acts on the map.
+Acts of intercantonal bodies are on floor 5 throughout: law-making by intercantonal bodies is
+intercantonal law and prevails over cantonal law (Art. 48 Abs. 4/5 BV). 40 acts moved: the
+Verwaltungsrat of the Ostschweizer and beider Basel BVG-Aufsicht, the OST's Hochschulrat, the CLDJP's
+concordat rules, the HES-SO's and the Gymnase de la Broye's acts, the fishing commissions' rules,
+UR's and ZG's acts published only by reference to an intercantonal body. Not moved: a canton's
+approval or executing act for an agreement, private bodies acting for the cantons (the SRK's
+rules), foundations not called intercantonal.

@@ -146,11 +146,19 @@ PARL = re.compile(r"Kantonsrat|Gro(?:ss|ß)e[rn]?\s+Rat|Grossrat|Landrat|Landsge
                   r"Stimmbürger|Verfassungsrat|Grand\s+Conseil|GRAND\s+CONSEIL|peuple|Assemblée\s+constituante|Constituante|"
                   r"Conseil\s+représentatif|Gran\s+Cons\w*glio|Consigli\s+del\s+Cantone|popolo|Landeskonferenz|Grosse\s+Landrat", re.I)
 # a conference of the cantons or of their directors (not "die Mittelschulkonferenz des Kantons", "la Conférence des préfets")
-CONF_INTER = (r"\w*(?:konferenz|conférence|conferenza)\b(?![^,;]{0,40}?\bdes\s+Kantons\b)[^;]{0,140}?(?:kantonal|cantona|\bKantone|\bcantons|"
+CONF_INTER = (r"\w*(?:konferenz|conf[ée]rence|conferenza)\b(?![^,;]{0,40}?\bdes\s+Kantons\b)[^;]{0,140}?(?:kantonal|cantona|\bKantone|\bcantons|"
               r"\bCantoni|Kantonsregierungen|konkordat|concordat|Vereinbarungskantone|romand|latin|suisse|schweizerisch|svizzer|"
               r"zentralschweiz|ostschweiz|nordwestschweiz|westschweiz|interkantonal|intercantonal|universitaire)|"
               r"\w*(?:direktor|direktoren|direktorinnen|regierungs)\w*konferenz|interkantonal\w*\s+\w*(?:konferenz|conférence|conferenza)|"
               r"\b(?:GDK|EDK|SODK|KKJPD|BPUK|FDK|VDK|SDK|CDIP|CDS|CDAS|CCDJP|DTAP|CDEP|LDK|EnDK|KdK|CdC|CIIP|CDPE|InöB|AiMp)\b")
+# an act of a body of several cantons, by its title: "Gebührenreglement der BVG- und Stiftungsaufsicht der Kantone …",
+# "Actes adoptés par les organes du Gymnase intercantonal de la Broye", "Statuten des Universitäts-Kinderspitals beider
+# Basel"; not an act of the canton about one ("Verordnung des Regierungsrates zur Interkantonalen Vereinbarung …")
+TITLE_ORGAN = re.compile(r"^(?:[\w\-'’]+\s+){0,3}?(?:der|des|de\s+la|du|de\s+l['’]|della|dei|par\s+les\s+organes\s+(?:de\s+la|du|de\s+l['’]))\s+"
+                         r"(?!(?:\w+\s+)?(?:Regierung|Regierungsrat\w*|Grossen?\s+Rat\w*|Kantonsrat\w*|Landrat\w*|Departement\w*|Direktion|"
+                         r"Kantons\b|Conseil\s+d|Grand\s+Conseil|Département|Direction|Consiglio))[^,;:]{0,50}?(?:interkantonal\w*|"
+                         r"intercantonal\w*|concordat\w*|[Kk]onkordat\w*|beider\s+Basel|Suisse\s+occidentale|romand\w*|Ostschweiz\w*|"
+                         r"Zentralschweiz\w*|Nordwestschweiz\w*|der\s+Kantone\b)", re.I)
 # an act a conference of the cantons issued, by its title ("Reglement der EDK", "Actes adoptés par la Conférence latine …")
 TITLE_CONF = re.compile(r"^.{0,60}?\b(?:der|des|de\s+la|du|par\s+la|della|dei)\s+(?:Organe\s+der\s+)?(?:[\w\-]+\s+){0,2}(?:" + CONF_INTER + ")", re.I)
 INTERCANT = re.compile(r"^(?:Die|Les|I|Gli)\s+(?:Regierungen\s+der\s+)?(?:Kantone|cantons|Cantoni|Vereinbarungskantone|"
@@ -158,9 +166,11 @@ INTERCANT = re.compile(r"^(?:Die|Les|I|Gli)\s+(?:Regierungen\s+der\s+)?(?:Kanton
                        r"Vereinbarungs|Konkordats|"
                        # the cantons named one by one, or "die dieser Vereinbarung beigetretenen Kantone"
                        r"^(?:Le|Der|Il)\s+(?:Canton|Kanton|Cantone)\b[^,]{0,40},\s*(?:le|der|il|la)\s+(?:Canton|Kanton|Cantone|République)|"
-                       r"^(?!(?:Erlassen\s+vo[mn]\s+(?:der\s+|dem\s+)?)?(?:(?:Der|Die|Das|Le|La|L['’]|Il|Les|I)\s+)?(?:Verwaltungsrat|Vorstand|Hochschulrat|"
-                       r"Fachhochschulrat|Stiftungsrat|Geschäftsleitung|Direktion|Direktionen|Departemente|Kommission|conseil\s+d['’]administration|comité|"
-                       r"Comitato|commission|départements|dipartimenti)\b).*\b(?:Kantone|Kantonen|cantons|Cantoni)\b", re.I)
+                       # a body of several cantons (decision 27: its acts are intercantonal law, Art. 48 Abs. 4/5 BV): "der
+                       # Verwaltungsrat der BVG- und Stiftungsaufsicht der Kantone …", "der BSABB (… beider Basel)", "der Hochschulrat
+                       # der OST – Ostschweizer Fachhochschule", "les départements … des cantons universitaires romands"
+                       r"\b(?:Kantone|Kantonen|cantons|Cantoni)\b|beider\s+Basel|\b(?:Ost|Zentral|Nordwest|West)schweizer\w*|"
+                       r"Suisse\s+(?:occidentale|romande|latine)|romands?\b|romandes?\b|concordataire|Fondation\s+romande", re.I)
 GOV = re.compile(r"Regierungsrat|Regierung\b|Standeskommission|Landammann|Conseil\s+d['’]\s*[ÉE]tat|CONSEIL\s+D['’]\s*[ÉE]TAT|"
                  r"Conseil-exécutif|Consiglio\s+di\s+Stato|CONSIGLIO\s+DI\s+STATO|Gouvernement|Obergericht|Kantonsgericht|"
                  r"Verwaltungsgericht|Appellationsgericht|Tribunal\s+cantonal|Tribunale\s+d['’]appello|Cour\s+(?:suprême|de\s+justice)|"
@@ -451,8 +461,8 @@ CHURCH_TITLE = re.compile(r"^(?:[\w\-]+\s+){0,1}(?:des|der|du|de\s+la|de\s+l['�
 CHURCH_ISSUER = re.compile(r"^(?:(?:Die|Der|Das|Le|La|L['’]|Il|Zwischen\s+dem|Zwischen\s+der)\s+)?(?:[\w\-.]+\s+){0,3}?" + CHURCH_BODY)
 
 # agreements: who the parties are decides the floor (decisions 17, 26)
-AGREE_HEAD = re.compile(r"^(?:Nachtrag\s+zu[mr]\s+)?(?:[A-ZÄÖÜ][\w.\-]*(?:e|er|es|en|isch)\s+){0,2}?[\w\-]*?(?i:vereinbarung|konkordat|"
-                        r"übereinkunft|übereinkommen|vertrag|verträge|konvention|abkommen|traité|convention|concordat|accord|"
+AGREE_HEAD = re.compile(r"^(?:(?:[IVX]+\.\s+)?Nachtrag\s+zu[mr]\s+)?(?:[A-ZÄÖÜ][\w.\-]*(?:e|er|es|en|isch)\s+){0,2}?[\w\-]*?(?i:vereinbarung|konkordat|"
+                        r"übereinkunft|übereinkommen|uebereinkunft|uebereinkommen|vertrag|verträge|konvention|abkommen|traité|convention|concordat|accord|"
                         r"protocole|convenzione|accordo|concordato|trattato|protocollo)\b")
 TOPIC = re.compile(r"\s(?:über|betreffend|betr\.|bezüglich|wegen|zur|zum|für|im\s+Bereich|hinsichtlich|concernant|sur|relative?s?|réglant|"
                    r"au\s+sujet|visant|portant|en\s+matière|pour|concernente|sulla|sul|sui|sugli|sulle|per|in\s+materia|riguardante|"
@@ -591,6 +601,12 @@ def issuer_and_floor(rec, ct=""):
     ag = agreement_floor(title, ing, iss, ct)
     if ag:
         return iss, ag[0], ag[1]
+    if ED_NOTE.search(ing):
+        return iss, 5, "Verweis"          # published only by reference to an intercantonal body's site or Intlex (UR, ZG)
+    if not iss and TITLE_ORGAN.match(title) and not APPROVAL.match(title) and \
+            not re.search(r"d['’]application|\bzu[rm]\b|Vollzug|Einführung", title) and \
+            not (re.search(r"Stiftung|Fondation", title) and not re.search(r"inter[kc]antonal", title, re.I)):
+        return iss, 5, "Titel"            # an act of a body of several cantons (not the canton's approval or executing act)
     if TITLE_CONF.match(title) and not (iss and (GOV.search(iss.split(",")[0]) or PARL.search(iss.split(",")[0]))) or \
             re.match(r"^[\w\-]+\s+(?:intercantona\w*|interkantonal\w*)\b|^Interkantonal\w*\s+(?!Vereinbarung)", title, re.I):
         return iss, 5, "interkantonal" if iss else "Titel"   # "Reglement der EDK", "Règlement intercantonal …"
@@ -1077,6 +1093,7 @@ def main():
     fed_titles = federal_titles()
     kvs = kv_structure()
     out, stats = {}, Counter()
+    loaded = {}
     for ct in CANTONS:
         p = ROOT / "build" / "cantonal" / f"{ct}.json"
         if not p.exists():
@@ -1101,6 +1118,24 @@ def main():
                 stats["numbers_shared"] += 1
         for a in acts:
             a["_issuer"], a["_floor"], a["_floor_by"] = issuer_and_floor(a, ct)
+        loaded[ct] = acts
+    # an intercantonal act is published in several collections; where one copy names its intercantonal issuer,
+    # the copies with no issuer take that floor ("Zentralschweizer Fachhochschul-Verordnung": LU names the Konkordatsrat)
+    inter = defaultdict(set)
+    for ct, acts in loaded.items():
+        for a in acts:
+            if a["_floor"] == 5 and a["_floor_by"] in ("interkantonal", "Verweis") and a.get("adopted"):
+                inter[(tkey(a.get("title") or ""), a["adopted"])].add(ct)
+    for ct, acts in loaded.items():
+        for a in acts:
+            if a["_floor_by"] in ("Titel", "unbekannt") and a["_floor"] != 5 and a.get("adopted") and \
+                    inter.get((tkey(a.get("title") or ""), a["adopted"]), set()) - {ct} and key_ok(tkey(a.get("title") or "")):
+                a["_floor"], a["_floor_by"] = 5, "interkantonal"
+                stats["floor_from_other_collection"] += 1
+    for ct in CANTONS:
+        if ct not in loaded:
+            continue
+        acts = loaded[ct]
         cx = Canton(ct, acts, fed, kvs.get(ct, {}).get("arts", {}), fed_date, fed_titles)
         recs = {}
         for a in acts:

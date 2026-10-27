@@ -1,7 +1,7 @@
 {
  "reviewed": "2026-10-27",
  "by": "manual reading of each Ingress (swiss-law-graph)",
- "note": "Every stated basis whose target sits on a lower floor than the act naming it, after the parser and floor fixes of 2026-10-27. Categories in display order; 'n' quotes or paraphrases the Ingress.",
+ "note": "Every stated basis whose target sits on a lower floor than the act naming it, after the parser and floor fixes of 2026-10-27. Categories in display order; 'n' quotes or paraphrases the Ingress. 2026-10-27, decision 27: acts of intercantonal bodies on floor 5; UR 20.2715 → ZBSA rules is no longer an inversion.",
  "categories": [
   {
    "id": "claim",
@@ -82,12 +82,6 @@
    "t": "K:BE:923.111",
    "c": "party",
    "n": "BE–JU agreement on the Birs; names Art. 8 Abs. 1 lit. d of the Bernese Fischereiverordnung (competence to conclude)."
-  },
-  {
-   "a": "K:UR:20.2715",
-   "t": "K:UR:9.3103",
-   "c": "floor",
-   "n": "The ZBSA's implementing provisions are published by reference only (no Ingress, no issuer in the collection). They are an act of the concordat's body: whether this is an inversion depends on how acts of intercantonal bodies are ranked (open question)."
   },
   {
    "a": "K:ZG:1021.018",

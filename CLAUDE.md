@@ -138,18 +138,18 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     constitutions (SR 131.2, `pipeline/cantons.py`) hang from Art. 51 BV (a constitutional link, not
     an Ingress; drawn down the central axis). Below, every act in force of the 26 official collections
     (16,358 + 26 constitutions) on floors by the issuer its Ingress names: 5 parliament/people/
-    Landsgemeinde/intercantonal (6,937), 6 government + cantonal courts (7,721), 7 directorates,
-    offices, other bodies incl. communal bodies some cantons publish and church law (1,700);
-    no issuer → from the title (1,436, marked; every agreement, intercantonal or with a foreign state,
+    Landsgemeinde/intercantonal incl. acts of intercantonal bodies (6,977), 6 government + cantonal courts (7,709), 7 directorates,
+    offices, other bodies incl. communal bodies some cantons publish and church law (1,672);
+    no issuer → from the title (1,435, marked; every agreement, intercantonal or with a foreign state,
     → 5 whoever concluded it: intercantonal law prevails over cantonal law, Art. 48 Abs. 5 BV — until
     2026-10-26 agreements between governments went to 6 by title but to 5 by Ingress, 131 acts moved;
-    a contract of the canton "vertreten durch den Regierungsrat" with a commune → 6; 200 with no
+    a contract of the canton "vertreten durch den Regierungsrat" with a commune → 6; 187 with no
     telling title → 7, marked "unknown"; parties of agreements since decision 26). Found through the matrix (decision 25): "Le Parlement de la
     République et Canton du Jura" and GR's "Vom Volke angenommen" were not read as parliament/people
     (287 acts were on floor 7); agreements whose Ingress lists the cantons one by one or says "die dieser
     Vereinbarung beigetretenen Kantone", or whose title names the agreement later ("Zentralschweizer
     Fachhochschul-Vereinbarung"), → 5 (117); "Plenarausschuss/Geschäftsleitung der Gerichte" → 6.
-    Acts of an intercantonal body (its Verwaltungsrat, departments of several cantons) stay on 7. Parent = the nearest higher cantonal basis the Ingress names
+    Acts of an intercantonal body (its Verwaltungsrat, departments of several cantons) → 5 since decision 27. Parent = the nearest higher cantonal basis the Ingress names
     (a KV article node `KV:<ct>:art_N`, or a cantonal act), then text order. No parent → one of five
     groups, in this order (decision 24): "basis named, not identifiable" (469; incl. acts of another
     canton), "names only acts not above it" (lower floor or a same-floor circle, 4), "only federal law
@@ -238,12 +238,12 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     (distinct); 936,926 decisions refer to at least one act in force (979,726 incl. earlier acts).
 
 24. The 54 % check (2026-10-26). Floor 5 first showed 54 % of its acts hanging from no cantonal
-    basis; after the fixes below and the floor fixes of decisions 17 and 26: 3,653 of 6,937 (52.7 %). The
-    share is real, but "no cantonal basis" was one grey group mixing five cases. Now: 1,959 the Ingress
-    names no basis (28.2 %; sample 25/25 genuine: "Der Grosse Rat … beschliesst:", "Le Grand Conseil …
+    basis; after the fixes below and the floor fixes of decisions 17, 26, 27: 3,676 of 6,977 (52.7 %). The
+    share is real, but "no cantonal basis" was one grey group mixing five cases. Now: 1,963 the Ingress
+    names no basis (28.1 %; sample 25/25 genuine: "Der Grosse Rat … beschliesst:", "Le Grand Conseil …
     décrète"; drafting practice differs: JU 2 %, UR 5 %, ZG 8 %, VS 8 % vs LU 58 %, GL 55 %, TI 55 %,
-    GE 51 %; agreements that moved to floor 5 in decision 26 often name none), 737 no preamble
-    published (10.6 %), 784 only federal law (11.3 %), 170 a basis named but not identifiable (2.5 %),
+    GE 51 %; agreements that moved to floor 5 in decision 26 often name none), 755 no preamble
+    published (10.8 %), 784 only federal law (11.2 %), 171 a basis named but not identifiable (2.5 %),
     3 only acts not above them.
     Parser fixes found on the way (each checked by diff against the previous run; 29 targets changed,
     all corrections): footnote digits glued to the year ("19912"); "gestützt §", "in Hinsicht auf",
@@ -264,16 +264,16 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     node → block, `rank`). A dependency structure matrix of the overview's blocks in Stufenbau order:
     BV parts, treaties, floors 1–3 by SR area, then per canton KV, 5, 6, 7 (canton-major, so each canton
     is a 4 × 4 module on the diagonal). Cell = acts of the row naming a basis in the column (all stated
-    bases, 24,537 act → target pairs in 1,463 cells), provisions (federal acts only), or case-law lift
+    bases, 24,537 act → target pairs in 1,457 cells), provisions (federal acts only), or case-law lift
     (≥ 20 shared decisions; diagonal empty, not computable from pair counts). Log colour up to the
-    strongest cell shown. Grey fields = same floor; below = a higher floor (21,679 bases), same floor
-    2,803, a lower floor 55 (each read by hand, decision 26; it was 571 before the floor fixes the
+    strongest cell shown. Grey fields = same floor; below = a higher floor (21,666 bases), same floor
+    2,817, a lower floor 54 (each read by hand, decision 26; it was 571 before the floor fixes the
     matrix exposed, 109 before decision 26). Sections: all (156 × 156), federal (with labels), cantons (104 rows × federal
     columns + the canton's own four). In the basis layer BV parts and treaties are columns only (they
     rest on nothing). Hover = row/column cross + tooltip; click = the acts behind the cell (basis: acts
     and their targets; legislation: act pairs by provisions; case law: pairs of the pruned co-citation
     network); the strongest 12 cells beside it; arrow keys + Enter. Panel counts checked against the
-    cells (18 of 18) and the lower-floor list against the pipeline (55).
+    cells (18 of 18) and the lower-floor list against the pipeline (54).
 
 26. The 109 inversions read (2026-10-27, `reports/inversions-review.md`, data `reports/inversions_review.json`).
     Every stated basis on a lower floor than the act naming it was read in its Ingress. 62 of the 109
@@ -315,8 +315,18 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
     Ausführungsbestimmungen 2" of the Amt für Berufsbildung: Phase 2). 07 reports `mat_low_open`
     (pairs not yet reviewed; 0) and `mat_low_review_stale` (reviewed pairs gone; 0): after a data
     refresh, read the open ones and add them to the JSON.
-    Open: how to rank acts of intercantonal bodies (Konkordatsrat, Konferenz → 5 today; a
-    concordat's Verwaltungsrat → 7) — Art. 48 Abs. 4/5 BV argue for 5 throughout.
+27. Acts of intercantonal bodies → floor 5 (2026-10-27, Jonas): law-making by intercantonal bodies is
+    intercantonal law and prevails over cantonal law (Art. 48 Abs. 4/5 BV). An issuer naming several
+    cantons or an intercantonal institution ("Verwaltungsrat der BVG- und Stiftungsaufsicht der Kantone
+    …", "BSABB … beider Basel", "Hochschulrat der OST – Ostschweizer Fachhochschule", "les départements
+    … des cantons universitaires romands", "CONFERENCE LATINE", "Fondation romande") → 5; with no issuer,
+    a title naming such a body in the genitive ("Actes adoptés par les organes du Gymnase intercantonal
+    de la Broye", "Statuten des Universitäts-Kinderspitals beider Basel") → 5, not a canton's approval or
+    executing act about one, not a foundation unless called intercantonal; acts UR and ZG publish only
+    by reference (all 27 point to an intercantonal body's site or to Intlex) → 5 ("Verweis"); a copy
+    with no issuer takes floor 5 when another collection's copy (same title, same date) names its
+    intercantonal issuer (4). 40 acts moved; the SRK's rules (a private body acting for the cantons)
+    stay on 7. The lower-floor list: 54 (UR 20.2715 → ZBSA rules no longer lower).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -399,8 +409,8 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
   communal law (BZO …) is out of scope of the cantonal collections.
 - The 13 dangling bases and 79 acts without a basis are Phase-2 material (lacunae, outdated Ingress);
   so is the one genuine upward delegation of decision 26 (ZG 413.123 → § 20 of the Amt's provisions).
-- The 12 inversions with a default floor (decision 26) need the issuer read in the official gazette:
-  FR Tarif des émoluments administratifs 1968, ZG Richtplan 1988, SO Volksbeschluss 1898, ZBSA rules.
+- The 11 inversions with a default floor (decision 26) need the issuer read in the official gazette:
+  FR Tarif des émoluments administratifs 1968, ZG Richtplan 1988, SO Volksbeschluss 1898.
 - Phase 2 (simplification, contradictions, lacunae) builds on `fedlex_structure.json.gz` and the
   article co-citation graph.
 
@@ -409,6 +419,3 @@ Preview (private): https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republi
 - TI and SZ come via LexFind (Institute of Federalism, academic service): only Ingress text (official,
   Art. 5 URG) and metadata are republished, links go to ti.ch / sz.ch. Acceptable for the public page?
 - VD shows only the BLV's "majeur" acts (895 of 2,747); the 1,852 "mineur" decrees are left out.
-- Rank of acts of intercantonal bodies (decision 26): Konkordatsrat/Konferenz → 5, a concordat's
-  Verwaltungsrat → 7 today. All on 5 (Art. 48 Abs. 4/5 BV: law-making by intercantonal bodies is
-  intercantonal law and prevails over cantonal law), or the concordat on 5 and its bodies by rank?
