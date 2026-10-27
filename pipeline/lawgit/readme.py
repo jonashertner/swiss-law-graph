@@ -14,8 +14,8 @@ AREAS = {"1": "Staat – Volk – Behörden", "2": "Privatrecht – Zivilrechtsp
          "0.7": "Völkerrecht: Öffentliche Werke – Energie – Verkehr", "0.8": "Völkerrecht: Gesundheit – Arbeit – Soziale Sicherheit",
          "0.9": "Völkerrecht: Wirtschaft – Technische Zusammenarbeit"}
 CANTON = {"AG": "Aargau", "AI": "Appenzell Innerrhoden", "AR": "Appenzell Ausserrhoden", "BE": "Bern", "BL": "Basel-Landschaft",
-          "BS": "Basel-Stadt", "FR": "Freiburg / Fribourg", "GE": "Genf / Genève", "GL": "Glarus", "GR": "Graubünden / Grigioni / Grischun", "LU": "Luzern",
-          "NE": "Neuenburg / Neuchâtel", "NW": "Nidwalden", "OW": "Obwalden", "SG": "St. Gallen", "SH": "Schaffhausen", "SO": "Solothurn", "TG": "Thurgau",
+          "BS": "Basel-Stadt", "FR": "Freiburg / Fribourg", "GE": "Genf / Genève", "GL": "Glarus", "JU": "Jura", "GR": "Graubünden / Grigioni / Grischun", "LU": "Luzern",
+          "NE": "Neuenburg / Neuchâtel", "ZH": "Zürich", "NW": "Nidwalden", "OW": "Obwalden", "SG": "St. Gallen", "SH": "Schaffhausen", "SO": "Solothurn", "TG": "Thurgau",
           "UR": "Uri", "VD": "Waadt / Vaud", "VS": "Wallis / Valais", "ZG": "Zug"}
 
 
@@ -41,7 +41,8 @@ def files(snaps: dict, facts: dict, kacts: dict, start: str, today: str, future=
         if not path.startswith("ch/") and not path.startswith(("beschlossen/", "vernehmlassung/")):
             a = kby.get(path) or {}
             kt[path.split("/")[0].upper()].append((a.get("nr") or path.split("/")[2], a.get("short") or "", a.get("title") or "", path, sorted(langs),
-                                                    "_pdf" in "".join(langs) or any(snaps[path][lg].count("\ntext: pdf\n") for lg in langs)))
+                                                    "pdf" if any("\ntext: pdf\n" in snaps[path][lg] for lg in langs)
+                                                    else "link" if any("\ntext: link\n" in snaps[path][lg] for lg in langs) else ""))
     # per area
     for grp, rows in fed.items():
         rows.sort(key=lambda r: srkey(r[0]))
@@ -55,11 +56,13 @@ def files(snaps: dict, facts: dict, kacts: dict, start: str, today: str, future=
                                     [f"| [{g}]({g}/README.md) | {AREAS.get(g, '')} | {len(fed[g])} |" for g in order]) + "\n"
     for ct, rows in kt.items():
         rows.sort(key=lambda r: srkey(r[0]))
-        npdf = sum(1 for r in rows if r[5])
+        npdf = sum(1 for r in rows if r[5] == "pdf")
+        nlink = sum(1 for r in rows if r[5] == "link")
         t = [f"# Kanton {CANTON.get(ct, ct)}", "", f"{len(rows)} Erlasse in Kraft am {today}"
-             + (f"; {npdf} davon veröffentlicht der Kanton nur als PDF (hier ohne Text, mit Link)" if npdf else ""), "",
+             + (f"; {npdf} davon veröffentlicht der Kanton nur als PDF, ihr Text ist daraus gelesen (PDF)" if npdf else "")
+             + (f"; {nlink} nur als Link auf das PDF" if nlink else ""), "",
              "| Nummer | Kurztitel | Titel | Sprachen |", "|---|---|---|---|"]
-        t += [f"| {cell(nr)} | {cell(sh)} | {cell(ti)}{' (PDF)' if pdf else ''} | " + " ".join(f"[{lg}](../{p.split('/', 1)[1]}/{lg}.md)" for lg in ls) + " |"
+        t += [f"| {cell(nr)} | {cell(sh)} | {cell(ti)}{' (PDF)' if pdf == 'pdf' else ' (nur Link)' if pdf == 'link' else ''} | " + " ".join(f"[{lg}](../{p.split('/', 1)[1]}/{lg}.md)" for lg in ls) + " |"
               for nr, sh, ti, p, ls, pdf in rows]
         out[f"{ct.lower()}/README.md"] = "\n".join(t) + "\n"
     # adopted, not yet in force; consultations
@@ -101,7 +104,7 @@ def files(snaps: dict, facts: dict, kacts: dict, start: str, today: str, future=
                  f"{cell(fm(p, 'title'))} | " + " ".join(f"[{lg}](../{p}/{lg}.md)" for lg in sorted(snaps[p])) + " |")
     out["vernehmlassung/README.md"] = "\n".join(t) + "\n"
     chk = {}
-    for jur in ("ch", "kt", "vd", "sil", "pend"):
+    for jur in ("ch", "kt", "vd", "sil", "pend", "pdfcur", "zh"):
         f = B / f"check_{jur}.json"
         if f.exists():
             vals = list(json.load(open(f)).values())
@@ -124,6 +127,8 @@ def readme(nfed: int, nkt: dict, chk: dict, start: str, today: str, npend=(0, 0,
     kc = chk.get("kt", (0, 0, 0, 0))
     vc = chk.get("vd", (0, 0, 0, 0))
     sc = chk.get("sil", (0, 0, 0, 0))
+    zc = chk.get("pdfcur", (0, 0, 0, 0))
+    zh_ = chk.get("zh", (0, 0, 0, 0))
     pc = chk.get("pend", (0, 0, 0, 0))
     return f"""# Schweizer Recht
 
@@ -171,13 +176,18 @@ Tages, ab dem die Fassung gilt. Ein aufgehobener Erlass wird an seinem letzten T
 - Kantone: die systematischen Gesetzessammlungen der Kantone auf LexWork (AG, AI, AR, BE, BL, BS, FR, GL, GR, LU, NW, OW, SG, SH, SO, TG, UR,
   VS, ZG), jede Fassung seit {start}, auch formlose Berichtigungen; die Base législative vaudoise (BLV) mit allen konsolidierten Erlassen
   (auch den «mineurs»), ebenfalls jede Fassung seit {start}. Erlasse, die seit {start} aufgehoben wurden, sind bis zu ihrer Aufhebung enthalten.
+- Zürich (zh.ch, Loseblattsammlung): jede Fassung seit {start} der heute geltenden Erlasse, aus den PDF des Kantons gelesen (Kopf
+  `text: pdf`); eine Fassung gilt ab der letzten «in Kraft seit»-Angabe ihrer Fussnoten, sonst ab dem Ende der vorigen laut «Historie».
+  Jura (RSJU): der geltende Text aus dem PDF, ab dem Tag seiner Fassung (letzte «en vigueur depuis le»), bei älteren ab {start}.
 - Genf (rs/GE) und Neuenburg (RSN) veröffentlichen nur den geltenden Text (Word-HTML der SIL). Er steht ab dem Tag im Repository, an dem
   er gilt (GE: das letzte Inkrafttreten der Änderungstabelle, NE: «État au»), bei älteren Fassungen ab {start}. Ein Erlass, der seit
   {start} geändert wurde, fehlt deshalb vor seiner geltenden Fassung; die Änderungen nennt die Tabelle am Ende des Erlasses (GE) bzw. die Fussnoten (NE).
 - Geprüft wird jede Datei: Jedes Wort des Quelltextes muss im Markdown stehen. Bund: {n(ch[0])} Dateien, {ch[1]} mit Abweichung,
   {n(ch[2])} von {n(ch[3])} Wörtern fehlen (meist Abstände in Fundstellen). Kantone: {n(kc[0])} Dateien, {kc[1]} mit Abweichung,
   {n(kc[2])} von {n(kc[3])} Wörtern fehlen. Waadt: {n(vc[0])} Dateien, {vc[1]} mit Abweichung, {n(vc[2])} von {n(vc[3])} Wörtern fehlen.
-  Genf und Neuenburg: {n(sc[0])} Dateien, {sc[1]} mit Abweichung, {n(sc[2])} von {n(sc[3])} Wörtern fehlen.
+  Genf und Neuenburg: {n(sc[0])} Dateien, {sc[1]} mit Abweichung, {n(sc[2])} von {n(sc[3])} Wörtern fehlen. Zürich (aus dem PDF):
+  {n(zh_[0])} Dateien, {n(zh_[2])} von {n(zh_[3])} Wörtern fehlen; Jura: {n(zc[0])} Dateien (mit den geltenden Zürcher Texten),
+  {n(zc[2])} von {n(zc[3])} Wörtern fehlen.
 - Beschlossene Erlasse und Referendumsvorlagen: XML aus AS und Bundesblatt (Fedlex). Vernehmlassungsvorlagen: die PDF auf Fedlex,
   Text daraus gelesen ({n(pc[0])} Dateien, {n(pc[2])} von {n(pc[3])} Wörtern fehlen).
 - Erzeugt mit den offenen Skripten in [`jonashertner/swiss-law-graph`](https://github.com/jonashertner/swiss-law-graph) (`pipeline/lawgit/`).
@@ -186,8 +196,13 @@ Tages, ab dem die Fassung gilt. Ein aufgehobener Erlass wird an seinem letzten T
 
 - Fassungen vor 2021 (Fedlex hat sie nur als PDF und Word) und kantonale Erlasse, die vor 2021 aufgehoben wurden.
 - Frühere Fassungen in GE und NE (die Kantone veröffentlichen sie nicht als Text).
-- Die Kantone ZH und JU (veröffentlichen nur PDF) sowie TI und SZ (von hier aus nur über LexFind erreichbar).
-- Kantonale Fassungen, die der Kanton nur als PDF veröffentlicht: Die Datei nennt sie mit Link, ohne Text.
+- Frühere Fassungen im Jura (RSJU veröffentlicht nur den geltenden Text) sowie Zürcher Erlasse, die seit {start} aufgehoben wurden.
+- Die Kantone TI und SZ (von hier aus nur über LexFind erreichbar).
+- Kantonale Fassungen, die der Kanton nur als PDF veröffentlicht, sind aus dem PDF gelesen (Kopf `text: pdf`): der Wortlaut ist exakt, die
+  Gliederung aus dem Satzbild erschlossen; in Tarifen und Tabellen können Zeilen zusammenlaufen. War kein PDF zu lesen, nennt die Datei den Link.
+- Referendumsvorlagen, die vor Juli 2020 veröffentlicht wurden (etwa das CO2-Gesetz von 2020), fehlen unter `beschlossen/`. Abgelehnte
+  Vorlagen erkennt das Repository an den Bundesratsbeschlüssen über das Ergebnis der Volksabstimmung; sie verschwinden am Tag der Abstimmung.
+- Von den Vernehmlassungen nur die Vorlagen, nicht die erläuternden Berichte und Stellungnahmen.
 - Aufzählungen kantonaler Tarife mit einer Betragsspalte: Betrag nach « — ».
 
 ## Lizenz

@@ -4,7 +4,7 @@ main   — the law as it applied on each day from START (2021-01-01) to TODAY; o
          (the first commit per jurisdiction is its state on START), a deletion when an act ends.
 future — main plus the versions Fedlex and the cantons already publish for a later day.
 Paths: ch/<area>/<SR>/<lang>.md (area: first digit, international law 0.1 … 0.9), <ct>/<first char>/<number>/<lang>.md.
-Cantons: LexWork (19) and Vaud with every version since START; Geneva and Neuchâtel with the text in force only.
+Cantons: LexWork (19) and Vaud with every version since START; Geneva, Neuchâtel, Zürich, Jura with the text in force.
 Messages are computed from the texts: federal — the AS references in footnotes new in this version; cantonal — the
 rows of the canton's change table that took effect on that day. Written with `git fast-import`.
 
@@ -256,14 +256,52 @@ def cantonal_events():
             stats["vd_versions"] += 1
         if end:
             ev.append({"d": end, "jur": "VD", "act": ("VD", nr), "path": base, "files": {}, "kind": "end", "label": label})
-    # Geneva, Neuchâtel (SIL): only the text in force is published; it enters on the day it took effect (START if
-    # earlier), so an act amended since START is absent before its current version applies
-    cf = B / "check_sil.json"
-    chk = json.load(open(cf)) if cf.exists() else {}
+    # Geneva, Neuchâtel (SIL), Zürich, Jura (PDF): only the text in force here; it enters on the day it took effect
+    # (START if earlier), so an act amended since START is absent before its current version applies
+    chk = {}
+    for name in ("check_sil.json", "check_pdfcur.json"):
+        cf = B / name
+        if cf.exists():
+            chk.update(json.load(open(cf)))
     K = json.load(open(ROOT / "data/cantonal_basis.json"))["cantons"]
-    for ct in ("GE", "NE"):
+    zf = B / "zh/acts.json"
+    zh_hist = zf.exists()
+    if zh_hist:                                          # Zürich: every version since START, from the canton's PDFs
+        zc = json.load(open(B / "check_zh.json")) if (B / "check_zh.json").exists() else {}
+        KZ = K["ZH"]["acts"]
+        for r in json.load(open(zf)):
+            nr = r["sr"]
+            a = KZ.get(nr) or {}
+            base = f"zh/{slug(nr)[:1]}/{slug(nr)}"
+            title = re.sub(r"\s+", " ", a.get("title") or "").strip()
+            short = a.get("abbr") or ""
+            label = f"ZH {nr} {short or (title[:60] + ('…' if len(title) > 60 else ''))}".strip()
+            acts[("ZH", nr)] = {"path": base, "ct": "ZH", "nr": nr, "title": title, "short": short, "url": a.get("url") or ""}
+            vs, prev_end = [], ""
+            for v in r["versions"]:                      # in the order of the Nachträge
+                f = B / "md/zh" / slug(nr) / f"{v['key']}.de.md.gz"
+                if not f.exists():
+                    stats["zh_missing"] += 1
+                    continue
+                own = (zc.get(str(f.relative_to(B))) or {}).get("version") or ""
+                # "in Kraft bis 01.07.2024": the next version applies from that day; "bis 31.12.2002": from the day after
+                after = (prev_end if prev_end.endswith("-01") else day_after(prev_end)) if prev_end else ""
+                start = own if own and (not after or own >= after) else (after or own or START)
+                vs.append((max(start, START), v, f))
+                prev_end = v.get("end") or prev_end
+            vs.sort(key=lambda x: (x[0], x[1]["nachtrag"]))
+            keep = [x for k, x in enumerate(vs) if k + 1 == len(vs) or vs[k + 1][0] > x[0]]   # superseded the same day: the later one
+            for d, v, f in keep:
+                ev.append({"d": d, "jur": "ZH", "act": ("ZH", nr), "path": base, "files": {"de": f}, "kind": "zh",
+                           "src": None, "lang0": "de", "label": label, "url": "https://www.zh.ch" + v["link"],
+                           "msg": f"{label}: Stand {de_date(d)} (Nachtrag {v['nachtrag']:03d})\n\nText aus dem PDF des Kantons "
+                                  f"gelesen.\n\nQuelle: https://www.zh.ch{v['link']}"})
+                stats["zh_versions"] += 1
+    for ct, lg in (("GE", "fr"), ("NE", "fr"), ("ZH", "de"), ("JU", "fr")):   # ZH, JU: read from the canton's PDF
+        if ct == "ZH" and zh_hist:
+            continue
         for nr, a in K[ct]["acts"].items():
-            f = B / "md" / ct.lower() / slug(nr) / "current.fr.md.gz"
+            f = B / "md" / ct.lower() / slug(nr) / f"current.{lg}.md.gz"
             if not f.exists():
                 stats["sil_missing"] += 1
                 continue
@@ -276,8 +314,8 @@ def cantonal_events():
             short = a.get("abbr") or ""
             label = f"{ct} {nr} {short or (title[:60] + ('…' if len(title) > 60 else ''))}".strip()
             acts[(ct, nr)] = {"path": base, "ct": ct, "nr": nr, "title": title, "short": short, "url": a.get("url") or ""}
-            ev.append({"d": d, "jur": ct, "act": (ct, nr), "path": base, "files": {"fr": f}, "kind": "current",
-                       "src": None, "lang0": "fr", "label": label, "url": a.get("url") or ""})
+            ev.append({"d": d, "jur": ct, "act": (ct, nr), "path": base, "files": {lg: f}, "kind": "current",
+                       "src": None, "lang0": lg, "label": label, "url": a.get("url") or ""})
             stats[f"sil_{ct}_{'start' if d == START else 'later' if d <= TODAY else 'future'}"] += 1
     print(f"cantonal: {len(acts)} acts, {dict(stats)}", file=sys.stderr)
     return ev, acts
@@ -314,8 +352,9 @@ def pending_events():
                        f"{label}: veröffentlicht, tritt gestaffelt in Kraft ({', '.join(de_date(d) for d in a['eif'])})"
             else:
                 dl = (chk.get(str(files.get("de", next(iter(files.values()))).relative_to(B))) or {}).get("deadline") or ""
-                end = a.get("as_pd") or (day_after(dl) if dl else "")
-                why = f"in der Amtlichen Sammlung veröffentlicht ({a['as'].replace('oc/', 'AS ').replace('/', ' ')})" if a.get("as_pd") \
+                end = a.get("rejected") or a.get("as_pd") or (day_after(dl) if dl else "")
+                why = f"in der Volksabstimmung vom {de_date(a['rejected'])} abgelehnt" if a.get("rejected") else \
+                    f"in der Amtlichen Sammlung veröffentlicht ({a['as'].replace('oc/', 'AS ').replace('/', ' ')})" if a.get("as_pd") \
                     else (f"Referendumsfrist am {de_date(dl)} abgelaufen" if dl else "")
                 head = f"{label}: Referendumsvorlage" + (f", Referendumsfrist bis {de_date(dl)}" if dl else "")
             if end and end <= START:
@@ -364,7 +403,7 @@ def pdf_stub(t: dict, v: dict, lang: str) -> str:
             "fr": "Le canton ne publie cette version qu’en PDF ; son texte n’est pas reproduit ici.",
             "it": "Il Cantone pubblica questa versione solo in PDF; il suo testo non è riprodotto qui."}.get(lang)
     return (f"---\ncanton: {t.get('ct', '')}\nnumber: \"{t.get('systematic_number', '')}\"\ntitle: \"{title}\"\n"
-            f"version: \"{v.get('version_dates_str') or ''}\"\nurl: {t.get('canonical_link') or ''}\npdf: {pdf}\ntext: pdf\n---\n\n"
+            f"version: \"{v.get('version_dates_str') or ''}\"\nurl: {t.get('canonical_link') or ''}\npdf: {pdf}\ntext: link\n---\n\n"
             f"# {title}\n\n{note}\n\n[PDF]({pdf})\n")
 
 
@@ -376,8 +415,11 @@ def message(e, prev_text: dict) -> str:
     if e["kind"] == "end":
         return f"{e['label']}: aufgehoben per {d}"
     if e["kind"] == "current":
-        return (f"{e['label']}: Stand {d}\n\nGeltende Fassung. Frühere Fassungen veröffentlicht der Kanton nicht als Text; "
-                f"die Änderungen nennt die Tabelle am Ende des Erlasses.\n\nQuelle: {e['url']}")
+        why = {"GE": "Frühere Fassungen veröffentlicht der Kanton nicht als Text; die Änderungen nennt die Tabelle am Ende des Erlasses.",
+               "NE": "Frühere Fassungen veröffentlicht der Kanton nicht als Text; die Änderungen nennen die Fussnoten.",
+               "ZH": "Text aus dem PDF des Kantons gelesen; frühere Fassungen folgen.",
+               "JU": "Text aus dem PDF des Kantons gelesen; die Änderungen nennen die Fussnoten."}.get(e["jur"], "")
+        return f"{e['label']}: Stand {d}\n\nGeltende Fassung. {why}\n\nQuelle: {e['url']}"
     if e["kind"] == "fix":
         head = f"{e['label']}: formlos berichtigt, {d}"
     else:

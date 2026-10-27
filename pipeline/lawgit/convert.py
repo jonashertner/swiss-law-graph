@@ -6,7 +6,7 @@ Vaud (BLV): build/lawgit/vd/html/<htmlId>.html.gz → build/lawgit/md/vd/<cote>/
 Geneva, Neuchâtel (SIL, text in force only): build/cantonal/raw/<CT>/htm/<page>.htm → build/lawgit/md/<ct>/<nr>/current.fr.md.gz
 Each conversion is checked: the words of the source's text against the words of the Markdown (multiset); the result
 of every file goes to build/lawgit/check_<jur>.json. Resumable (existing Markdown is kept unless --force).
-Usage: python3 pipeline/lawgit/convert.py [ch] [kt] [vd] [sil] [pend] [--force]
+Usage: python3 pipeline/lawgit/convert.py [ch] [kt] [vd] [sil] [pend] [pdfcur] [zh] [--force]
 """
 import gzip
 import json
@@ -353,6 +353,92 @@ def pending():
     merge_check("pend", run(pend_convert, jobs))
 
 
+# ---- Zürich, Jura: the text in force, read from the canton's PDF (cached by pipeline/cantonal/zh.py, ju.py)
+RAWK = ROOT / "build/cantonal/raw"
+
+
+def zh_since(key: str) -> str:
+    """ZH: the current version applies from the day its predecessor ended ("Historie: 121 (in Kraft bis 01.07.2024)")."""
+    f = RAWK / "ZH/detail" / f"{key}.html"
+    if not f.exists():
+        return ""
+    ends = [f"{y}-{m}-{d}" for d, m, y in re.findall(r"\(in Kraft bis (\d{2})\.(\d{2})\.(\d{4})\)", f.read_text("utf-8", "replace"))]
+    ends = [e for e in ends if e <= RUN_DATE]
+    return max(ends) if ends else ""
+
+
+def pdfcur_convert(args):
+    ct, nr, a, src, out, lg, hint = args
+    front = {"canton": ct, "number": nr, "title": a.get("title") or "", "short": a.get("abbr") or "", "language": lg,
+             "version": "", "adopted": a.get("adopted") or "", "url": a.get("url") or "", "text": "pdf"}
+    try:
+        md, want = pdf2md.convert_checked(src, front, NOTICE_KT[lg].format(ct=ct) + " " + NOTICE_PDF[lg], lg, nr)
+    except Exception as e:                                # noqa: BLE001
+        return {"f": str(out.relative_to(B)), "error": str(e)[:200]}
+    ver = hint or pdf2md.latest_in_force(md, RUN_DATE)
+    if ver:                                              # the version's day, known only once the text is read
+        md = re.sub(r"^(language: .*)$", lambda m: f'{m.group(1)}\nversion: "{ver}"', md, count=1, flags=re.M)
+    got = Counter(akn2md.text_tokens_md(md))
+    write_gz(out, md)
+    miss = want - got
+    return {"f": str(out.relative_to(B)), "pdf": 1, "n": sum(want.values()), "miss": sum(miss.values()),
+            "extra": sum((got - want).values()), "ex": [w for w, _ in miss.most_common(6)], "version": ver}
+
+
+def pdfcur():
+    K = json.load(open(ROOT / "data/cantonal_basis.json"))["cantons"]
+    jobs = []
+    for m in json.load(open(RAWK / "ZH/meta.json")):
+        key = m["page"].rsplit("/", 1)[1].replace(".html", "")
+        src, nr = RAWK / "ZH/pdf" / f"{key}.pdf", m["sr"]
+        out = B / "md/zh" / re.sub(r"[^\w.\-]", "_", nr) / "current.de.md.gz"
+        a = K["ZH"]["acts"].get(nr) or {"title": "", "url": m.get("page") or ""}
+        if src.exists() and (FORCE or not out.exists()):
+            jobs.append(("ZH", nr, a, src, out, "de", zh_since(key) or ""))
+    for nr, a in K["JU"]["acts"].items():
+        m = re.search(r"[?&]id=(\d+)", a.get("url") or "")
+        src = RAWK / "JU/pdf" / f"{m.group(1)}.pdf" if m else None
+        out = B / "md/ju" / re.sub(r"[^\w.\-]", "_", nr) / "current.fr.md.gz"
+        if src and src.exists() and (FORCE or not out.exists()):
+            jobs.append(("JU", nr, a, src, out, "fr", ""))
+    print(f"pdfcur: {len(jobs)} acts", file=sys.stderr)
+    merge_check("pdfcur", run(pdfcur_convert, jobs))
+
+
+def zh_convert(args):
+    nr, a, v, src, out = args
+    front = {"canton": "ZH", "number": nr, "title": a.get("title") or "", "short": a.get("abbr") or "", "language": "de",
+             "nachtrag": v["nachtrag"], "valid_until": v.get("end") or "", "adopted": a.get("adopted") or "",
+             "url": "https://www.zh.ch" + v["link"], "text": "pdf"}
+    try:
+        md, want = pdf2md.convert_checked(src, front, NOTICE_KT["de"].format(ct="ZH") + " " + NOTICE_PDF["de"], "de", nr)
+    except Exception as e:                                # noqa: BLE001
+        return {"f": str(out.relative_to(B)), "error": str(e)[:200]}
+    ver = pdf2md.latest_in_force(md, v.get("end") or RUN_DATE)
+    if ver:
+        md = re.sub(r"^(language: .*)$", lambda m: f'{m.group(1)}\nversion: "{ver}"', md, count=1, flags=re.M)
+    got = Counter(akn2md.text_tokens_md(md))
+    write_gz(out, md)
+    miss = want - got
+    return {"f": str(out.relative_to(B)), "pdf": 1, "n": sum(want.values()), "miss": sum(miss.values()),
+            "extra": sum((got - want).values()), "ex": [w for w, _ in miss.most_common(6)], "version": ver}
+
+
+def zhhist():
+    K = json.load(open(ROOT / "data/cantonal_basis.json"))["cantons"]["ZH"]["acts"]
+    jobs = []
+    for r in json.load(open(B / "zh/acts.json")):
+        nr = r["sr"]
+        for v in r["versions"]:
+            if not v.get("pdf"):
+                continue
+            out = B / "md/zh" / re.sub(r"[^\w.\-]", "_", nr) / f"{v['key']}.de.md.gz"
+            if FORCE or not out.exists():
+                jobs.append((nr, K.get(nr) or {}, v, Path(v["pdf"]), out))
+    print(f"zh: {len(jobs)} versions", file=sys.stderr)
+    merge_check("zh", run(zh_convert, jobs))
+
+
 def run(fn, jobs):
     out = []
     with Pool(4) as p:
@@ -378,7 +464,7 @@ def merge_check(jur: str, res: list) -> None:
 
 
 if __name__ == "__main__":
-    which = [a for a in sys.argv[1:] if not a.startswith("--")] or ["ch", "kt", "vd", "sil", "pend"]
+    which = [a for a in sys.argv[1:] if not a.startswith("--")] or ["ch", "kt", "vd", "sil", "pend", "pdfcur", "zh"]
     if "ch" in which:
         federal()
     if "kt" in which:
@@ -389,3 +475,7 @@ if __name__ == "__main__":
         sil()
     if "pend" in which:
         pending()
+    if "pdfcur" in which:
+        pdfcur()
+    if "zh" in which:
+        zhhist()

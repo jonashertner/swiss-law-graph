@@ -27,7 +27,7 @@ import pdfplumber
 
 from akn2md import esc, line_safe, squash, yval
 
-NUM = r"\d+\s?[a-z]?(?:\s?(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?"
+NUM = r"(?:\d+\s?[a-z]?(?:\s?(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?|premier|première|unique|primo|unico)"
 ART = re.compile(rf"^((?:Art\.|Artikel|Article|Articolo|Art|§§?)\s*{NUM})(?![\w])\.?\s*(.*)$", re.S)
 LISTM = re.compile(r"^(?:[a-z]{1,2}\)|[a-z]{1,2}\.(?=\s)|\d{1,2}\.(?=\s)|\d{1,2}\)(?=\s)|[ivx]+\)|[–\-•·](?=\s)|\d+°)")
 ENACT = re.compile(r"(beschlie(?:ss|ß)t|verordnet|erl(?:ä|ae)sst|beschliessen|d(?:é|e)cr(?:è|e)te|arr(?:ê|e)te|d(?:é|e)cide|ordonne|"
@@ -162,9 +162,12 @@ def segments(ln, S, L, R, just=False):
             cur.append(c)
             continue
         gap = c["x0"] - prev["x1"] if prev is not None else 0
-        if prev is not None and (gap > 1.2 * max(S, ln["size"]) or (just and c["x0"] >= R + 1.5 and prev["x1"] <= R + 1.5
-                                                                    and gap > 0.2 * S)):
-            chunks.append(cur)                           # a wide gap, or a word that starts beyond the justified edge
+        raised = c["bottom"] < max(p["bottom"] for p in ln["cs"]) - 0.25 * c["size"]
+        if prev is not None and (gap > 1.2 * max(S, ln["size"])
+                                 or (prev["x1"] <= L - 1 and c["x0"] >= L - 1 and gap > 0.1 * S)       # out of the left margin
+                                 or (c["x0"] >= R + 1.5 and prev["x1"] <= R + 1.5 and gap > 0.15 * S
+                                     and (just or (c["size"] < 0.88 * S and (c["size"] >= 0.7 * S or not raised))))):   # into the right margin
+            chunks.append(cur)                           # a wide gap, or a word that crosses the column's edge
             cur = []
         cur.append(c)
         prev = c
@@ -327,10 +330,12 @@ def blocks(S, pages):
                 centred = s["x0"] > L + 3 * S and s["x1"] < R - 3 * S and abs((s["x0"] - L) - (R - s["x1"])) < 2 * S
                 at_start = prev is None or prev["kind"] != "text" or bool(re.search(r"[.:;!?]$", prev["tail"]))
                 if m and (s["lead"] >= len(m.group(1).replace(" ", "")) - 1 or s["bold"]):
-                    kind = "art"
+                    # the number in bold; a rest in plain type is the article's text, not its heading (JU, SO)
+                    kind = "art_inline" if m.group(2).strip() and not s["bold"] and \
+                        s["lead"] < len(m.group(1).replace(" ", "")) + 2 and m.group(2)[:1].isupper() else "art"
                 elif m and not m.group(2).strip() and (centred or at_start):
                     kind = "art"                        # "Art. 1" alone on its line (AI: centred, regular)
-                elif at_start and re.match(r"^(?:§§?|Art\.|Artikel)\s*\d+\s?[a-z]?(?:bis|ter|quater)?\.\s+(?:\d+[a-z]?\s+)?[A-ZÀ-Ý«]", t):
+                elif at_start and re.match(r"^(?:§§?|Art\.|Artikel|Article|Articolo)\s*(?:\d+\s?[a-z]?(?:bis|ter|quater)?\.|premier|unique|primo)\s+(?:\d+[a-z]?\s+)?[A-ZÀ-Ý«]", t):
                     kind = "art_inline"                 # "§ 1. Der Staat …" (older SO acts: number and text on one line)
                 elif s["size"] > 1.12 * S or (enacted and ((s["bold"] and len(t) > 2) or (
                         s.get("other") and abs(s["size"] - S) < 0.6 and len(t) < 90 and not re.search(r"[.,;:]$", t)
@@ -514,8 +519,8 @@ def convert_checked(path, front: dict, notice: str, lang: str = "de", number: st
             w.lines.append("#### " + num + calls)
             for g in b["marg"]:
                 w.lines += ["", f"**{squash(w.render([{'runs': [(g, False)]}]))}**"]
-            head = b["kind"] == "art" and (b["segs"][0]["lead"] >= len(num) + 2 or (
-                len(b["segs"]) == 1 and len(rest) < 90 and not rest.startswith("<sup>") and not re.search(r"[.:;,]$", rest)))
+            head = b["segs"][0]["lead"] >= len(num) + 2 or (
+                len(b["segs"]) == 1 and len(rest) < 90 and not rest.startswith("<sup>") and not re.search(r"[.:;,]$", rest))
             if rest:
                 w.lines += ["", f"**{rest}**" if head else line_safe(rest)]
             after_art = not rest and not b["marg"]
@@ -553,3 +558,22 @@ def convert_checked(path, front: dict, notice: str, lang: str = "de", number: st
     for n, t in notes.items():
         src.update(WORD.findall(re.sub(r"<sup>|</sup>", "", t)))
     return "\n".join(yaml) + "\n" + body, src
+
+
+MONTHS = {**{m: i + 1 for i, m in enumerate("januar februar märz april mai juni juli august september oktober november dezember".split())},
+          **{m: i + 1 for i, m in enumerate("janvier février mars avril mai juin juillet août septembre octobre novembre décembre".split())},
+          **{m: i + 1 for i, m in enumerate("gennaio febbraio marzo aprile maggio giugno luglio agosto settembre ottobre novembre dicembre".split())}}
+SINCE = re.compile(r"(?:in Kraft (?:seit|ab|getreten am)|en vigueur (?:depuis le|dès le|le)|in vigore (?:dal|il))\s+"
+                   r"(\d{1,2})\.?\s*(?:er|°)?\s*([A-Za-zäéèûô]+)\s+(\d{4})", re.I)
+
+
+def latest_in_force(text: str, today: str) -> str:
+    """The day the text took effect, from its change notes: the latest "in Kraft seit …" / "en vigueur depuis le …" up to today."""
+    best = ""
+    for d, m, y in SINCE.findall(text.replace("\xa0", " ")):
+        mo = MONTHS.get(m.lower())
+        if mo:
+            x = f"{y}-{mo:02d}-{int(d):02d}"
+            if x <= today and x > best:
+                best = x
+    return best

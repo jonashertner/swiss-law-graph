@@ -11,7 +11,9 @@
    document type 11) as PDF per language, the opening and closing day, the department, the acts they would change.
 
 Output: build/lawgit/pending/{as,ref,cons}.json and the files under build/lawgit/pending/{xml,pdf}/ (resumable).
-Usage: python3 pipeline/lawgit/fedlex_pending.py
+4. Ballots: the Federal Council's decrees on each vote's result (BBl) give the bills the people rejected (`votes`).
+
+Usage: python3 pipeline/lawgit/fedlex_pending.py [votes]
 """
 import gzip
 import json
@@ -207,5 +209,74 @@ def main() -> None:
     print(f"files: {len(jobs)} ({n} fetched now), {len(failed)} failed", file=sys.stderr)
 
 
+Q_VOTES = PRE + """SELECT ?a ?t ?f ?u WHERE { ?a a jolux:Act ; jolux:publicationDate ?pd ; jolux:isRealizedBy ?e .
+ ?e jolux:language <http://publications.europa.eu/resource/authority/language/DEU> ; jolux:title ?t ; jolux:isEmbodiedBy ?m .
+ ?m jolux:userFormat ?f ; jolux:isExemplifiedBy ?u .
+ FILTER(STRSTARTS(STR(?a), "https://fedlex.data.admin.ch/eli/fga/")) FILTER(?pd >= "%s"%s)
+ FILTER(CONTAINS(?t, "Ergebnis der Volksabstimmung")) }"""
+MONTHS = {m: i + 1 for i, m in enumerate("Januar Februar März April Mai Juni Juli August September Oktober November Dezember".split())}
+STOP = {"bundesgesetz", "bundesgesetzes", "über", "die", "den", "das", "der", "des", "und", "vom", "änderung", "bundesbeschluss", "zum",
+        "zur", "im", "in", "für", "auf", "mit", "von", "eine", "einen", "ein"}
+
+
+def votes() -> None:
+    """Which Referendumsvorlagen the people rejected: the Federal Council's decrees on the result of each ballot list the
+    rejected bills (Art. "Abgelehnte Vorlage(n)") with their date of adoption; a bill matches when that date and the words
+    of its title are in the same item. Adds "rejected": <vote date> to ref.json."""
+    import io
+    import pdfplumber
+    refs = json.load(open(OUT / "ref.json"))
+    rows = sparql(Q_VOTES % (FROM, DATE))
+    by = defaultdict(dict)
+    for r in rows:
+        by[r["a"]]["t"] = r["t"]
+        by[r["a"]][r["f"].rsplit("/", 1)[1]] = r["u"]
+    out = []
+    for a, d in sorted(by.items()):
+        m = re.search(r"Volksabstimmung\s+vom\s+(\d{1,2})\.\s*([A-Za-zä]+)\s+(\d{4})", d["t"])
+        if not m:
+            continue
+        day = f"{m.group(3)}-{MONTHS.get(m.group(2), 0):02d}-{int(m.group(1)):02d}"
+        inline = bool(d.get("xml"))                    # XML cites each bill inline; a PDF prints the citations as footnotes
+        if d.get("xml"):
+            txt = re.sub(r"<[^>]+>", " ", get(d["xml"]).decode("utf-8", "replace"))
+        elif d.get("pdf-a"):
+            with pdfplumber.open(io.BytesIO(get(d["pdf-a"]))) as pdf:
+                txt = "\n".join(p.extract_text() or "" for p in pdf.pages)
+        else:
+            continue
+        txt = re.sub(r"[ \t]+", " ", txt)
+        txt = txt.split("Im Namen des", 1)[0]
+        # each item ends with its result: "… ist vom Volk … abgelehnt worden" / "… angenommen worden"
+        items, last = [], 0
+        for mm in re.finditer(r"(abgelehnt|angenommen)\s+worden", txt):
+            items.append((mm.group(1), txt[last:mm.end()]))
+            last = mm.end()
+        hits = []
+        for res, it in items:
+            if res != "abgelehnt":
+                continue
+            flat = re.sub(r"-\s*\n\s*", "", it).replace("\n", " ")
+            cited = {f"fga/{y}/{n}" for y, n in re.findall(r"BBl (\d{4}) (\d+)", flat)} if inline else set()
+            for v in refs:
+                dd = v.get("dd") or ""
+                if v["id"] in cited:
+                    v["rejected"] = day
+                    hits.append(v["id"])
+                    continue
+                if not dd or dd > day or cited:
+                    continue
+                y, mo, dy = dd.split("-")
+                ds = f"{int(dy)}. {list(MONTHS)[int(mo) - 1]} {y}"
+                words = [w for w in re.findall(r"\w+", v["title"].get("de", "").lower()) if w not in STOP and len(w) > 2]
+                if ds in flat and words and sum(w in flat.lower() for w in words) >= 0.8 * len(words):
+                    v["rejected"] = day
+                    hits.append(v["id"])
+        out.append({"decree": a.split("/eli/")[1], "vote": day, "rejected": hits})
+        print(f"{day}: {len(hits)} rejected bills matched ({', '.join(hits)})", file=sys.stderr)
+    json.dump(out, open(OUT / "votes.json", "w"), ensure_ascii=False, indent=0)
+    json.dump(refs, open(OUT / "ref.json", "w"), ensure_ascii=False)
+
+
 if __name__ == "__main__":
-    main()
+    votes() if sys.argv[1:] == ["votes"] else main()
