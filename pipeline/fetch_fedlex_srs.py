@@ -44,7 +44,7 @@ def main() -> None:
                 eli.append((a["n"], act.rstrip("/"), "" if st is None else ST + str(st)))
     eli.sort(key=lambda r: (srkey(r[0]), r[1], r[2]))
     write(ROOT / "data/sr_eli.csv", ["notation", "act", "inForce"], eli)
-    tax = sorted(((r["c"], r["n"], r.get("bn") or "", r["lang"], " ".join(r["l"].split())) for r in sparql(Q_TAX)),
+    tax = sorted(((r["c"], r["n"], r.get("bn") or "", r["lang"], r["l"]) for r in sparql(Q_TAX)),   # titles verbatim
                  key=lambda r: (srkey(r[1]), r[0], r[3]))
     if len(tax) < 30000:                                 # a partial answer must not replace the tree
         sys.exit(f"taxonomy: only {len(tax)} rows, kept the copy")
