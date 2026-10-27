@@ -17,6 +17,7 @@
   <a class="brand" href="#" id="brand"><span class="mark" aria-hidden="true"></span><span class="name" id="brandname">Atlas des Schweizer Rechts</span></a>
   <nav class="views" id="views" aria-label="Ansichten">
     <a href="#" data-view="map">Karte</a>
+    <a href="#" data-view="net">Netz</a>
     <a href="#" data-view="hier">Hierarchie</a>
     <a href="#" data-view="matrix">Abhängigkeiten</a>
     <a href="#" data-view="method">Methode</a>
@@ -43,6 +44,11 @@
       <ul class="sr" id="tmlist"></ul>
     </div>
     <div class="legend"><div class="seg" id="mode" role="group"></div><div class="keys" id="legend"></div></div>
+  </section>
+  <section class="view" id="v-net" hidden>
+    <div class="vhead"><h1 id="ntitle"></h1><div class="chips" id="nlayers" role="group"></div></div>
+    <div class="stage" id="nstage"><canvas id="nc" tabindex="0" role="img"></canvas></div>
+    <div class="legend" id="nfoot"></div>
   </section>
   <section class="view" id="v-hier" hidden>
     <div class="vhead"><h1 id="htitle"></h1><div class="hkey" id="hkey"></div></div>

@@ -4,9 +4,12 @@
 a tile of a zoomable map, sized by acts or by the court decisions that refer to them, coloured by who
 enacted it; inside each cited federal act its divisions and articles. Two further views: the hierarchy
 (every act hangs from the basis its preamble names, from the Federal Constitution down to cantonal
-administration) and the dependencies between all parts of the law. German, French, Italian, English.
+administration), the dependencies between all parts of the law, and the network of every link between
+acts (stated bases, statutory references, co-citation in case law) across federal law, treaties and the 26
+cantons. German, French, Italian, English.
 Static files only: `python3 -m http.server -d docs` and open http://localhost:8000. The data in
-`docs/data/` is built by `pipeline/08_web.py` from the outputs of steps 05 and 07.
+`docs/data/` is built by `pipeline/08_web.py` from the outputs of steps 05 and 07; the network layout
+(`docs/data/net.json`) by `node layout/net.mjs`.
 
 The earlier 3D map:
 
@@ -23,9 +26,17 @@ LexFind for TI and SZ).
 - `data/` — raw source files (OpenCaseLaw CC0 snapshot 2026-10-26; Fedlex exports of the same day).
 - `pipeline/` — steps 01–08, from statute references to the site data. See `CLAUDE.md` for the
   run order and every data decision.
-- `layout/` — circle packing (d3-hierarchy).
+- `layout/` — circle packing (d3-hierarchy) and the network layout (graphology, ForceAtlas2).
 - `site/` — the page (`index.html` + ES modules `main.js`, `gl.js`, `i18n.js`, `method.js`; three.js
   from jsDelivr); `flat.html` + `app.js` is the earlier 2D version. `site/data/` is generated and
   not committed. Serve `site/` over HTTP (`python3 -m http.server`) — modules do not load from file://.
 - `docs/` — the public site (`index.html`, `style.css`, `js/`, `fonts/` Geist under the SIL OFL, `data/`).
 - `reports/opencaselaw-anomalies.md` — issues found in the source data.
+
+## Licence
+
+- Code (pipeline, layout, site): MIT, see `LICENSE`.
+- Data derived from OpenCaseLaw (decisions, citations, statute references): CC0, as the source dataset.
+- Federal and cantonal legislation, titles and preambles: official texts, not protected by copyright
+  (Art. 5 URG, SR 231.1); every act links to its official source (Fedlex or the canton's collection).
+- Fonts in `docs/fonts/`: Geist and Geist Mono under the SIL Open Font License 1.1.

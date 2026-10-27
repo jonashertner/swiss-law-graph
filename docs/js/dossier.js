@@ -6,7 +6,10 @@ import { $, esc, num, date, sw, href, decUrl, ICON } from "./util.js";
 import { headingOf } from "./treemap.js";
 
 const el = () => $("dossier");
-let token = 0, opts = {};
+let token = 0, opts = {}, linker = null, extra = () => "";
+export function setLinker(f) { linker = f; }
+export function setExtra(f) { extra = f; }
+const linkTo = (j) => (linker ? linker(j) : href(idOf(j)));
 const LIST = 10;
 
 export function hide() { el().hidden = true; el().innerHTML = ""; document.body.classList.remove("sheet"); }
@@ -41,7 +44,7 @@ function rowsHTML(items, render, cap = LIST) {
 }
 function actRow(j, value, sub) {
   const s = sub ?? title(j);
-  return `<a class="r" href="${href(idOf(j))}"><span class="a">${sw(M.cls[j] >= 0 ? M.cls[j] : 6)}${esc(labelCt(j))}</span>${value != null ? `<span class="v">${esc(value)}</span>` : ""}${s && s !== label(j) ? `<span class="b">${esc(s)}</span>` : ""}</a>`;
+  return `<a class="r" href="${linkTo(j)}"><span class="a">${sw(M.cls[j] >= 0 ? M.cls[j] : 6)}${esc(labelCt(j))}</span>${value != null ? `<span class="v">${esc(value)}</span>` : ""}${s && s !== label(j) ? `<span class="b">${esc(s)}</span>` : ""}</a>`;
 }
 function section(h, body, n) {
   return body ? `<section><h2><span>${esc(h)}</span>${n != null ? `<span class="n">${esc(num(n))}</span>` : ""}</h2>${body}</section>` : "";
@@ -119,8 +122,11 @@ export async function node(i, o = {}) {
   const h1 = labelCt(i), lede = title(i);
   const facts = [];
   const c = M.cls[i];
-  if (k === KIND.a) facts.push([t("level"), `${sw(c)}${esc(clsName(c))}`]);
-  if (M.BY[i]) facts.push([t("enactedBy"), esc(M.BY[i])]);
+  // the level; where no issuer is stated, the level comes from the title (or is not known)
+  const how = M.BY[i] === "Titel" || M.FB[i] === "Titel" ? ` (${t("fromTitle")})` : M.FB[i] === "unbekannt" ? ` (${t("notStated")})` : "";
+  if (k === KIND.a) facts.push([t("level"), `${sw(c)}${esc(clsName(c) + how)}`]);
+  const BY = { Bundesversammlung: "byFA", Bundesrat: "byFC", Gericht: "byCourt", "Departement, Amt oder andere Behörde": "byDept" };
+  if (BY[M.BY[i]]) facts.push([t("enactedBy"), esc(t(BY[M.BY[i]]))]);
   if (M.AD[i]) facts.push([t("adopted"), esc(date(M.AD[i]))]);
   if (M.A[i]) facts.push([t("articles"), `<span class="num">${esc(num(M.A[i]))}</span>`]);
   if (k === KIND.o) { const today = M.byId.get(M.S[i].split("@")[0]); if (today != null) facts.push([t("today"), `<a href="${href(idOf(today))}">${esc(label(today))}</a>`]); }
@@ -128,6 +134,7 @@ export async function node(i, o = {}) {
     (lede && lede !== h1 ? `<p class="lede">${esc(lede)}</p>` : "") +
     (pooled ? `<p class="lede">${esc(t("pooledNote", num(M.MM[i])))}</p>` : k === KIND.x ? `<p class="lede">${esc(t("codeNote"))}</p>` : "") +
     (u ? `<a class="src" href="${esc(u)}" target="_blank" rel="noopener">${esc(ct && !u.includes("fedlex") ? t("cantonText") : t("fedlex"))} ${ICON.ext}</a>` : "") +
+    (!linker && extra(i) ? `<div class="btnrow">${extra(i)}</div>` : "") +
     (facts.length ? `<dl class="facts">${facts.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${b}</dd>`).join("")}</dl>` : "") +
     (M.D[i] ? `<div class="stat"><b>${esc(num(M.D[i]))}</b><span>${esc(t("referring"))}</span></div>` : "");
   const hasArts = M.PK[i] >= 0;
@@ -179,7 +186,7 @@ export async function node(i, o = {}) {
       const [j, arts, clause, via, prim] = b;
       const note = via === "old" ? t("viaOld") : via === "note" ? t("viaNote") : via === "aBV→BV" ? t("viaABV") : "";
       if (j >= 0) {
-        return `<a class="r wrap" href="${href(idOf(j))}"><span class="a">${sw(M.cls[j] >= 0 ? M.cls[j] : 6)}${esc(labelCt(j))}${prim ? "" : ""}</span>` +
+        return `<a class="r wrap" href="${linkTo(j)}"><span class="a">${sw(M.cls[j] >= 0 ? M.cls[j] : 6)}${esc(labelCt(j))}${prim ? "" : ""}</span>` +
           `<span class="v">${esc(fmtArts(arts, j))}</span><span class="b">${esc(clause || title(j))}${note ? ` · ${esc(note)}` : ""}${prim && bs.length > 1 ? ` · ${esc(t("primary"))}` : ""}</span></a>`;
       }
       const why = { absent: t("viaAbsent"), earlier: t("viaEarlier"), fedany: t("basisFederal"), other: t("basisOther"), unresolved: t("basisUnknown") }[via] || t("basisUnknown");

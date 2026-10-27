@@ -5,6 +5,7 @@ import { M, build, loadNames, getJSON, idOf, isAct, KIND, pathTo, isAncestor } f
 import * as TM from "./treemap.js";
 import * as DOS from "./dossier.js";
 import { initSearch, refreshSearch } from "./search.js";
+import * as NET from "./net.js";
 import { $, esc, num, sw, href, ICON, store } from "./util.js";
 
 const wide = matchMedia("(min-width: 1181px)"), phone = matchMedia("(max-width: 720px)");
@@ -31,7 +32,7 @@ function staticText() {
   for (const a of $("views").querySelectorAll("a")) {
     const v = a.dataset.view;
     a.textContent = t(v);
-    a.href = href(v === "map" ? mapTarget() : { hier: "hierarchy", matrix: "matrix", method: "method" }[v]);
+    a.href = href(v === "map" ? mapTarget() : { net: "net", hier: "hierarchy", matrix: "matrix", method: "method" }[v]);
   }
   $("q").placeholder = t("search"); $("q").setAttribute("aria-label", t("search"));
   $("qbtn").setAttribute("aria-label", t("searchOpen")); $("closeq").setAttribute("aria-label", t("close"));
@@ -70,7 +71,8 @@ function go(target, replace = false) {
 async function route() {
   const { lang: lg, rest } = parseHash();
   if (lg !== lang()) await switchLang(lg);
-  const view = rest === "hierarchy" || rest.startsWith("hierarchy/") ? "hier" : rest === "matrix" || rest.startsWith("matrix/") ? "matrix" : rest === "method" ? "method" : "map";
+  const view = rest === "net" || rest.startsWith("net/") ? "net" : rest === "hierarchy" || rest.startsWith("hierarchy/") ? "hier" :
+    rest === "matrix" || rest.startsWith("matrix/") ? "matrix" : rest === "method" ? "method" : "map";
   showView(view);
   if (view === "map") { S.target = rest; await showMap(rest); }
   else await showOther(view, rest);
@@ -82,12 +84,13 @@ async function route() {
 const mapTarget = () => S.target || "";
 function showView(v) {
   S.view = v;
-  for (const id of ["map", "hier", "matrix", "method"]) $("v-" + id).hidden = id !== v;
+  for (const id of ["map", "net", "hier", "matrix", "method"]) $("v-" + id).hidden = id !== v;
+  DOS.setLinker(v === "net" ? (j) => (NET.has(j) ? href("net/" + idOf(j)) : href(idOf(j))) : null);
   if (v !== "map") $("tip").hidden = true;
 }
 async function showOther(view, rest) {
   if (!views[view]) {
-    const mod = await import(view === "hier" ? "./hierarchy.js" : view === "matrix" ? "./matrix.js" : "./method.js");
+    const mod = view === "net" ? NET : await import(view === "hier" ? "./hierarchy.js" : view === "matrix" ? "./matrix.js" : "./method.js");
     views[view] = mod;
     await mod.init({ go, panel: DOS });
   }
@@ -266,7 +269,10 @@ async function boot() {
   const toLang = (lg) => { const { rest } = parseHash(); history.pushState(null, "", `#${lg}/${rest}`); route(); };
   $("langs").addEventListener("click", (e) => { const b = e.target.closest("[data-lang]"); if (b) toLang(b.dataset.lang); });
   $("langsel").addEventListener("change", () => toLang($("langsel").value));
-  initSearch({ go, ensureAct });
+  // in the network a search result opens there; everything else on the map
+  initSearch({ go: (target) => { const i = M.byId.get(target); return S.view === "net" && i != null && NET.has(i) ? go("net/" + target) : go(target); }, ensureAct });
+  NET.load().then(() => { if (S.view === "map") panelFor(); }).catch(() => {});
+  DOS.setExtra((i) => (NET.has(i) ? `<a class="btn" href="${href("net/" + idOf(i))}">${ICON.net} ${esc(t("inNet"))}</a>` : ""));
   addEventListener("hashchange", route);
   addEventListener("popstate", route);
   wide.addEventListener("change", () => S.view === "map" && panelFor());

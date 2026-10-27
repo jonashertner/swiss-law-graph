@@ -62,6 +62,7 @@ python3 pipeline/cantonal_basis.py                  # 10 s, offline: data/canton
 python3 pipeline/07_tree.py                         # site/data/tree.json + ingress(_k).json + agg.json (Stufenbau, Aufbau)
 python3 pipeline/06_artifact.py                     # site/artifact.html for claude.ai preview (the 3D page)
 python3 pipeline/08_web.py                          # 8 s -> docs/data (67 MB, committed): the public site
+node layout/net.mjs                                 # 40 s -> docs/data/net.json (network layout, decision 29)
 python3 -m http.server -d docs 8766                 # the public site: http://localhost:8766
 python3 -m http.server -d site 8765                 # local view: http://localhost:8765
 ```
@@ -70,11 +71,13 @@ Fedlex fetchers (only when refreshing data): `fetch_fedlex_acts.py`, `fetch_fedl
 `fetch_fedlex_xrefs.py` and `fetch_fedlex_basis.py` for the two legislative layers.
 Cantonal collections (only when refreshing): `python3 pipeline/cantonal/lexwork.py` (~15 min), `zh.py`
 (~15 min), `vd.py` (~30 min), `ge.py`, `ne.py`, `ju.py`, `ti.py`, `sz.py` (minutes each), then `cantonal_basis.py`.
-Preview (private): the public site (decision 28) at https://claude.ai/artifact/XBRDshccV9KQwnf8qdaqo9 —
-republish from `docs/index.html` without its doctype/html/head/body wrapper, with root `docs` and every file
-under it, in two publishes (≤ 64 MB each: first all but `data/art/`, then `data/art/`). The 3D page:
-https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republish from `site/artifact.html` with root `site`
-and the files under `site/data`.
+Preview (private): the public site (decision 28) at https://claude.ai/artifact/XBRDshccV9KQwnf8qdaqo9 and,
+since 2026-10-27 (Jonas: "replace the 3D preview too"), also at the former 3D preview
+https://claude.ai/artifact/24YRYz7zvbowy3WEyXLhjU — republish both from `docs/index.html` without its
+doctype/html/head/body wrapper (and without its charset/viewport/theme-color metas), with root `docs` and
+every file under it, in two publishes each (≤ 64 MB: first all but `data/art/`, then `data/art/`). The 3D
+page itself (`site/`, `06_artifact.py` → `site/artifact.html`) is kept in the repository but no longer
+previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, fonts OFL (README).
 
 ## Decisions taken (each disclosed on the page's method panel)
 1. Language variants collapse onto one SR number (OR = CO, BGG = LTF, EMRK = CEDH).
@@ -366,6 +369,36 @@ and the files under `site/data`.
     hosted. Phone: compact header with a language select, the panel as a bottom sheet above which the map
     shrinks, hierarchy and matrix scroll sideways. 60 fps in headless Chromium (median frame 16.7 ms).
 
+29. Network view "Netz" (2026-10-27, Jonas: "an exceptional graph also showing the complexities and
+    interdependencies"; `layout/net.mjs` → `docs/data/net.json`, view `docs/js/net.js`, deep link
+    `#<lang>/net[/<id>]`). Nodes = every act with at least one link (18,051: federal 2,083 incl. earlier
+    acts, treaties 2,059, cantonal 13,909); 4,273 acts in force have none and are counted, not drawn.
+    Three layers, never merged, each its own colour (dataviz validator, all pairs: CVD ΔE ≥ 13.5, normal
+    ≥ 18.8; the ink of the bases is a deliberate neutral, so it fails the categorical lightness/chroma band):
+    stated bases (ink, 24,497 act → basis pairs from `links.json`; primary basis weighted 2), legislation
+    (vermilion, 11,693 act pairs, decision 15) and case law (purple, 7,396 co-citation pairs, decision 9).
+    Layout in two levels — a plain force layout of 18,000 nodes was a hairball whose positions meant
+    nothing: (1) the place of each cluster is fixed by rule, not by force: federal law in the centre (the
+    BV at 0,0), treaties above it, the 26 cantons on a ring in the order of Art. 1 BV, clockwise from the
+    top; a cluster of n acts is a disc of radius 10·√n (area ∝ acts). (2) inside a disc, ForceAtlas2
+    (LinLog, Barnes-Hut, gravity 1.2, scaling 4, outbound attraction distribution) gives each act its
+    angle; the radius is its level: rings from the centre outwards constitution → parliament →
+    government → administration → not in the collection (earlier acts, codes), each ring's area ∝ its
+    acts; federal law and treaties in sectors by first SR digit. Acts are spread on their ring segment by
+    Halton points (no overlap, no clumps). A canton's disc is turned so that its acts with links to
+    federal law face the centre. So distance from a disc's centre = level of enactment (exact), sector =
+    SR area (exact), angle inside a ring = closeness in the force layout (designed, not measured).
+    Links between clusters are bundled (cubic Bézier through each disc's facing rim, β 0.92); links
+    inside a disc are straight. Rendering: one bitmap cache, transformed while panning, redrawn after
+    140 ms (38 ms per redraw at 1440×900); click = the act's ego network over a white veil, its
+    partners labelled, the panel opens; search jumps into the network while it is shown. Counts by
+    pair of clusters: bases 15,159 inside a canton, 6,340 canton → federal, 2,867 federal → federal,
+    131 federal → treaty; legislation 7,446 federal ↔ federal, 3,304 treaty ↔ treaty, 921 federal ↔
+    treaty, 22 cantonal constitution → BV (the constitutions are in Fedlex as SR 131.2); case law 2,734 canton ↔ federal, 2,463 inside a
+    canton, 1,978 federal ↔ federal. Bridges (federal acts most cantons rest on, BV aside): OR, WaG,
+    GSchG, SVG, BGS, AIG, ArG — 25 cantons each (TG publishes mostly no preamble); ZGB 24 cantons with
+    261 cantonal acts, KVG 24/181, StGB 24/159. The panel of every act in the network offers "Im Netz zeigen".
+
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
       Deterministic (ties broken explicitly); two runs give identical reports.
@@ -430,6 +463,9 @@ and the files under `site/data`.
       links.json, hier.json, pairs.json, years.json, art/<n>.json, law/<x>.json, find.<lang>.json,
       method.json); `docs/index.html`, `style.css`, `js/` (app, data, treemap, dossier, search, hierarchy,
       matrix, method, methodtext, i18n, util). Tested at 1440×900, 1024×768 and 390×844 in DE/FR/IT/EN.
+- [x] Step 12 network view (decision 29): `layout/net.mjs` (graphology 0.25.4 + graphology-layout-forceatlas2
+      0.10.1) → `docs/data/net.json` (0.3 MB); `docs/js/net.js` (canvas, layer chips, ego network, labels
+      with collision, pinch/wheel/keys). MIT `LICENSE`. Both previews show the public site.
 
 ## Reports
 - `reports/opencaselaw-anomalies.md` — anomalies in OpenCaseLaw for Jonas to fix there (duplicates,
@@ -440,6 +476,10 @@ and the files under `site/data`.
 - Jonas: make the repository public (Settings → General → Danger Zone) and enable Pages (Settings → Pages →
   Deploy from a branch → this branch or main after merging, folder `/docs`). Pages on a private repository
   needs a paid plan and publishes the site publicly anyway.
+- Network: the angle inside a ring is a force-layout position (designed); a measured alternative would be
+  community detection (Leiden) per canton with communities as sectors. Treaties are a dense legislative
+  cluster of their own (3,304 pairs) with few links to the rest; a "law in force only" filter and a time
+  slider (legislation has no time series, decision 15) are open.
 - New site: row names of the hierarchy are not sticky when a phone scrolls sideways; the treemap has a
   keyboard path through the top-level tiles but not inside nested parts; cantonal acts have no subject
   grouping below the canton (their collections' numbering is not uniform: GE uses letters).
