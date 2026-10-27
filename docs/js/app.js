@@ -41,7 +41,7 @@ function staticText() {
   }
   $("subnav").setAttribute("aria-label", t("links"));
   $("by").title = t("byline");
-  $("q").placeholder = t("search"); $("q").setAttribute("aria-label", t("search"));
+  $("q").placeholder = t(S.view === "net" ? "searchNet" : "search"); $("q").setAttribute("aria-label", t("search"));
   $("qbtn").setAttribute("aria-label", t("searchOpen")); $("closeq").setAttribute("aria-label", t("close"));
   $("langs").setAttribute("aria-label", t("language"));
   for (const b of $("langs").querySelectorAll("button")) b.setAttribute("aria-pressed", b.dataset.lang === lang());
@@ -110,6 +110,7 @@ const mapTarget = () => S.target || "";
 function showView(v) {
   S.view = v;
   for (const id of ["map", "net", "hier", "matrix", "method", "cantons", "check", "new"]) $("v-" + id).hidden = id !== v;
+  $("q").placeholder = t(v === "net" ? "searchNet" : "search");          // in the network the search finds acts there
   DOS.setLinker(v === "net" ? (j) => (NET.has(j) ? href("net/" + idOf(j)) : href(idOf(j))) : null);
   if (v !== "map") $("tip").hidden = true;
 }
@@ -230,7 +231,8 @@ function renderLegend() {
   }
   const vis = TM.visibleClasses();
   const cls = [0, 1, 2, 3, 4, 5, 6].filter((c) => c <= 4 ? true : vis.has(c));
-  $("legend").innerHTML = cls.map((c) => `<button class="it" data-cls="${c}">${sw(c)}<span>${esc(t(c === 6 ? "levelUnknown" : "c" + c))}</span></button>`).join("");
+  $("legend").innerHTML = cls.map((c) => `<button class="it" data-cls="${c}">${sw(c)}<span>${esc(t(c === 6 ? "levelUnknown" : "c" + c))}</span></button>`).join("")
+    + (TM.getMode() === "dec" ? `<span class="note">${esc(t("cantonFloor", String(TM.CANTON_FLOOR * 100).replace(".", t("dec"))))}</span>` : "");
 }
 
 // tooltip
@@ -328,7 +330,19 @@ async function boot() {
   $("langs").addEventListener("click", (e) => { const b = e.target.closest("[data-lang]"); if (b) toLang(b.dataset.lang); });
   $("langsel").addEventListener("change", () => toLang($("langsel").value));
   // in the network a search result opens there; everything else on the map
-  initSearch({ go: (target) => { const i = M.byId.get(target); return S.view === "net" && i != null && NET.has(i) ? go("net/" + target) : go(target); }, ensureAct });
+  initSearch({
+    go: (target) => {
+      if (S.view === "net") {                        // in the network a hit opens there: an article or a topic opens its act
+        const id = target.split(":")[0], i = M.byId.get(id);
+        if (i != null && NET.has(i)) return go("net/" + id);
+        if (i != null && M.K[i] === KIND.t) return go("net/" + M.S[i]);
+        if (i != null && M.K[i] === KIND.b && (M.S[i] === "fed" || M.S[i] === "int")) return go("net/" + M.S[i]);
+      }
+      return go(target);                             // everything else (an act without a link) on the map
+    },
+    ensureAct,
+    net: () => (S.view === "net" ? NET.has : null),
+  });
   NET.load().then(() => { if (S.view === "map") panelFor(); }).catch(() => {});
   DOS.setExtra((i) => (NET.has(i) ? `<a class="btn" href="${href("net/" + idOf(i))}">${ICON.net} ${esc(t("inNet"))}</a>` : ""));
   $("dossier").addEventListener("click", (e) => {             // "Wie ist das Recht gewachsen?": the time view plays

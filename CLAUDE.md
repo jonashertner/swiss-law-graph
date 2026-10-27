@@ -601,6 +601,19 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     document type 11, PDF DE/FR/IT) under `vernehmlassung/` from opening; a commit at the deadline marks them closed. Only the
     drafts, not the explanatory reports.
 
+37. All cantons named on the map; search and closing in the network (2026-10-27, Jonas: "can we have all cantons, and name of
+    canton, on the Karte?"; "i want to be able to search for laws in the Netz, without losing the position of the law in the Netz
+    when i close the right side tab"). Map: a canton is always named — its name in the header band, its code where the name does
+    not fit, and a tile too small for a band gets the code on a paper chip (`treemap.js::drawCantonLabel`). With "Fläche:
+    Entscheide" the per-canton counts span three orders of magnitude (VD 145,447, GE 100,017 … SZ 117, AI 89), so only four
+    cantons were visible: each canton now keeps at least 0.6 % of the cantonal block (`CANTON_FLOOR`), stated under the legend and
+    on the method page; tooltips keep the exact count. (ZH shows 6,041 decisions: ZH's collection states few abbreviations, so
+    decision codes rarely reach its acts — decision 17; a data gap, not a display one.) Network: while it is shown the search is
+    "Im Netz suchen", lists acts in the network first and marks the others "ohne Verbindung im Netz"; an article or topic hit
+    opens its act in the network, a canton its jurisdiction. × on an act's panel hides the panel only: the act stays chosen with
+    its links, and what is on screen stays where it is while the stage widens (`keepPos`); clicking the chosen act brings the
+    panel back. Esc and a click elsewhere still go one level up.
+
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
       Deterministic (ties broken explicitly); two runs give identical reports.

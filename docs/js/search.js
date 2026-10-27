@@ -24,7 +24,7 @@ function render(groups) {
     for (const it of list) {
       const k = items.length;
       items.push(it);
-      out.push(`<button role="option" id="opt${k}" data-k="${k}" aria-selected="false">${it.sw != null ? sw(it.sw) : "<span></span>"}` +
+      out.push(`<button role="option" id="opt${k}" data-k="${k}" aria-selected="false"${it.off ? ' class="off"' : ""}>${it.sw != null ? sw(it.sw) : "<span></span>"}` +
         `<span style="min-width:0;display:flex;gap:8px;align-items:baseline;overflow:hidden"><span class="lab">${esc(it.lab)}</span><span class="sub">${esc(it.sub || "")}</span></span>` +
         `<span class="meta">${esc(it.meta || "")}</span></button>`);
     }
@@ -55,8 +55,15 @@ const nodeItem = (i) => ({ lab: labelCt(i), sub: M.K[i] === KIND.c ? M.L[i] : is
 
 async function run(q) {
   const my = ++seq;
-  const acts = searchActs(q, 10).filter((i) => !(M.K[i] === KIND.c && M.val.acts[i] === 0 && M.val.dec[i] === 0));
-  const groups = [[t("acts"), acts.map(nodeItem)]];
+  const inNet = ctx.net && ctx.net();                // the network is open: acts in it first, the others marked
+  let acts = searchActs(q, inNet ? 24 : 10).filter((i) => !(M.K[i] === KIND.c && M.val.acts[i] === 0 && M.val.dec[i] === 0));
+  if (inNet) acts = acts.filter((i) => M.K[i] !== KIND.c).sort((a, b) => !inNet(a) - !inNet(b)).slice(0, 10);
+  const item = (i) => {
+    const it = nodeItem(i);
+    if (inNet && isAct(i) && !inNet(i)) { it.meta = [it.meta, t("notInNet")].filter(Boolean).join(" · "); it.off = true; }
+    return it;
+  };
+  const groups = [[t("acts"), acts.map(item)]];
   render(groups);
   // an article: "Art. 41 OR"
   const pa = parseArticle(q);
@@ -72,7 +79,7 @@ async function run(q) {
       for (const x of a.arts) if (normNum(x[1]) === want) arts.push({ lab: `${t("art")} ${x[1]} ${labelCt(i)}`, sub: x[9] ? x[9][M.lang] || x[9].de || "" : "", meta: srOf(i) ? `SR ${srOf(i)}` : "", sw: M.cls[i], target: `${idOf(i)}:${x[0]}` });
     }
     if (my !== seq) return;
-    if (arts.length) { groups.splice(0, groups.length, [t("articles"), arts.slice(0, 4)], [t("acts"), acts.filter((i) => cand.includes(i)).map(nodeItem)]); render(groups); }
+    if (arts.length) { groups.splice(0, groups.length, [t("articles"), arts.slice(0, 4)], [t("acts"), acts.filter((i) => cand.includes(i)).map(item)]); render(groups); }
   }
   // headings of divisions
   if (fold(q).replace(/[^a-z]/g, "").length >= 4 && !pa) {

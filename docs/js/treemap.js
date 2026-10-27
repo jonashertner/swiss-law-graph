@@ -14,6 +14,10 @@ let items = [], byId = new Map(), root = null;
 let anim = null, raf = 0;
 let OA = null;                      // the act whose articles are open: built by openAct()
 const H1 = 26, H2 = 20;             // header bands of groups at depth 1 and below
+// with decisions as area, every canton keeps at least this share of its block, so that all 26 stay visible and named
+// (VD 145,447 decisions, AI 89: in proportion, AI would be a few pixels); disclosed in the legend and the method
+export const CANTON_FLOOR = 0.006;
+const isCanton = (id) => !isStr(id) && M.K[id] === KIND.t;
 let cb = {};                        // callbacks: select(id), focus(id), hover(id)
 let COL = {}, HEAT = [];
 let hatch = null;
@@ -167,7 +171,8 @@ function layout(f) {
     if (d > 0) {
       const pad = d === 1 ? 3 : d === 2 ? 2 : isStr(id) ? 0 : 1;      // deep divisions of an act: no frame of their own
       // a part that fills nearly all of its parent repeats it: no header of its own (173 › 173.1 › 173.11 …)
-      const hh = d === 1 ? (w >= 64 && h >= 52 ? H1 : 0) : it.share > 0.8 ? 0 :
+      const hh = isCanton(id) ? (w >= 30 && h >= 34 ? (d === 1 ? H1 : H2) : 0) :   // a canton is always named
+        d === 1 ? (w >= 64 && h >= 52 ? H1 : 0) : it.share > 0.8 ? 0 :
         d === 2 ? (w >= 64 && h >= 46 ? H2 : 0) : (w >= 110 && h >= 72 ? H2 : 0);
       it.hdr = hh;
       ix += pad; iw -= 2 * pad; iy += hh || pad; ih -= (hh || pad) + pad;
@@ -179,7 +184,12 @@ function layout(f) {
       // (parts first: a lone small tile before a large part would be squeezed into a hairline)
       isStr(id) || (OA && id === OA.i) ? ch : ch.map((c, k) => [isLeaf(c) ? (M.HD[id] && M.S[c] === M.S[id] ? 0 : 1 + clsOf(c)) : -1, k, c])
         .sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
-    const vals = order.map(value), rects = [];
+    let vals = order.map(value);
+    const rects = [];
+    if (mode === "dec" && order.length > 1 && order.every(isCanton)) {
+      const tot = vals.reduce((a, b) => a + b, 0);
+      vals = vals.map((v) => Math.max(v, tot * CANTON_FLOOR));
+    }
     squarify(order, vals, ix, iy, ix + iw, iy + ih, rects);
     for (const [cid, cx, cy, cw, chh] of rects) {
       const c = { id: cid, x: cx, y: cy, w: cw, h: chh, d: d + 1, hdr: 0, leaf: false, parent: it, lab: 0, share: (cw * chh) / (iw * ih) };
@@ -264,12 +274,33 @@ function drawLabel(it, alpha, r = it) {
   const w = x1 - x0, h = y1 - y0;
   ctx.globalAlpha = alpha * (hiCls >= 0 && it.leaf && !isStr(it.id) && clsOf(it.id) !== hiCls ? 0.25 : 1) * (it.leaf && shareOf(it.id) === 0 ? 0.4 : 1);
   if (it.leaf) { if (it.lab) drawLeafLabel(it, x0, y0, w - 1, h - 1); return; }
+  if (isCanton(it.id)) { drawCantonLabel(it, x0, y0, w, h); return; }
   if (!it.hdr) return;
   const big = it.d === 1, f = font(big ? 620 : 600, big ? 13 : 11.5);
   ctx.fillStyle = big ? COL.ink : COL.ink2;
   ctx.font = f; ctx.textBaseline = "alphabetic";
   const s = fit(labelOf(it.id), f, w - 10);
   if (s) ctx.fillText(s, x0 + 4, y0 + (big ? 17.5 : 14));
+}
+// a canton: its name in the header band, its code where the name does not fit; a tile too small for a band gets the
+// code on a paper chip over its acts
+function drawCantonLabel(it, x0, y0, w, h) {
+  const big = it.d === 1, name = labelOf(it.id), code = M.S[it.id];
+  if (it.hdr) {
+    const f = font(big ? 620 : 600, big ? 13 : 11.5);
+    ctx.fillStyle = big ? COL.ink : COL.ink2; ctx.font = f; ctx.textBaseline = "alphabetic";
+    const s = textW(name, f) <= w - 10 ? name : textW(code, f) <= w - 6 ? code : "";
+    if (s) ctx.fillText(s, x0 + (s === code && w < 40 ? 3 : 4), y0 + (big ? 17.5 : 14));
+    return;
+  }
+  const f = font(640, w >= 26 && h >= 16 ? 11 : 9.5), tw = textW(code, f);
+  if (w < tw + 4 || h < 11) return;
+  const cw = tw + 6, ch = h >= 16 ? 15 : 12;
+  ctx.fillStyle = COL.paper; ctx.globalAlpha *= 0.92;
+  ctx.fillRect(x0 + 1, y0 + 1, Math.min(cw, w - 2), Math.min(ch, h - 2));
+  ctx.globalAlpha /= 0.92;
+  ctx.fillStyle = COL.ink; ctx.font = f; ctx.textBaseline = "alphabetic";
+  ctx.fillText(code, x0 + 4, y0 + (ch === 15 ? 12 : 10));
 }
 function drawLeafLabel(it, x, y, w, h) {
   const id = it.id;
@@ -330,13 +361,13 @@ function frame(now) {
       drawFill(it, from ? lerp(from, it) : it, from || !anim.fade ? 1 : e);
     }
     const la = e > 0.7 ? (e - 0.7) / 0.3 : 0;
-    if (la > 0) for (const it of items) if ((it.leaf && it.lab) || it.hdr) { const from = anim.from.get(it.id); drawLabel(it, la, from ? lerp(from, it) : it); }
+    if (la > 0) for (const it of items) if ((it.leaf && it.lab) || it.hdr || isCanton(it.id)) { const from = anim.from.get(it.id); drawLabel(it, la, from ? lerp(from, it) : it); }
     ctx.globalAlpha = 1;
     raf = requestAnimationFrame(frame);
   } else {
     anim = null;
     for (const it of items) drawFill(it, it, 1);
-    for (const it of items) if ((it.leaf && it.lab) || it.hdr) drawLabel(it, 1);
+    for (const it of items) if ((it.leaf && it.lab) || it.hdr || isCanton(it.id)) drawLabel(it, 1);
     ctx.globalAlpha = 1;
   }
   drawOverlay();

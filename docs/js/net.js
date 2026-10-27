@@ -36,6 +36,7 @@ let base0 = null, base0V = null, cache = null, cacheV = null, cacheTimer = 0, ra
 // what is shown
 let on = { bases: true, legis: true, cocite: true };
 let focus = { lvl: 0, c: -1, k: -1 }, ego = null, from = -1, spotC = -1, shown = false, noFly = false;
+let panelOff = false, keepPos = false;                    // the act's panel closed by hand: the act stays, the view keeps its place
 let hot = null, hotT = 0, prevK = -1, prevEgo = null, chotK = -1, chotC = -1, hint = -1, kbd = null;
 let drag = null, pinch = null, miniKey = "";
 const COLS = [];
@@ -710,8 +711,26 @@ function learnt(l) { const s = +(store("slm-net-learnt") || 0); if (!(s & (1 << 
 function activate(it) {
   if (!it) { if (focus.lvl > 0) up(false); return; }
   learnt(focus.lvl);
-  if (it.t === "a") { if (!(focus.lvl === 2 && it.i === focus.k)) ctx.go("net/" + idOf(AT[it.i])); }
+  if (it.t === "a") {
+    if (!(focus.lvl === 2 && it.i === focus.k)) ctx.go("net/" + idOf(AT[it.i]));
+    else if (panelOff) openPanel();                      // the chosen act again: its panel comes back, the view stays
+  }
   else if (!(focus.lvl === 1 && focus.c === it.i)) ctx.go("net/" + CLU[it.i].id);
+}
+function closePanel() {                                   // × on the act's panel: the panel goes, the act stays chosen
+  panelOff = true; holdPos();
+  ctx.panel.hide();
+  hints(); redraw();
+}
+function openPanel() {
+  panelOff = false; holdPos();
+  ctx.panel.node(AT[focus.k], { go: ctx.go, close: closePanel, closable: true });
+  redraw();
+}
+let holdT = 0;
+function holdPos() {                                      // the stage resizes when the panel goes or comes: keep the view
+  keepPos = true; clearTimeout(holdT);
+  holdT = setTimeout(() => { keepPos = false; }, 600);   // no resize followed (phone sheet): nothing to keep
 }
 function up(flyUp = true) {
   if (focus.lvl === 2) { noFly = !flyUp; ctx.go("net/" + CLU[focus.c].id); }
@@ -846,12 +865,15 @@ function resize() {
   if (w === W && h === H && cache) return;
   dpr = Math.min(2, devicePixelRatio || 1);
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-  const first = !W, oldFit = fitZ;
+  const first = !W, oldFit = fitZ, oldW = W, oldH = H;
   W = w; H = h;
   mx = W < 600 ? 38 : 90; my = W < 600 ? 30 : 40;         // room for the cantons' names round the ring
   fitZ = Math.min((W - 2 * mx) / 2000, (H - 2 * my) / 2000);
   if (first) view = fitView();
-  else if (aim) {                                         // the panel opened: frame the same thing in the new stage
+  else if (keepPos) {                                     // the panel closed: what is on screen stays where it is
+    keepPos = false; aim = null;
+    view = { ...view, x: view.x + (W - oldW) / (2 * view.z), y: view.y + (H - oldH) / (2 * view.z) };
+  } else if (aim) {                                         // the panel opened: frame the same thing in the new stage
     const b = aim();
     if (flight) { const a = { ...view }, left = Math.max(260, flight.dur - (performance.now() - flight.t0)); flight = { a, b, f: vanWijk(a, b).f, t0: performance.now(), dur: left }; }
     else view = b;
@@ -1013,7 +1035,8 @@ export async function show(rest) {
       if (flyTo) fly(frameAct(ego), () => frameAct(ego));
       ego.t0 = flight ? flight.t0 + flight.dur : performance.now();
     }
-    ctx.panel.node(AT[nf.k], { go: ctx.go, close: () => up(true), closable: true });
+    panelOff = false;
+    ctx.panel.node(AT[nf.k], { go: ctx.go, close: closePanel, closable: true });
   } else {
     tw("sel", 0, 220); from = -1;
     if (nf.lvl === 1) {
@@ -1032,7 +1055,7 @@ export async function show(rest) {
 export function refresh() {
   if ($("v-net").hidden) return;
   controls(); crumbs(); hints(); legend();
-  if (focus.lvl === 2) ctx.panel.node(AT[focus.k], { go: ctx.go, close: () => up(true), closable: true });
+  if (focus.lvl === 2) { if (!panelOff) ctx.panel.node(AT[focus.k], { go: ctx.go, close: closePanel, closable: true }); }
   else if (focus.lvl === 1) clusterCard(focus.c); else summary();
   redraw();
 }
