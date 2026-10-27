@@ -449,29 +449,34 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 32. The federal history (2026-10-27, Jonas: "yes, fetch the full federal history"; `pipeline/fetch_fedlex_history.py` →
     `data/fedlex_history.json`: every consolidation abstract on Fedlex, 17,319 acts, queried per ELI segment because
     OFFSET paging answers HTTP 500 beyond ~9,000). Status: 0 in force, 1 no longer published in the SR, 2 obsolete, 3 no
-    longer in force, 4 not yet in force. An act enters the time view if it has a repeal date not after the run, is
-    not in force (0/4) and is not one of the map's acts (by ELI): 9,355 acts. 6,624 carried an SR number (5,782
-    federal acts, 829 treaties, 13 cantonal constitutions, in their canton): id "<SR>@<year of adoption>" ("~2" for a
-    second act of that number and year), placed next to the act now under that number, else in the nearest SR area.
-    2,731 have none (2,453 federal acts, 278 treaties; 2,515 repealed before 1970, 77 later, adopted 1850–1969):
-    their own group "Aufgehoben, ohne SR-Nummer" in federal and in international law (kind g, `hg`, id `fed/-`,
-    `int/-`), id "@<year>~k". Level from the document type: Bundesgesetz, dringliches BG, Bundesbeschluss,
+    longer in force, 4 not yet in force. The end of an act's force: its repeal (dateNoLongerInForce), else the day
+    after the end of applicability a temporary act states (dateEndApplicability, on the abstract or on its act in
+    the AS; where both exist the repeal is never later: 89 repealed early, 26 on the day). An act enters the time
+    view if it ended before the run, is not in force (0/4) and is not one of the map's acts (by ELI): 11,413 acts
+    (9,356 repealed, 2,058 temporary acts that lapsed — the panel says "Befristet, galt bis 31. Dezember 1974").
+    7,594 carried an SR number (6,629 federal acts, 952 treaties, 13 cantonal constitutions, in their canton): id
+    "<SR>@<year of adoption>" ("~2" for a second act of that number and year), placed next to the act now under
+    that number, else in the nearest SR area. 3,819 have none (3,568 ended before 1970): their own group "Nicht
+    mehr in Kraft, ohne SR-Nummer" in federal and in international law (kind g, `hg`, id `fed/-`, `int/-`), id
+    "@<year>~k". Level from the document type: Bundesgesetz, dringliches BG, Bundesbeschluss,
     Verordnung der Bundesversammlung, Erlass eines Rates → 1; Verordnung des Bundesrates, Erlass eines eidg.
     Gerichts, Vertrag Bund–Kantone → 2; Departements-, Amtsverordnung, Erlass einer Anstalt, Kommission → 3;
     international texts → treaty; Kantonsverfassung → 0. Shown from adoption (treaty: entry into force) to repeal.
-    Left out: 2,513 acts Fedlex lists as not in force without a repeal date (said on the page, number from
-    time.json `noend`). Before 1948 the record holds almost only what was still in force in 1948 (21 acts repealed
+    Every act Fedlex marks no longer in force (1–3) now has a date of its end (`noend` in time.json: 0; the page
+    names the number only if a refresh brings one). Acts without any status on Fedlex are not history: 163 drafts and
+    placeholders (`…_cc`, "*wird später veröffentlicht*", no entry into force), 16 enter into force later, and 276
+    are in force by their own dates but have no status — see Next. Before 1948 the record holds almost only what was still in force in 1948 (21 acts repealed
     earlier): said on the page. No value today, so the map, search and their counts are unchanged; the time view's
     map holds every act ever in force (`M.val.hist`, earlier acts in their level's colour `M.hcls`) and re-lays out
     when it opens; the header counts what exists in the year ("916 Erlasse 1955"), the editions aZGB/aOR/aStGB
     ("@a") are shown but not counted twice. Names in `hnames.<lang>.json` (loaded with the time view). Not in the
     network or matrix (no Ingress or cross-references of repealed acts were read). The panel of an earlier act says
     "Heute unter dieser Nummer" (not "Heute gilt": a number can carry an unrelated act). Federal acts / treaties in
-    force by year (data): 1900 127/147; 1930 534/363; 1948 1,590/603; 1950 1,515/629; 1955 1,528/747; 1960
-    1,498/869; 1970 1,696/1,203; 1980 1,947/1,543; 1990 2,092/1,777; 2000 2,107/2,203; 2010 1,904/2,626; 2020
-    2,141/2,975; 2026 2,022/3,098 (2,013 in force + 9 earlier acts repealed only from 2027 or still in force). The dip
-    1948–1960 is consistent with the end of the wartime full-powers law (1,195 acts without SR number repealed in
-    the 1950s). Found on the way: `#de/101@1874` (BV 1874) was read as "time view, year 1874" — the year now stands
+    force by year (data): 1900 132/150; 1914 276/235; 1930 560/376; 1939 1,049/511; 1945 1,618/545; 1948 1,884/630;
+    1950 1,824/664; 1960 1,659/920; 1970 1,779/1,250; 1980 2,008/1,582; 1990 2,152/1,788; 2000 2,157/2,210; 2010
+    1,947/2,635; 2020 2,181/2,980; 2026 2,016/3,098 (2,013 in force + 3 earlier acts in force until 2027). The rise
+    1939–1948 and the fall to 1960 are consistent with the wartime full-powers law and its winding-down (574 temporary
+    acts lapsed in the 1950s; not checked against the AS). Found on the way: `#de/101@1874` (BV 1874) was read as "time view, year 1874" — the year now stands
     next to the language (`#de@1975/net`; the first links `#de/net@1975` still work); six earlier acts labelled with a
     month ("916.310@1958-08", two acts of one year) were matched to the wrong Fedlex record (title and adoption of
     the first act, shown only in the last year): matched by date prefix and ELI now; an earlier act without a repeal
@@ -550,7 +555,8 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - [x] Step 13 time view (decision 31): `pipeline/fetch_fedlex_dates.py`, `08_web.py` → `docs/data/time.json` (0.16 MB);
       `docs/js/time.js` (state, bar, chart) with hooks in treemap.js, net.js, matrix.js, app.js (hash `@year`).
 - [x] Step 13′ federal history (decision 32): `pipeline/fetch_fedlex_history.py` → `data/fedlex_history.json` (11 MB);
-      08 adds 9,355 repealed acts (kind o, `_y`), `hnames.<lang>.json`; step 1 fix for acts never in force.
+      08 adds 11,413 acts no longer in force (repealed or lapsed; kind o, `_y`), `hnames.<lang>.json`; step 1 fix
+      for acts never in force.
 
 ## Reports
 - `reports/opencaselaw-anomalies.md` — anomalies in OpenCaseLaw for Jonas to fix there (duplicates,
@@ -563,8 +569,14 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
   needs a paid plan and publishes the site publicly anyway.
 - Time view: cantonal history (repealed cantonal acts) is not published as data by the cantons; the network and
   matrix show repealed federal acts only where courts cite them (fetching the consolidated texts of repealed acts
-  would add their bases and references); 2,513 federal acts without a repeal date (decision 32) could be dated from
-  the AS notes of the acts that repealed them.
+  would add their bases and references).
+- In force without a status (found 2026-10-27, decision 32): 276 acts on Fedlex have no inForceStatus although their
+  dates say in force — 252 entered into force 2024–2026 (147 federal acts, e.g. SR 122.1 Hamas-Gesetz in force
+  2025-05-15, SR 745.13 FPV 2024 whose predecessor is marked repealed on 2025-02-01; 114 treaties), 21 acts of
+  1875–1897 without SR number (end unknown). The map takes "in force" from status 0 (`sr_eli.csv`), so the recent ones
+  are missing (unless courts cite them), and 8 numbers show the older act with status 0 beside a newer one without
+  status. Fix: in force = status 0, or no status with entry into force before the run and no end, for acts since
+  2000; then fetch their Ingress (basis), cross-references and structure and rerun the pipeline.
 - Network: the angle inside a ring is a force-layout position (designed); a measured alternative would be
   community detection (Leiden) per canton with communities as sectors. Treaties are a dense legislative
   cluster of their own (3,304 pairs) with few links to the rest; a "law in force only" filter and a time

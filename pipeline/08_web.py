@@ -28,6 +28,7 @@ import json
 import re
 import shutil
 from collections import Counter, defaultdict
+from datetime import date, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,7 +57,8 @@ BLOCKS = {"fed": ("Bundesrecht", "Droit fédéral", "Diritto federale", "Federal
 NOT_IN_FORCE = ("Nicht in der geltenden Sammlung", "Hors du recueil en vigueur", "Fuori dalla raccolta in vigore",
                 "Not in the collection in force")
 OTHER_CODES = ("Weitere", "Autres", "Altri", "Others")
-NO_SR = ("Aufgehoben, ohne SR-Nummer", "Abrogés, sans numéro RS", "Abrogati, senza numero RS", "Repealed, no SR number")
+NO_SR = ("Nicht mehr in Kraft, ohne SR-Nummer", "Plus en vigueur, sans numéro RS", "Non più in vigore, senza numero RS",
+         "No longer in force, no SR number")
 
 
 def plain(s):
@@ -272,20 +274,31 @@ def main():
                 return cat(tax[s]["_b"])
             s = s[:-1].rstrip(".")
         return blk["int" if sr.startswith("0") else "fed"]
-    nosr = {}                                      # repealed before the SR numbered them (mostly before 1970)
+    nosr = {}                                      # ended before the SR numbered them (mostly before 1970)
 
     def nosr_group(b):
         if b not in nosr:
             nosr[b] = add("g", blk[b], "", NO_SR, id=f"{b}/-", hg=1)
         return nosr[b]
+    run = (tree["method"].get("run_date") or f"{y_run}-12-31")[:10]
+    day_after = lambda d: (date.fromisoformat(d) + timedelta(days=1)).isoformat()
     for eli, h in hist.items():
         sr = h.get("hid") or h.get("n") or ""
-        rep = h.get("repealed")
+        st = h.get("status")
+        # the end of its force: the repeal, else the day after the end of applicability a temporary act states
+        rep = h.get("repealed") or (day_after(h["end"]) if h.get("end") else None)
         y = (h.get("date") or h.get("in_force") or "")[:4]
-        if not rep or not (sr or y) or h.get("status") in (0, 4) or rep[:4] > str(y_run) or path(eli) in have:
-            hstat["skipped" if rep else "no end" if h.get("status") in (0, 4) or path(eli) in have else
-                  "no repeal date"] += 1                # not in force, but Fedlex does not say since when: left out
+        if st in (0, 4) or path(eli) in have:
+            hstat["in force, not yet, or on the map"] += 1
             continue
+        if not rep or rep > run:                       # no end before the run: Fedlex gives no date, or no status
+            hstat["no date of its end" if st in (1, 2, 3) else "no status: draft or placeholder" if not h.get("in_force")
+                  else "no status: enters into force later" if h["in_force"] > run else "no status: in force by its dates"] += 1
+            continue
+        if not (sr or y):
+            hstat["undated"] += 1
+            continue
+        hstat["ended: repealed" if h.get("repealed") else "ended: lapsed (end of applicability)"] += 1
         if sr and (sr, y) in cited:                    # an earlier act courts cite: its node is there already
             hstat["cited"] += 1
             continue
@@ -312,7 +325,7 @@ def main():
         fl = 0 if sr == "101" else TYPE_FLOOR.get(ty, 8 if treaty else -1)
         parent = ct_idx[ct] if ct else place(sr) if sr else nosr_group("int" if treaty else "fed")
         k = add("o", parent, code, {lg: ab[lg] or title[lg] for lg in LANGS}, title,
-                id=code, f=fl, ad=h.get("date"), ct=ct, rp=rep, u=eli.replace("https://fedlex.data.admin.ch/", "https://www.fedlex.admin.ch/"),
+                id=code, f=fl, ad=h.get("date"), ct=ct, rp=rep, le=None if h.get("repealed") else h.get("end"), u=eli.replace("https://fedlex.data.admin.ch/", "https://www.fedlex.admin.ch/"),
                 ab={lg: ab[lg] for lg in LANGS if ab[lg]} if any(ab.values()) else None)
         start = h.get("in_force") if treaty else h.get("date")
         nodes[k]["_y"] = [int((start or h.get("date") or h.get("in_force") or "0")[:4]), int(rep[:4])]
@@ -529,7 +542,7 @@ def main():
     json.dump({"y0": 1848, "y1": y1, "born": born, "died": died, "cy": cy,
                "dec": {"y0": d0, "fed": [dy.get(y, (0, 0))[0] for y in range(d0, y1 + 1)],
                        "kt": [dy.get(y, (0, 0))[1] for y in range(d0, y1 + 1)], "undated": undated},
-               "how": dict(how), "noend": hstat["no repeal date"]}, open(OUT / "time.json", "w"), separators=(",", ":"))
+               "how": dict(how), "noend": hstat["no date of its end"]}, open(OUT / "time.json", "w"), separators=(",", ":"))
     print("time:", dict(how), f"{sum(1 for y in cy if y)} of {len(cy)} pairs reach 20 with dated decisions;",
           f"{sum(r[1] + r[2] for r in dec)} dated decisions, {undated} undated")
 
@@ -577,7 +590,7 @@ def main():
         if n.get("ab"):
             v = list(dict.fromkeys(n["ab"][lg] for lg in LANGS if n["ab"].get(lg)))
             n["ab"] = "|".join(v)
-    fields = ["k", "p", "s", "f", "d", "n", "pk", "ad", "by", "u", "ab", "ct", "fb", "m", "dd", "sr", "hd", "rp", "hg"]
+    fields = ["k", "p", "s", "f", "d", "n", "pk", "ad", "by", "u", "ab", "ct", "fb", "m", "dd", "sr", "hd", "rp", "hg", "le"]
     meta = {"run": tree["method"].get("run_date"), "decisions": core["nodes"][0].get("n"), "fields": fields,
             "fedlex": FED, "kurl": kurl, "ksym": tree["method"].get("ksym") or {},
             "counts": {"fed_in_force": sum(1 for n in out_nodes if n["k"] == "a" and not n.get("ct") and not n["s"].startswith("0.")),

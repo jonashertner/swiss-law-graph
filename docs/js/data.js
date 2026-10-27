@@ -26,7 +26,7 @@ export function build(atlas) {
     K: new Uint8Array(n), P: new Int32Array(n), S: new Array(n), F: new Int8Array(n).fill(-1),
     D: new Float64Array(n), A: new Int32Array(n), PK: new Int16Array(n).fill(-1), AD: new Array(n), BY: new Array(n),
     U: new Array(n), AB: new Array(n), CT: new Array(n), FB: new Array(n), MM: new Int32Array(n), DD: new Float64Array(n),
-    SR: new Array(n), HD: new Uint8Array(n), RP: new Array(n), HG: new Uint8Array(n),
+    SR: new Array(n), HD: new Uint8Array(n), RP: new Array(n), HG: new Uint8Array(n), LE: new Array(n),
   });
   for (let i = 0; i < n; i++) {
     const r = rows[i], g = (k) => r[at[k]];
@@ -36,7 +36,7 @@ export function build(atlas) {
     const pk = g("pk"); if (pk != null) M.PK[i] = pk;
     M.AD[i] = g("ad") || ""; M.BY[i] = g("by") || ""; M.U[i] = g("u") || ""; M.AB[i] = g("ab") || "";
     M.CT[i] = g("ct") || ""; M.FB[i] = g("fb") || ""; M.MM[i] = g("m") || 0; M.DD[i] = g("dd") || 0; M.SR[i] = g("sr") || ""; M.HD[i] = g("hd") ? 1 : 0;
-    M.RP[i] = g("rp") || ""; M.HG[i] = g("hg") ? 1 : 0;
+    M.RP[i] = g("rp") || ""; M.HG[i] = g("hg") ? 1 : 0; M.LE[i] = g("le") || "";
   }
   // children, as slices of one array
   const cnt = new Int32Array(n);

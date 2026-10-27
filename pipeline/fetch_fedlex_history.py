@@ -5,10 +5,10 @@ under and the one it carried (historicalLegalId), adoption (dateDocument), entry
 (dateNoLongerInForce), in-force status (0 in force, 1 no longer published in the SR, 2 obsolete, 3 no longer in
 force, 4 not yet in force), document type (Bundesgesetz, Verordnung des Bundesrates, Departementsverordnung, …,
 treaty), and title and short title per language. The record reaches back to the cleaned-up collection of 1948
-(acts repealed from the 1940s on); 19th-century acts without an SR number and without a repeal date are kept as
-they are and left out by 08_web.py.
+(acts repealed from the 1940s on). A temporary act that lapsed has no repeal date but an end of applicability
+(dateEndApplicability, the last day it applied; on the abstract or on its act in the AS).
 
-Output: data/fedlex_history.json  {eli: {"n", "hid", "date", "in_force", "repealed", "status", "type",
+Output: data/fedlex_history.json  {eli: {"n", "hid", "date", "in_force", "repealed", "end", "status", "type",
                                          "title": {lang}, "abbr": {lang}}}
 Run when refreshing data (~10 min); then 08_web.py and layout/net.mjs.
 """
@@ -36,6 +36,11 @@ Q_META = PRE + """SELECT DISTINCT ?a ?n ?hid ?doc ?eif ?enlif ?st ?ty WHERE { %s
  OPTIONAL { ?a jolux:dateNoLongerInForce ?enlif }
  OPTIONAL { ?a jolux:inForceStatus ?st }
  OPTIONAL { ?a jolux:typeDocument ?ty } }"""
+# the end of applicability a temporary act states ("gilt bis 31. Dezember 1974"): on the abstract, else on its AS act
+Q_END = PRE + """SELECT DISTINCT ?a ?e ?oe WHERE { %s
+ OPTIONAL { ?a jolux:dateEndApplicability ?e }
+ OPTIONAL { ?a jolux:basicAct ?b . ?b jolux:dateEndApplicability ?oe }
+ FILTER(BOUND(?e) || BOUND(?oe)) }"""
 Q_TITLE = PRE + """SELECT DISTINCT ?a ?lang ?t ?s WHERE { %s
  ?a jolux:isRealizedBy ?e . ?e jolux:language ?l ; jolux:title ?t .
  OPTIONAL { ?e jolux:titleShort ?s }
@@ -84,11 +89,29 @@ def segment(seg: str) -> dict[str, dict]:
     return acts
 
 
+def ends(seg: str) -> dict[str, str]:
+    f = CACHE / f"{seg}.end.json"
+    if f.exists():
+        return json.load(open(f))
+    out: dict[str, str] = {}
+    for v in sparql(Q_END % (PAGE % seg)):
+        if v.get("e"):
+            out[v["a"]] = v["e"][:10]
+        elif v.get("oe"):
+            out.setdefault(v["a"], v["oe"][:10])
+    CACHE.mkdir(parents=True, exist_ok=True)
+    json.dump(out, open(f, "w"))
+    return out
+
+
 def main() -> None:
     segs = sorted((r["seg"], int(r["n"])) for r in sparql(Q_SEG))
     acts: dict[str, dict] = {}
     for k, (seg, n) in enumerate(segs):
         got = segment(seg)
+        for a, e in ends(seg).items():
+            if a in got:
+                got[a]["end"] = e
         acts.update(got)
         if len(got) != n:
             print(f"segment {seg}: {len(got)} of {n}", flush=True)
@@ -96,7 +119,9 @@ def main() -> None:
             print(f"{k + 1}/{len(segs)} segments, {len(acts)} acts", flush=True)
     json.dump(dict(sorted(acts.items())), open(ROOT / "data/fedlex_history.json", "w"), ensure_ascii=False, indent=0)
     rep = sum(1 for a in acts.values() if a.get("repealed"))
-    print(f"{len(acts)} acts, {rep} with a repeal date, {sum(1 for a in acts.values() if a.get('n') or a.get('hid'))} with an SR number")
+    end = sum(1 for a in acts.values() if a.get("end") and not a.get("repealed"))
+    print(f"{len(acts)} acts, {rep} with a repeal date, {end} more with an end of applicability, "
+          f"{sum(1 for a in acts.values() if a.get('n') or a.get('hid'))} with an SR number")
 
 
 if __name__ == "__main__":

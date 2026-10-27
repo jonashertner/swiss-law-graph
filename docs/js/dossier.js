@@ -129,7 +129,8 @@ export async function node(i, o = {}) {
   const BY = { Bundesversammlung: "byFA", Bundesrat: "byFC", Gericht: "byCourt", "Departement, Amt oder andere Behörde": "byDept" };
   if (BY[M.BY[i]]) facts.push([t("enactedBy"), esc(t(BY[M.BY[i]]))]);
   if (M.AD[i]) facts.push([t("adopted"), esc(date(M.AD[i]))]);
-  if (M.RP[i]) facts.push([t("repealedOn"), esc(date(M.RP[i]))]);
+  if (M.LE[i]) facts.push([t("appliedUntil"), esc(date(M.LE[i]))]);          // a temporary act that lapsed
+  else if (M.RP[i]) facts.push([t("repealedOn"), esc(date(M.RP[i]))]);
   if (M.A[i]) facts.push([t("articles"), `<span class="num">${esc(num(M.A[i]))}</span>`]);
   if (k === KIND.o) { const sr = srOf(i), today = sr ? M.byId.get(sr) : null; if (today != null) facts.push([t("sameNumber"), `<a href="${href(idOf(today))}">${esc(label(today))}</a>`]); }
   const head = `<div class="k">${kick}</div><h1${h1.length > 42 ? ' class="long"' : ""}>${esc(h1)}</h1>` +
