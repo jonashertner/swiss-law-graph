@@ -92,8 +92,8 @@ function repoHTML(R, i, artNo) {
   const [path, langs] = r.split("|"), ls = langs.split(",");
   const lg = ls.includes(lang()) ? lang() : ls.includes("de") ? "de" : ls[0];
   const file = `${path}/${lg}.md`, anchor = artNo ? "#" + slug(`Art ${artNo}`) : "";
-  return `<div class="repo"><a class="src" href="${esc(`${REPO}/blob/main/${file}${anchor}`)}" target="_blank" rel="noopener">${esc(t("repoText"))} ${ICON.ext}</a>` +
-    `<a class="src" href="${esc(`${REPO}/commits/main/${file}`)}" target="_blank" rel="noopener">${esc(t("repoHist"))} ${ICON.ext}</a></div>`;
+  return `<a class="src" href="${esc(`${REPO}/blob/main/${file}${anchor}`)}" target="_blank" rel="noopener">${esc(t("repoText"))} ${ICON.ext}</a>` +
+    `<a class="src" href="${esc(`${REPO}/commits/main/${file}`)}" target="_blank" rel="noopener">${esc(t("repoHist"))} ${ICON.ext}</a>`;
 }
 function fill(id, html, my) {
   if (my !== token) return;
@@ -199,8 +199,8 @@ export async function node(i, o = {}) {
   const head = `<div class="k">${kick}</div><h1${h1.length > 42 ? ' class="long"' : ""}>${esc(h1)}</h1>` +
     (lede && lede !== h1 ? `<p class="lede">${esc(lede)}</p>` : "") +
     (pooled ? `<p class="lede">${esc(t("pooledNote", num(M.MM[i])))}</p>` : k === KIND.x ? `<p class="lede">${esc(t("codeNote"))}</p>` : "") +
-    (u ? `<a class="src" href="${esc(u)}" target="_blank" rel="noopener">${esc(ct && !u.includes("fedlex") ? t("cantonText") : t("fedlex"))} ${ICON.ext}</a>` : "") +
-    (k === KIND.a ? `<div class="repo" id="d-repo"></div>` : "") +
+    (u || k === KIND.a ? `<div class="srcs">${u ? `<a class="src" href="${esc(u)}" target="_blank" rel="noopener">${esc(ct && !u.includes("fedlex") ? t("cantonText") : t("fedlex"))} ${ICON.ext}</a>` : ""}` +
+      `${k === KIND.a ? `<span id="d-repo"></span>` : ""}</div>` : "") +
     (!linker && extra(i) ? `<div class="btnrow">${extra(i)}</div>` : "") +
     (facts.length ? `<dl class="facts">${facts.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${b}</dd>`).join("")}</dl>` : "") +
     (M.D[i] ? `<div class="stat"><b>${esc(num(M.D[i]))}</b><span>${esc(t("referring"))}</span></div>` : "");
@@ -286,8 +286,7 @@ export async function article(oa, aid, o = {}) {
     `<h1>${esc(t("art"))} ${esc(n)} ${esc(label(i))}</h1>` +
     (headingOf(a) ? `<p class="lede">${esc(headingOf(a))}</p>` : "") +
     (path.length ? `<p class="path">${path.map((p) => `<span>${esc(p)}</span>`).join("")}</p>` : "") +
-    (u ? `<a class="src" href="${esc(u)}#${esc(eid)}" target="_blank" rel="noopener">${esc(t("fedlex"))} ${ICON.ext}</a>` : "") +
-    `<div class="repo" id="a-repo"></div>` +
+    `<div class="srcs">${u ? `<a class="src" href="${esc(u)}#${esc(eid)}" target="_blank" rel="noopener">${esc(t("fedlex"))} ${ICON.ext}</a>` : ""}<span id="a-repo"></span></div>` +
     `<div class="stat"><b>${esc(num(nd))}</b><span>${esc(t("referring"))}</span></div>`;
   open(head + section(t("perYear"), yearsChart(y0, ys)) + later("a-imp") + later("a-dec") + later("a-co"), o);
   wireCharts(el());

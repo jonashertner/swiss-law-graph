@@ -588,26 +588,35 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     Sources and results (run 2026-10-27): federal — Fedlex SPARQL consolidations with XML (12,197 versions of 5,923 acts since
     2021, 37,274 files DE/FR/IT/RM/EN; on 2021-01-01 5,105 of the 5,106 acts then in force), 703 of 333,497,234 words missing
     (spacing inside AS references); LexWork (19 cantons, every version since 2021, repealed acts included, informal corrections
-    as their own commits): 35,647 files, 343 of 68,800,929 words missing; 3,984 versions in the period exist only as PDF
+    as their own commits): 27,846 files from the structured text, 343 of 68,800,929 words missing; 3,984 versions in the period exist only as PDF
     (GR 1,075, VS 552, SH 429, NW 418, AI 389, UR 372 …; 667 current versions) — read by `pdf2md.py` from the cantons' born-digital
     PDFs (layout rules: body size, raised small digits, page furniture by recurrence, marginal notes by the justified edge, article
     lines in bold/italic/another font; footnotes keyed by page because some PDFs restart the numbering; check against the words the
-    reading kept), marked `text: pdf` with a notice; Vaud (BLV API, every version since 2021, "mineurs" included): 3,452 files,
+    reading kept), marked `text: pdf` with a notice (5,883 files, 113 of 14,192,665 missing); Vaud (BLV API, every version since 2021, "mineurs" included): 3,452 files,
     22 of 5,910,511 missing; Geneva and Neuchâtel (SIL Word-HTML, text in force only; enters the history on the day its version
     took effect — GE: the last entry into force in its change table, NE: "État au", else adoption — or on 2021-01-01): 1,687 acts,
-    13 of 4,374,100 missing (digits glued to words). Not in: ZH, JU (PDF only, next for pdf2md), TI, SZ (LexFind only), versions
-    before 2021 (Fedlex has them as PDF/Word only). Reading fixes found by the check: SG/AR outline numbers "(1.1)"
+    13 of 4,374,100 missing (digits glued to words); Zurich (zh.ch PDFs per LS number, every version since 2021, pdf2md): 1,786
+    files, 17 of 5,275,451 missing; Jura (RSJU PDFs, text in force only, like GE/NE): 855 files, 467 of 1,653,093 missing; AS and BBl
+    (XML): 7,695 files, 189 of 13,006,466; consultation drafts (PDF): 3,079 files, 263 of 8,641,030. Not in: TI, SZ (LexFind
+    only), versions before 2021 (Fedlex has them as PDF/Word only). Reading fixes found by the check: SG/AR outline numbers "(1.1)"
     (number_discrete, editorial) left out; footnotes a LexWork version lists but no element calls → "Weitere Fussnoten" (BS);
     NE annexes in WordSection2/3 and headings inside table cells; GE titles in a header table.
     Adopted, not yet in force (`fedlex_pending.py`): AS acts published since 2020-07 with a later entry into force (3,573) appear
-    under `beschlossen/as/` from publication to their (last) entry into force; Referendumsvorlagen (BBl resource type 84, 329;
-    federal decrees on popular initiatives left out) under `beschlossen/bbl/` until their AS publication (matched by date of
+    under `adopted/as/` from publication to their (last) entry into force; Referendumsvorlagen (BBl resource type 84, 329;
+    federal decrees on popular initiatives left out) under `adopted/bbl/` until their AS publication (matched by date of
     adoption and title: 205) or, without one, the referendum deadline the text states — a law rejected at the ballot therefore
     disappears at the deadline, not at the vote (vote results are not read yet). Amending acts render `<mod>` as the amended
     element in bold + the new text. Cantonal acts not yet in force are LexWork/BLV future versions: in `future`, listed with their
-    dates in `beschlossen/README.md`. Vernehmlassungen: 611 opened since 2020-10 (610 with a Vernehmlassungsvorlage, draft
-    document type 11, PDF DE/FR/IT) under `vernehmlassung/` from opening; a commit at the deadline marks them closed. Only the
+    dates in `adopted/README.md`. Vernehmlassungen: 611 opened since 2020-10 (610 with a Vernehmlassungsvorlage, draft
+    document type 11, PDF DE/FR/IT) under `consultations/` from opening; a commit at the deadline marks them closed. Only the
     drafts, not the explanatory reports.
+    Build (`build_repo.py`, ~15 min): main 28,027 commits, future 602 more, 70 tags, 22,349 acts in today's tree. On one day an
+    act's end is written before any new version (a successor taking the same path the same day, e.g. SR 0.142.112.739, had been
+    deleted by its predecessor's end: 128 federal acts in force were missing). Checked (scratchpad `verify_repo.py`): all 5,312
+    federal acts in force present (+ 26 KV); cantonal acts in force of the 24 cantons all present but VD's two `~1` decrees
+    filed under their main act's number; 120 of 120 random act × month tags give the version Fedlex lists for that day; 0 of
+    1,500 files with an undefined footnote or a footnote call in a heading. The atlas links 20,646 acts in force (all but TI 623,
+    SZ 426, VD 2) to their file and its history (`docs/data/repo.json`).
 
 37. All cantons named on the map; search and closing in the network (2026-10-27, Jonas: "can we have all cantons, and name of
     canton, on the Karte?"; "i want to be able to search for laws in the Netz, without losing the position of the law in the Netz

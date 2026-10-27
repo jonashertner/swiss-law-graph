@@ -177,10 +177,8 @@ main { position: relative; height: calc(100% - var(--top) - var(--foot)); displa
 .dossier h1.long { font-size: var(--t-xl); letter-spacing: -.015em; }
 .dossier .lede { font-size: var(--t-b); color: var(--ink-2); margin: 0 0 12px; text-wrap: pretty; }
 .dossier .src { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-ink); font-weight: 560; text-decoration: none; }
-.dossier .repo { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; }
-.dossier .repo:empty { display: none; }
-.dossier .repo .src { font-weight: 500; color: var(--ink-2); }
-.dossier .repo .src:hover { color: var(--ink); }
+.dossier .srcs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; }   /* Fedlex · GitHub · its versions */
+.dossier .srcs > span { display: contents; }
 .dossier .src:hover { text-decoration: underline; text-underline-offset: 3px; }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 0; margin: 18px 0 4px; border-top: 1px solid var(--rule); }
 .facts dt, .facts dd { margin: 0; padding: 9px 0; border-bottom: 1px solid var(--rule); }

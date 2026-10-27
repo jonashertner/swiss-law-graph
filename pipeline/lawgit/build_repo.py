@@ -504,9 +504,11 @@ def stream(out, events: list, branch: str, start_mark: int, parent: str | None, 
                 name = {"ch": "Bundesrecht", "beschlossen": "Beschlossen, noch nicht in Kraft",
                         "vernehmlassung": "Vernehmlassungen"}.get(jur) or f"Kanton {CANTON.get(jur, jur)}"
                 unit = "Vorlagen" if jur == "vernehmlassung" else "Erlasse"
-                groups.append((f"{name}: Stand {de_date(START)} ({n:,} {unit})".replace(",", "'"), per[jur], True))
+                groups.append((f"{name}: Stand {de_date(START)} ({n:,} {unit})".replace(",", "'"),
+                               sorted(per[jur], key=lambda x: x["kind"] != "end"), True))
         else:
-            for e in sorted(es, key=lambda x: (x["jur"] != "ch", x["jur"], x["path"], x["kind"] == "end")):
+            # an act that ends on the day another begins under its number (a successor, SR 0.142.112.739 in 2025): the end first
+            for e in sorted(es, key=lambda x: (x["jur"] != "ch", x["jur"], x["path"], x["kind"] != "end")):
                 groups.append((None, [e], False))
         for head, group, snap in groups:
             changes, msg = [], head
