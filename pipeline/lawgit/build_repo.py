@@ -283,7 +283,7 @@ def cantonal_events():
                     stats["pdf_or_missing"] += 1
                     files = {"_pdf": (t, v, lang0)}         # a stub pointing to the canton's PDF
                 ev.append({"d": d, "jur": ct, "act": (ct, nr), "path": base, "files": files, "kind": "fix" if sp.get("fix") else "version",
-                           "src": src, "lang0": lang0, "label": label, "url": t.get("canonical_link") or ""})
+                           "src": src, "lang0": lang0, "label": label, "url": t.get("canonical_link") or "", "orig": sp["from"]})
                 stats["versions"] += 1
             if end:
                 ev.append({"d": end, "jur": ct, "act": (ct, nr), "path": base, "files": {}, "kind": "end", "label": label})
@@ -312,7 +312,7 @@ def cantonal_events():
                 stats["vd_missing"] += 1
                 continue
             ev.append({"d": d, "jur": "VD", "act": ("VD", nr), "path": base, "files": {"fr": f}, "kind": "version",
-                       "src": None, "lang0": "fr", "label": label, "url": url})
+                       "src": None, "lang0": "fr", "label": label, "url": url, "orig": v["_start"]})
             stats["vd_versions"] += 1
         if end:
             ev.append({"d": end, "jur": "VD", "act": ("VD", nr), "path": base, "files": {}, "kind": "end", "label": label})
@@ -351,7 +351,7 @@ def cantonal_events():
             vs.sort(key=lambda x: (x[0], x[1]["nachtrag"]))
             keep = [x for k, x in enumerate(vs) if k + 1 == len(vs) or vs[k + 1][0] > x[0]]   # superseded the same day: the later one
             for d, v, f in keep:
-                ev.append({"d": d, "jur": "ZH", "act": ("ZH", nr), "path": base, "files": {"de": f}, "kind": "zh",
+                ev.append({"d": d, "jur": "ZH", "act": ("ZH", nr), "path": base, "files": {"de": f}, "kind": "zh", "orig": d,
                            "src": None, "lang0": "de", "label": label, "url": "https://www.zh.ch" + v["link"],
                            "msg": f"{label}: Stand {de_date(d)} (Nachtrag {v['nachtrag']:03d})\n\nText aus dem PDF des Kantons "
                                   f"gelesen.\n\nQuelle: https://www.zh.ch{v['link']}"})
@@ -374,7 +374,7 @@ def cantonal_events():
             label = f"{ct} {nr} {short or (title[:60] + ('…' if len(title) > 60 else ''))}".strip()
             acts[(ct, nr)] = {"path": base, "ct": ct, "nr": nr, "title": title, "short": short, "url": a.get("url") or ""}
             ev.append({"d": d, "jur": ct, "act": (ct, nr), "path": base, "files": {lg: f}, "kind": "current",
-                       "src": None, "lang0": lg, "label": label, "url": a.get("url") or ""})
+                       "src": None, "lang0": lg, "label": label, "url": a.get("url") or "", "orig": ver or a.get("adopted") or ""})
             stats[f"sil_{ct}_{'start' if d == START else 'later' if d <= TODAY else 'future'}"] += 1
     print(f"cantonal: {len(acts)} acts, {dict(stats)}", file=sys.stderr)
     return ev, acts
@@ -781,8 +781,13 @@ def append(repo: Path) -> None:
         day = e["d"] if e else window
         msg = message(e, old) if e else f"{path}: Stand {de_date(window)}"
         head, _, rest = msg.partition("\n\n")
-        note = (f"Nachträglich veröffentlicht: {'aufgehoben' if new is None else 'gilt'} seit {de_date(day)}, "
-                f"hier ergänzt am {de_date(window)}.")
+        since = (e or {}).get("orig") or day                # the version's own first day (START caps the history only)
+        if path not in T and new is not None:            # an act the source has only now: new in the collection
+            head = f"{e['label'] if e else path}: neu in der Sammlung"
+            note = f"Gilt seit {de_date(since)}; hier aufgenommen am {de_date(window)}."
+        else:
+            note = (f"Nachträglich veröffentlicht: {'aufgehoben' if new is None else 'gilt'} seit "
+                    f"{de_date(since if new is not None and since > day else day)}, hier ergänzt am {de_date(window)}.")
         mark = write_commit(p.stdin, mark, "main", f"{head}\n\n{note}" + (f"\n\n{rest}" if rest else ""), day, changes,
                             parent, committed=max(day, window))
         parent = None
