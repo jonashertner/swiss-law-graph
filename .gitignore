@@ -1,3 +1,5 @@
 build/
 node_modules/
 __pycache__/
+site/data/
+site/artifact.html

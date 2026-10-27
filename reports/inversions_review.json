@@ -1,0 +1,351 @@
+{
+ "reviewed": "2026-10-27",
+ "by": "manual reading of each Ingress (swiss-law-graph)",
+ "note": "Every stated basis whose target sits on a lower floor than the act naming it, after the parser and floor fixes of 2026-10-27. Categories in display order; 'n' quotes or paraphrases the Ingress. 2026-10-27, decision 27: acts of intercantonal bodies on floor 5; UR 20.2715 → ZBSA rules is no longer an inversion. Decision 35: SR 414.110.11 → 414.110.1 is gone (the contract is named after the enacting formula, in the act's text, not in its Ingress).",
+ "categories": [
+  {
+   "id": "claim",
+   "text": "A lower act stated as the basis (\"gestützt auf\"): the delegation chain runs upwards. Phase-2 material."
+  },
+  {
+   "id": "floor",
+   "text": "The target's floor is not stated: the collection gives no issuer and the title says nothing, so floor 7 is a default, not a finding. Read by hand, the inversion may disappear."
+  },
+  {
+   "id": "party",
+   "text": "An agreement names a party's own norm: agreements sit on floor 5 (or 6 for the canton with communes) whoever concluded them (decision 17), while the norm that empowers a concluding government or commune lies lower. Not an inversion of validity."
+  },
+  {
+   "id": "context",
+   "text": "The preamble lists a lower act as context, not as a delegation: \"vu\"/\"visto\" lists name the executing ordinance next to the law, or an act whose terms the new act presupposes."
+  },
+  {
+   "id": "successor",
+   "text": "The cited act was replaced: the Ingress cites it by its date, the footnote's number now carries a later act of a lower authority."
+  },
+  {
+   "id": "approval",
+   "text": "An approval decree names the contract it approves; the contract sits on a lower floor by its title only."
+  }
+ ],
+ "items": [
+  {
+   "a": "SR 112.1",
+   "t": "SR 112",
+   "c": "approval",
+   "n": "The Federal Assembly approves the contract of 22 June 1875 between the Federal Council and the municipal council of Bern on the city's contributions to the federal seat."
+  },
+  {
+   "a": "SR 725.151",
+   "t": "SR 725.151.1",
+   "c": "approval",
+   "n": "Approval of the agreement of 23 May 1958 with Vaud and Valais on the Great St Bernard road tunnel (\"in Anbetracht des Abkommens\")."
+  },
+  {
+   "a": "SR 414.110.12",
+   "t": "SR 414.110.1",
+   "c": "floor",
+   "n": "Agreement of the Federal Council and the Zurich government executing Art. 6 Ziff. III of the 1905 Aussonderungsvertrag; that contract was approved by the Federal Assembly (SR 414.110.11) and sits on floor 3 by its title only."
+  },
+  {
+   "a": "K:ZH:413.227",
+   "t": "K:ZH:413.228",
+   "c": "context",
+   "n": "The agreement of the Federal Council (for Zurich) with Italy on the Liceo artistico recites the local arrangements the school was founded on, among them its Reglement of 21 June 1988."
+  },
+  {
+   "a": "K:BE:923.919.1",
+   "t": "K:BE:923.111",
+   "c": "party",
+   "n": "BE–FR fishing agreement; names the Bernese Fischereiverordnung, which empowers the Bernese authority to conclude it."
+  },
+  {
+   "a": "K:BE:923.921.1",
+   "t": "K:BE:923.111",
+   "c": "party",
+   "n": "BE–SO fishing agreement; names Art. 3 Abs. 2 of the Bernese Fischereiverordnung (competence to conclude)."
+  },
+  {
+   "a": "K:BE:923.933.1",
+   "t": "K:BE:923.111",
+   "c": "party",
+   "n": "BE–NE fishing agreement; names Art. 3 Abs. 2 of the Bernese Fischereiverordnung (competence to conclude)."
+  },
+  {
+   "a": "K:BE:923.941.1-1",
+   "t": "K:BE:923.111",
+   "c": "party",
+   "n": "BE–JU agreement on the Birs; names Art. 8 Abs. 1 lit. d of the Bernese Fischereiverordnung (competence to conclude)."
+  },
+  {
+   "a": "K:ZG:1021.018",
+   "t": "K:ZG:711.31",
+   "c": "floor",
+   "n": "Names chapter E 15.2.1 of the cantonal Richtplan of 1 September 1988. The collection states no issuer for the Richtplan; floor 7 is the default."
+  },
+  {
+   "a": "K:ZG:1021.020",
+   "t": "K:ZG:711.31",
+   "c": "floor",
+   "n": "Names the cantonal Richtplan of 1 September 1988. The collection states no issuer for it; floor 7 is the default."
+  },
+  {
+   "a": "K:ZG:413.123",
+   "t": "K:ZG:413.112",
+   "c": "claim",
+   "n": "The Regierungsrat's ordinance on fees for examiners rests \"gestützt auf\" § 20 of the Ausführungsbestimmungen 2 zum EG Berufsbildung, issued by the Amt für Berufsbildung. A government ordinance resting on an office's provisions inverts the chain, unless § 20 only refers back to the government. Read § 20."
+  },
+  {
+   "a": "K:FR:122.28.16",
+   "t": "K:FR:126.21",
+   "c": "floor",
+   "n": "Names the Tarif des émoluments administratifs of 9 January 1968. The collection publishes no Ingress and no issuer; floor 7 is the default. If the Conseil d'Etat issued it, it shares the floor of the ordinances citing it."
+  },
+  {
+   "a": "K:FR:122.28.56",
+   "t": "K:FR:126.21",
+   "c": "floor",
+   "n": "As above (Tarif of 9 January 1968, issuer not stated)."
+  },
+  {
+   "a": "K:FR:482.13",
+   "t": "K:FR:126.21",
+   "c": "floor",
+   "n": "As above (Tarif of 9 January 1968, issuer not stated)."
+  },
+  {
+   "a": "K:FR:710.16",
+   "t": "K:FR:126.21",
+   "c": "floor",
+   "n": "As above (\"l'article 5 du tarif du 9 janvier 1968\")."
+  },
+  {
+   "a": "K:FR:721.0.16",
+   "t": "K:FR:126.21",
+   "c": "floor",
+   "n": "As above (Tarif of 9 January 1968, issuer not stated)."
+  },
+  {
+   "a": "K:FR:864.1.16",
+   "t": "K:FR:126.21",
+   "c": "floor",
+   "n": "As above (Tarif of 9 January 1968, issuer not stated)."
+  },
+  {
+   "a": "K:FR:420.82",
+   "t": "K:FR:420.81",
+   "c": "context",
+   "n": "The subsidy regulation names art. 2 of the statutes of the Association du Centre professionnel cantonal to define who receives the subsidies."
+  },
+  {
+   "a": "K:FR:480.1",
+   "t": "K:FR:616.11",
+   "c": "context",
+   "n": "\"Vu la loi du 17 novembre 1999 sur les subventions (LSub) et son règlement d'exécution (RSub)\": the executing regulation listed next to the law."
+  },
+  {
+   "a": "K:FR:710.2",
+   "t": "K:FR:710.11",
+   "c": "context",
+   "n": "\"Vu le règlement du 1er décembre 2009 d'exécution de la loi sur l'aménagement du territoire et les constructions\", listed next to the law."
+  },
+  {
+   "a": "K:SO:735.441",
+   "t": "K:SO:735.421",
+   "c": "floor",
+   "n": "The citing clause calls the target a \"Volksbeschluss\" of 13 November 1898, a decision of the people (floor 5). The collection publishes no Ingress for it, so the pipeline cannot see that; on floor 5 the inversion disappears."
+  },
+  {
+   "a": "K:SO:735.451",
+   "t": "K:SO:735.421",
+   "c": "floor",
+   "n": "As above (Volksbeschluss of 13 November 1898)."
+  },
+  {
+   "a": "K:BS:890.800",
+   "t": "K:BS:RiE 111.100",
+   "c": "party",
+   "n": "Contract canton–communes on asylum; names § 21 Abs. 3 lit. i of the Gemeindeordnung of Riehen, which empowers the communal council to conclude it."
+  },
+  {
+   "a": "K:BS:890.800",
+   "t": "K:BS:BeE 111.100",
+   "c": "party",
+   "n": "As above; names § 12 Abs. 1 Ziff. 5 of the Gemeindeordnung of Bettingen."
+  },
+  {
+   "a": "K:BS:BeE 890.800",
+   "t": "K:BS:RiE 111.100",
+   "c": "party",
+   "n": "The same contract in Bettingen's collection."
+  },
+  {
+   "a": "K:BS:BeE 890.800",
+   "t": "K:BS:BeE 111.100",
+   "c": "party",
+   "n": "The same contract in Bettingen's collection."
+  },
+  {
+   "a": "K:BS:RiE 890.800",
+   "t": "K:BS:RiE 111.100",
+   "c": "party",
+   "n": "The same contract in Riehen's collection."
+  },
+  {
+   "a": "K:BS:RiE 890.800",
+   "t": "K:BS:BeE 111.100",
+   "c": "party",
+   "n": "The same contract in Riehen's collection."
+  },
+  {
+   "a": "K:BS:952.570",
+   "t": "K:BS:952.560",
+   "c": "party",
+   "n": "BS–BL agreement concluded by the governments; names § 16 of the BS ordinance on parking management, the governments' own rule on the subject they agree on."
+  },
+  {
+   "a": "K:BS:952.570",
+   "t": "K:BS:952.300",
+   "c": "party",
+   "n": "As above; names the BS ordinance on exceptional access to the city centre."
+  },
+  {
+   "a": "K:BL:252.111",
+   "t": "K:BL:252.11",
+   "c": "party",
+   "n": "Contract on the victim counselling centres of both Basel; names § 1 Abs. 2 of the BL ordinance to the Victim Support Act (the BL government's competence)."
+  },
+  {
+   "a": "K:SG:277.3",
+   "t": "K:SG:173.5",
+   "c": "party",
+   "n": "Agreement of the government, the Catholic Konfessionsteil and the city of St. Gallen on the Abbey precinct; each party names its own constitution (KV, the Konfessionsteil's constitution, the city's Gemeindeordnung)."
+  },
+  {
+   "a": "K:TI:874.500",
+   "t": "K:TI:874.110",
+   "c": "context",
+   "n": "\"Richiamati … la legge per le famiglie … e il regolamento della legge per le famiglie\": the regulation listed next to the law."
+  },
+  {
+   "a": "K:VD:818.211",
+   "t": "K:VD:818.21.4",
+   "c": "context",
+   "n": "The decree on cannabis pilot trials lists the regulation on the experts' group on addictions (RGEA) that it relies on."
+  },
+  {
+   "a": "K:VS:175.101",
+   "t": "K:VS:175.100",
+   "c": "context",
+   "n": "The merger law lists the Conseil d'Etat's ordinance on mergers of communes (OFus) among its \"vu\"."
+  },
+  {
+   "a": "K:VS:175.102",
+   "t": "K:VS:175.100",
+   "c": "context",
+   "n": "As above (merger law, OFus among the \"vu\")."
+  },
+  {
+   "a": "K:VS:501.20",
+   "t": "K:VS:726.100",
+   "c": "context",
+   "n": "The decree on the Lötschental events lists 14 acts, among them the ordinance on public procurement."
+  },
+  {
+   "a": "K:VS:501.20",
+   "t": "K:VS:705.100",
+   "c": "context",
+   "n": "As above; the ordinance on constructions."
+  },
+  {
+   "a": "K:VS:501.20",
+   "t": "K:VS:611.101",
+   "c": "context",
+   "n": "As above; the ordinance on the delegation of financial powers."
+  },
+  {
+   "a": "K:VS:501.30",
+   "t": "K:VS:172.010",
+   "c": "context",
+   "n": "The decree for the victims of the Crans-Montana fire lists the ordinance on the attributions of the presidency and the departments."
+  },
+  {
+   "a": "K:VS:813.10",
+   "t": "K:VS:451.100",
+   "c": "context",
+   "n": "\"La loi cantonale sur la protection de la nature … (LcPN) et son ordonnance d'exécution (OcPN)\": law and executing ordinance listed together."
+  },
+  {
+   "a": "K:VS:813.10",
+   "t": "K:VS:921.100",
+   "c": "context",
+   "n": "\"La loi cantonale sur les forêts et les dangers naturels (LcFDN) et son ordonnance d'exécution (OcFDN)\": law and executing ordinance listed together."
+  },
+  {
+   "a": "K:VS:900.110",
+   "t": "K:VS:900.101",
+   "c": "context",
+   "n": "The Grand Conseil's decree lists the Conseil d'Etat's ordinance on economic policy next to the law."
+  },
+  {
+   "a": "K:VS:916.120",
+   "t": "K:VS:916.142",
+   "c": "context",
+   "n": "The decree on wine stock financing lists the ordinance on vine and wine."
+  },
+  {
+   "a": "K:NE:411.126.0",
+   "t": "K:NE:414.110.16",
+   "c": "context",
+   "n": "The intercantonal BEJUNE regulation lists each canton's own rules on the same course, among them Neuchâtel's departmental regulation."
+  },
+  {
+   "a": "K:NE:821.121.34",
+   "t": "K:NE:832.35",
+   "c": "context",
+   "n": "The Conseil d'Etat's tariff decree lists the department's regulation on recognised working conditions (RRCGT), which the tariffs presuppose."
+  },
+  {
+   "a": "K:NE:832.36",
+   "t": "K:NE:832.35",
+   "c": "context",
+   "n": "As above (RRCGT listed among the \"vu\")."
+  },
+  {
+   "a": "K:NE:923.512",
+   "t": "K:NE:923.101",
+   "c": "party",
+   "n": "NE–BE fishing convention; names art. 1 of Neuchâtel's executing regulation of its fishing law (the footnote adds: \"actuellement R du 5 novembre 1997\")."
+  },
+  {
+   "a": "K:GE:H 2 10",
+   "t": "K:GE:H 2 05.01",
+   "c": "context",
+   "n": "The law on the CGN lists federal and cantonal navigation law, among them the Conseil d'Etat's règlement d'application."
+  },
+  {
+   "a": "K:GE:L 2 45",
+   "t": "K:GE:L 2 30.01",
+   "c": "context",
+   "n": "\"Vu la loi sur l'énergie, du 18 septembre 1986, et son règlement d'application\": listed next to the law."
+  },
+  {
+   "a": "K:JU:559.170",
+   "t": "K:JU:551.11",
+   "c": "successor",
+   "n": "The 1992 approval decree cites \"l'ordonnance du 19 février 1980 sur la police cantonale\"; the footnote's number RSJU 551.11 now carries the Gouvernement's later OPol."
+  },
+  {
+   "a": "K:JU:701.251",
+   "t": "K:JU:701.11",
+   "c": "successor",
+   "n": "An act of the Constituent Assembly (1978) cites \"l'ordonnance du 6 décembre 1978 sur les constructions\", its own act; RSJU 701.11 now carries the Gouvernement's OATC."
+  },
+  {
+   "a": "K:JU:701.511",
+   "t": "K:JU:701.11",
+   "c": "successor",
+   "n": "As above (act of the Constituent Assembly, the 1978 ordinance's number now carries the OATC)."
+  }
+ ]
+}

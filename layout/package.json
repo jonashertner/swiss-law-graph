@@ -1,0 +1,11 @@
+{
+  "name": "swiss-law-graph-layout",
+  "private": true,
+  "type": "module",
+  "description": "Circle-packing layout (step 3). Run: node pack.mjs",
+  "dependencies": {
+    "d3-hierarchy": "3.1.2",
+    "graphology": "0.25.4",
+    "graphology-layout-forceatlas2": "0.10.1"
+  }
+}
