@@ -5,8 +5,8 @@
 // Decisions count from their date; the steep rise after 2000 is mostly courts publishing more.
 // The bar under the view is the history itself: today's acts in force per year, stacked by level, and
 // decisions per year below; drag it, step it with the keys, or play it.
-import { t } from "./i18n.js";
-import { M, KIND, getJSON } from "./data.js";
+import { t, lang } from "./i18n.js";
+import { M, KIND, getJSON, loadHistNames } from "./data.js";
 import { $, esc, num } from "./util.js";
 
 export const TIME = { on: false, year: 2026, y0: 1848, y1: 2026 };
@@ -15,16 +15,19 @@ const CLS = [0, 1, 2, 3, 4, 5, 6];
 const motion = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export function load() {
-  if (!ready) ready = Promise.all([getJSON("data/time.json"), getJSON("data/years.json")]).then(([d, ys]) => {
+  if (!ready) ready = Promise.all([getJSON("data/time.json"), getJSON("data/years.json"), loadHistNames(lang())]).then(([d, ys]) => {
     D = d; YS = ys; TIME.y0 = d.y0; TIME.y1 = d.y1;
     if (!TIME.on) TIME.year = d.y1;
     build();
   });
   return ready;
 }
+// after a change of language: the repealed acts' names in it
+export async function relabel(lg) { if (ready) await loadHistNames(lg); }
 export const subscribe = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
 const emit = () => { for (const fn of listeners) fn(TIME); };
-const isLaw = (i) => M.K[i] === KIND.a || M.K[i] === KIND.o;
+// an edition of an act in force (aZGB, aOR, aStGB: "@a", decision 2) is the same act: shown, not counted again
+const isLaw = (i) => M.K[i] === KIND.a || (M.K[i] === KIND.o && !M.S[i].endsWith("@a"));
 
 // does act i exist in year y? undated acts only in the last year
 export function exists(i, y = TIME.year) {
@@ -58,7 +61,7 @@ function build() {
   const Y = TIME.y1 - TIME.y0 + 1, add = CLS.map(() => new Float64Array(Y + 1));
   for (let i = 0; i < M.n; i++) {
     if (!isLaw(i)) continue;
-    const c = M.cls[i] >= 0 ? M.cls[i] : 6, b = D.born[i], d = D.died[i];
+    const c = M.hcls[i] >= 0 ? M.hcls[i] : 6, b = D.born[i], d = D.died[i];      // earlier acts in the colour of who made them
     const from = b ? Math.max(0, b - TIME.y0) : Y - 1, to = d ? Math.min(Y, d - TIME.y0) : Y;
     if (from >= to) continue;
     add[c][from]++; add[c][to]--;
@@ -66,6 +69,16 @@ function build() {
   series = CLS.map((c) => { const a = new Float64Array(Y); let s = 0; for (let k = 0; k < Y; k++) { s += add[c][k]; a[k] = s; } return a; });
 }
 export function actsAt(y = TIME.year) { if (!series) return 0; const k = y - TIME.y0; return series.reduce((s, a) => s + a[k], 0); }
+// acts existing in year y below node f, as actsAt counts them (a parent always precedes its children in the atlas)
+let under = null;
+export function actsUnder(f, y = TIME.year) {
+  if (!under || under.y !== y) {
+    const c = new Int32Array(M.n);
+    for (let i = M.n - 1; i > 0; i--) { if (isLaw(i) && exists(i, y)) c[i]++; c[M.P[i]] += c[i]; }
+    under = { y, c };
+  }
+  return under.c[f];
+}
 
 // ---------- state
 export async function enter(year, autoplay = false) {
@@ -162,7 +175,7 @@ export function texts() {
   playButton();
   bar.querySelector("#tclose").setAttribute("aria-label", t("timeClose")); bar.querySelector("#tclose").title = t("timeClose");
   bar.querySelector("#ttrack").setAttribute("aria-label", t("timeYear"));
-  bar.querySelector("#tnote").textContent = t("timeNote");
+  bar.querySelector("#tnote").textContent = t("timeNote", num(D ? D.noend || 0 : 0));
   for (const b of document.querySelectorAll(".tbtn")) { b.querySelector("span").textContent = t("timeBtn"); b.title = t("timeOpen"); }
 }
 function drawBar() {

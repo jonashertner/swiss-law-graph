@@ -56,6 +56,7 @@ BLOCKS = {"fed": ("Bundesrecht", "Droit fédéral", "Diritto federale", "Federal
 NOT_IN_FORCE = ("Nicht in der geltenden Sammlung", "Hors du recueil en vigueur", "Fuori dalla raccolta in vigore",
                 "Not in the collection in force")
 OTHER_CODES = ("Weitere", "Autres", "Altri", "Others")
+NO_SR = ("Aufgehoben, ohne SR-Nummer", "Abrogés, sans numéro RS", "Abrogati, senza numero RS", "Repealed, no SR number")
 
 
 def plain(s):
@@ -79,6 +80,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     core = json.load(open(SRC / "core.json"))
     tree = json.load(open(SRC / "tree.json"))
+    y_run = int((tree["method"].get("run_date") or "2026")[:4])
     cnodes, tnodes = core["nodes"], tree["nodes"]
     ctitles = {lg: json.load(open(SRC / f"titles.{lg}.json")) for lg in LANGS}
     fedacts = json.load(open(ROOT / "data/fedlex_acts.json"))["acts"]
@@ -151,7 +153,8 @@ def main():
         fl = 8 if n.startswith("0.") else tn.get("l", -1) if tn.get("l", -1) is not None and tn.get("l", -1) >= 0 else -1
         base = n.split("@")[0]
         fa = (fedacts.get(base) or [{}])
-        fv = fa[-1] if "@" not in n else next((v for v in fa if (v.get("date") or "")[:4] == n.split("@")[1]), fa[0])
+        at = n.split("@")[1] if "@" in n else ""         # "1967", or "1986-11" when two acts of the number share a year
+        fv = fa[-1] if not at else next((v for v in fa if (v.get("date") or "")[:len(at)] == at), fa[0])
         title = {lg: plain((fv.get("title") or {}).get(lg)) or tax[base].get(lg) or tax[base].get("de", "") for lg in LANGS}
         ab = {lg: ((cn.get("a") or {}).get(lg) or (fv.get("abbr") or {}).get(lg) or abbr_of(tax[base].get(lg)) or
                    abbr_of(tax[base].get("de")) or "") for lg in LANGS}
@@ -164,7 +167,7 @@ def main():
         url = (cn.get("e") or eli_in.get(base) or eli_any.get(base) or "").replace("https://fedlex.data.admin.ch/", "https://www.fedlex.admin.ch/")
         k = add(kind, parent, base if kind == "a" else n, {lg: ab[lg] or title[lg] for lg in LANGS}, title,
                 id=n, f=fl, d=cn.get("n", 0), n=art_count.get(aid), pk=cn.get("pk") if "pk" in cn else None,
-                ad=tn.get("ad") or fv.get("date"), by=tn.get("by"), u=url,
+                ad=tn.get("ad") or fv.get("date"), by=tn.get("by"), u=url, rp=fv.get("repealed") if kind == "o" else None,
                 ab={lg: ab[lg] for lg in LANGS if ab[lg]} if any(ab.values()) else None)
         act_idx[aid] = k
         return k
@@ -230,6 +233,92 @@ def main():
             names[lg]["l"][k] = names[lg]["l"][a]
             names[lg]["t"][k] = names[lg]["t"][a] or names[lg]["t"][k]
         nodes[k]["hd"] = 1
+    # ---- the federal history (decision 32): every act the federal compilations carried in the SR and repealed
+    # since (Fedlex; from the cleaned-up collection of 1948 on), placed by the SR number it carried; the earlier
+    # acts courts cite are among them and keep their node. Shown only in the time view (no value today).
+    hist_path = ROOT / "data/fedlex_history.json"
+    hist = json.load(open(hist_path)) if hist_path.exists() else {}
+    path = lambda u: (u or "").split("/eli/")[-1]
+    TYPE_FLOOR = {21: 1, 22: 1, 28: 1, 8: 1, 9: 1, 7: 1, 36: 1, 10: 1, 4: 1, 5: 1, 19: 1,   # the Federal Assembly
+                  29: 2, 3: 2, 15: 2,                                                  # Federal Council, courts, contracts with cantons
+                  26: 3, 27: 3, 1: 3, 2: 3, 81: 3, 14: 3,                              # departments, offices, other bodies
+                  31: 8, 32: 8, 16: 4}                                                 # treaties; cantonal constitutions
+    have = {path(n.get("u")) for n in nodes if n["k"] in ("a", "o") and n.get("u")} | {path(u) for u in eli_in.values()}
+    cited = {(n["s"].split("@")[0], n["s"].split("@")[1]) for n in nodes if n["k"] == "o"}
+    kv_ct = {n["sr"]: n["ct"] for n in nodes if n["k"] == "a" and n.get("ct") and n.get("sr")}
+    codes = {n["s"] for n in nodes if n["k"] == "o"}
+    hstat = Counter()
+    by_sy = {}
+    for eli, h in hist.items():
+        sr = h.get("hid") or h.get("n")
+        if sr:
+            by_sy.setdefault((sr, (h.get("date") or "")[:4]), h)
+    by_eli = {path(eli): h for eli, h in hist.items()}
+    for n in nodes:                                    # the earlier acts courts cite: who made them (for the time view)
+        if n["k"] == "o" and n.get("f", -1) in (None, -1):
+            h = by_eli.get(path(n.get("u"))) or by_sy.get(tuple(n["s"].split("@")))
+            if h:
+                n["f"] = 0 if n["s"].startswith("101@") else TYPE_FLOOR.get(h.get("type"), 8 if n["s"].startswith("0.") else -1)
+
+    def place(sr):                                 # next to the act now under the number, else its nearest SR area
+        here = act_idx.get("SR " + sr)
+        if here is not None:
+            return nodes[here]["p"]
+        s = sr
+        while s:
+            if s in tax and s != sr:
+                return cat(s)
+            if s == sr and tax.get(s, {}).get("_b"):
+                return cat(tax[s]["_b"])
+            s = s[:-1].rstrip(".")
+        return blk["int" if sr.startswith("0") else "fed"]
+    nosr = {}                                      # repealed before the SR numbered them (mostly before 1970)
+
+    def nosr_group(b):
+        if b not in nosr:
+            nosr[b] = add("g", blk[b], "", NO_SR, id=f"{b}/-", hg=1)
+        return nosr[b]
+    for eli, h in hist.items():
+        sr = h.get("hid") or h.get("n") or ""
+        rep = h.get("repealed")
+        y = (h.get("date") or h.get("in_force") or "")[:4]
+        if not rep or not (sr or y) or h.get("status") in (0, 4) or rep[:4] > str(y_run) or path(eli) in have:
+            hstat["skipped" if rep else "no end" if h.get("status") in (0, 4) or path(eli) in have else
+                  "no repeal date"] += 1                # not in force, but Fedlex does not say since when: left out
+            continue
+        if sr and (sr, y) in cited:                    # an earlier act courts cite: its node is there already
+            hstat["cited"] += 1
+            continue
+        ty = h.get("type")
+        treaty = sr.startswith("0.") or (not sr and ty in (31, 32))
+        if sr:
+            code = f"{sr}@{y}" if y else sr + "@0000"
+            k2 = 2
+            while code in codes:
+                code = f"{sr}@{y}~{k2}"; k2 += 1
+        else:                                          # "@1951~3": no number, so no "SR …" and no hash year (#de@1951/)
+            k2 = 1
+            while f"@{y}~{k2}" in codes:
+                k2 += 1
+            code = f"@{y}~{k2}"
+        codes.add(code)
+        ct = kv_ct.get(sr) if ty == 16 else None
+        if ty == 16 and not ct:
+            hstat["constitution without canton"] += 1
+            continue
+        title = {lg: plain(h["title"].get(lg) or h["title"].get("de") or h["title"].get("fr") or "") for lg in LANGS}
+        ab = {lg: h["abbr"].get(lg) or h["abbr"].get("de") or "" for lg in LANGS}
+        ab = {lg: f"{v} {y}" if v and y and y not in v else v for lg, v in ab.items()}     # "OG 1943", as the cited ones
+        fl = 0 if sr == "101" else TYPE_FLOOR.get(ty, 8 if treaty else -1)
+        parent = ct_idx[ct] if ct else place(sr) if sr else nosr_group("int" if treaty else "fed")
+        k = add("o", parent, code, {lg: ab[lg] or title[lg] for lg in LANGS}, title,
+                id=code, f=fl, ad=h.get("date"), ct=ct, rp=rep, u=eli.replace("https://fedlex.data.admin.ch/", "https://www.fedlex.admin.ch/"),
+                ab={lg: ab[lg] for lg in LANGS if ab[lg]} if any(ab.values()) else None)
+        start = h.get("in_force") if treaty else h.get("date")
+        nodes[k]["_y"] = [int((start or h.get("date") or h.get("in_force") or "0")[:4]), int(rep[:4])]
+        hstat[("treaty" if treaty else "constitution" if ty == 16 else "federal act") + ("" if sr else ", no SR number")] += 1
+    print("history:", dict(hstat))
+
     # cited codes without an act in force, and the pooled small codes ("ZH *")
     nic = {}
     for k, cn in enumerate(cnodes):
@@ -389,13 +478,20 @@ def main():
             y = ys.get(str(k))
             born[k] = y[0] if y else 0
             how["first cited"] += 1
+        elif kind == "o" and n.get("_y"):               # the federal history: from adoption (a treaty: in force) to repeal
+            born[k], died[k] = n["_y"]
+            how["history"] += 1
         elif kind == "o":                              # an earlier federal act: while it was in force
             base, at = s.split("@")
-            fv = next((v for v in fedacts.get(base, []) if (v.get("date") or "")[:4] == at), None)
+            fv = next((v for v in fedacts.get(base, []) if (v.get("date") or "")[:len(at)] == at), None)
             if fv:
                 born[k] = year(fv.get("in_force") or fv.get("date"))
+                nxt = [v["in_force"] for v in fedacts.get(base, []) if (v.get("in_force") or "") > (fv.get("in_force") or "9")]
                 if year(fv.get("repealed")):
                     died[k] = year(fv.get("repealed"))
+                elif nxt:                               # no repeal date on Fedlex (VEZL 2002): until its successor started
+                    died[k] = year(min(nxt))
+                    how["earlier, ended by successor"] += 1
             how["earlier, in force" if fv else "earlier, undated"] += 1
         elif s.startswith("0.") and not n.get("ct"):   # a treaty: in force for Switzerland
             path = (n.get("u") or "").split("/eli/")[-1]
@@ -433,7 +529,7 @@ def main():
     json.dump({"y0": 1848, "y1": y1, "born": born, "died": died, "cy": cy,
                "dec": {"y0": d0, "fed": [dy.get(y, (0, 0))[0] for y in range(d0, y1 + 1)],
                        "kt": [dy.get(y, (0, 0))[1] for y in range(d0, y1 + 1)], "undated": undated},
-               "how": dict(how)}, open(OUT / "time.json", "w"), separators=(",", ":"))
+               "how": dict(how), "noend": hstat["no repeal date"]}, open(OUT / "time.json", "w"), separators=(",", ":"))
     print("time:", dict(how), f"{sum(1 for y in cy if y)} of {len(cy)} pairs reach 20 with dated decisions;",
           f"{sum(r[1] + r[2] for r in dec)} dated decisions, {undated} undated")
 
@@ -481,20 +577,27 @@ def main():
         if n.get("ab"):
             v = list(dict.fromkeys(n["ab"][lg] for lg in LANGS if n["ab"].get(lg)))
             n["ab"] = "|".join(v)
-    fields = ["k", "p", "s", "f", "d", "n", "pk", "ad", "by", "u", "ab", "ct", "fb", "m", "dd", "sr", "hd"]
+    fields = ["k", "p", "s", "f", "d", "n", "pk", "ad", "by", "u", "ab", "ct", "fb", "m", "dd", "sr", "hd", "rp", "hg"]
     meta = {"run": tree["method"].get("run_date"), "decisions": core["nodes"][0].get("n"), "fields": fields,
             "fedlex": FED, "kurl": kurl, "ksym": tree["method"].get("ksym") or {},
             "counts": {"fed_in_force": sum(1 for n in out_nodes if n["k"] == "a" and not n.get("ct") and not n["s"].startswith("0.")),
                        "int_in_force": sum(1 for n in out_nodes if n["k"] == "a" and n["s"].startswith("0.")),
                        "kt_in_force": sum(1 for n in out_nodes if n["k"] == "a" and n.get("ct")),
-                       "earlier": sum(1 for n in out_nodes if n["k"] == "o"),
+                       "earlier": sum(1 for n in out_nodes if n["k"] == "o" and not n.get("_y")),
+                       "history": sum(1 for n in out_nodes if n.get("_y")),
                        "not_in_collection": sum(1 for n in out_nodes if n["k"] == "x")}}
     rows = [[n.get(f) for f in fields] for n in out_nodes]
     for r in rows:                                   # trailing empties off
         while r and r[-1] is None:
             r.pop()
     json.dump({"meta": meta, "nodes": rows}, open(OUT / "atlas.json", "w"), separators=(",", ":"), ensure_ascii=False)
+    # the repealed acts only the time view shows: their names in a file of their own, loaded with it
+    hidx = [k for k, n in enumerate(out_nodes) if n.get("_y")]
     for lg in LANGS:
+        json.dump({"i": hidx, "l": [names[lg]["l"][k] for k in hidx], "t": [names[lg]["t"][k] for k in hidx]},
+                  open(OUT / f"hnames.{lg}.json", "w"), separators=(",", ":"), ensure_ascii=False)
+        for k in hidx:
+            names[lg]["l"][k] = names[lg]["t"][k] = ""
         json.dump(names[lg], open(OUT / f"names.{lg}.json", "w"), separators=(",", ":"), ensure_ascii=False)
     method = dict(tree["method"])
     for k in ("tours", "plates"):

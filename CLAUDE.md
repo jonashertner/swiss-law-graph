@@ -68,7 +68,8 @@ python3 -m http.server -d site 8765                 # local view: http://localho
 ```
 Fedlex fetchers (only when refreshing data): `fetch_fedlex_acts.py`, `fetch_fedlex_articles.py`,
 `fetch_fedlex_structure.py` (`--missing` adds new acts only), then step 1, then `fetch_fedlex_regimes.py`;
-`fetch_fedlex_xrefs.py` and `fetch_fedlex_basis.py` for the two legislative layers; `fetch_fedlex_dates.py` (~25 min,
+`fetch_fedlex_xrefs.py` and `fetch_fedlex_basis.py` for the two legislative layers; `fetch_fedlex_history.py` (~10 min,
+cached per segment in build/fedlex_history) for decision 32, then 08 and layout/net.mjs; `fetch_fedlex_dates.py` (~25 min,
 after 08 has written atlas.json; then 08 again) for the time view: adoption, entry into force and repeal of every
 federal act and treaty on the site (`data/fedlex_dates.json`, 5,111 SR numbers).
 Cantonal collections (only when refreshing): `python3 pipeline/cantonal/lexwork.py` (~15 min), `zh.py`
@@ -89,8 +90,10 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
    by old and new act (ELG, AsylG, MWSTG, BüG, BV) means the act in force on the decision date; a
    code only the current act bears (BGG, AIG) means the current act whatever the date. Short titles
    of repealed acts from Fedlex are added as aliases (223 added; 9 rejected because they collide with other usage
-   — `REJECTED_FEDLEX`: LAG, LAJ, OASI, TVA, ALV, OOA, OGF, OAJ, BCO). 305 act nodes carry a regime
-   suffix; 303 earlier acts were looked up on Fedlex, 211 have a text. Editions of acts still in force
+   — `REJECTED_FEDLEX`: LAG, LAJ, OASI, TVA, ALV, OOA, OGF, OAJ, BCO). 300 act nodes carry a regime
+   suffix (305 until decision 32: an act that never entered into force governs nothing — CO2-Gesetz 2020, rejected
+   on 13 June 2021, and Fedlex placeholders without entry into force, `…_cc` for GwG, TabPG, StADG, StReG, had taken the
+   references dated before the first act); 303 earlier acts were looked up on Fedlex, 211 have a text. Editions of acts still in force
    (aStGB, aZGB, aOR) get `@a`; StGB in decisions before 2007-01-01 → 311.0@a.
 3. ZPO/CPC/StPO/CPP before 2011-01-01: cantonal procedure codes (cantonal decision →
    `<canton> <code>`; federal decision → excluded). Cantonal decisions 2011–2013 citing an article
@@ -245,7 +248,7 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     treaties dropped); case law = distinct decisions citing acts of both blocks (refs_valid, BV by
     article → part), ranked by n·ln(lift), lift ≥ 1.5 (raw counts are dominated by BGG/BV/ZPO, cited
     everywhere); 90 strongest pairs drawn, all of a block's on pointing. Decisions per block exact
-    (distinct); 936,926 decisions refer to at least one act in force (979,726 incl. earlier acts).
+    (distinct); 936,927 decisions refer to at least one act in force (979,726 incl. earlier acts).
 
 24. The 54 % check (2026-10-26). Floor 5 first showed 54 % of its acts hanging from no cantonal
     basis; after the fixes below and the floor fixes of decisions 17, 26, 27: 3,676 of 6,977 (52.7 %). The
@@ -424,10 +427,10 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     moved against the hand until it was redrawn (sign of the pan term in the blit).
 31. Time view "Zeit" (2026-10-27, Jonas: "a historical development view for Karte, Netz and Abhängigkeiten so we can
     understand how this evolved over time"; `docs/js/time.js`, data `docs/data/time.json` from 08). One year for the
-    three views, in the hash (`#de/net@1975`; internal links keep it). When an act exists: a federal or cantonal act
+    three views, in the hash (`#de@1975/net` since decision 32; internal links keep it). When an act exists: a federal or cantonal act
     from its year of adoption (18,389; 8 undated → only the last year); a treaty from its entry into force for
     Switzerland (Fedlex, all 3,098; EMRK 1974, not 1950); an earlier federal act courts cite while it was in force
-    (293; BV 1874 1874 to end 1999, OG 1945 to end 2006; 9 undated); a cited code no collection holds from its first
+    (297 + 3 editions since decision 32; BV 1874 1874 to end 1999, OG 1945 to end 2006; none undated); a cited code no collection holds from its first
     citation (2,726); before 1848 → 1848. Bases: both acts exist (as today's Ingress names them — it may have been
     amended; RPG names today's BV, so in 1985 it has no chain). Co-citation pair: from the year of its 20th shared
     dated decision (7,283 of 7,396; 113 only in the last year). Legislation: today's text only (chip "nur heutiger
@@ -443,6 +446,36 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     law today only; the rank shares hidden. 60 fps in headless Chromium while playing (map, matrix; network p95
     33 ms after 1995). Uncomfortable truths, said on the page: earlier periods look emptier than they were (repealed
     law is missing except the 305 earlier federal acts), and the growth of case law is largely publication.
+32. The federal history (2026-10-27, Jonas: "yes, fetch the full federal history"; `pipeline/fetch_fedlex_history.py` →
+    `data/fedlex_history.json`: every consolidation abstract on Fedlex, 17,319 acts, queried per ELI segment because
+    OFFSET paging answers HTTP 500 beyond ~9,000). Status: 0 in force, 1 no longer published in the SR, 2 obsolete, 3 no
+    longer in force, 4 not yet in force. An act enters the time view if it has a repeal date not after the run, is
+    not in force (0/4) and is not one of the map's acts (by ELI): 9,355 acts. 6,624 carried an SR number (5,782
+    federal acts, 829 treaties, 13 cantonal constitutions, in their canton): id "<SR>@<year of adoption>" ("~2" for a
+    second act of that number and year), placed next to the act now under that number, else in the nearest SR area.
+    2,731 have none (2,453 federal acts, 278 treaties; 2,515 repealed before 1970, 77 later, adopted 1850–1969):
+    their own group "Aufgehoben, ohne SR-Nummer" in federal and in international law (kind g, `hg`, id `fed/-`,
+    `int/-`), id "@<year>~k". Level from the document type: Bundesgesetz, dringliches BG, Bundesbeschluss,
+    Verordnung der Bundesversammlung, Erlass eines Rates → 1; Verordnung des Bundesrates, Erlass eines eidg.
+    Gerichts, Vertrag Bund–Kantone → 2; Departements-, Amtsverordnung, Erlass einer Anstalt, Kommission → 3;
+    international texts → treaty; Kantonsverfassung → 0. Shown from adoption (treaty: entry into force) to repeal.
+    Left out: 2,513 acts Fedlex lists as not in force without a repeal date (said on the page, number from
+    time.json `noend`). Before 1948 the record holds almost only what was still in force in 1948 (21 acts repealed
+    earlier): said on the page. No value today, so the map, search and their counts are unchanged; the time view's
+    map holds every act ever in force (`M.val.hist`, earlier acts in their level's colour `M.hcls`) and re-lays out
+    when it opens; the header counts what exists in the year ("916 Erlasse 1955"), the editions aZGB/aOR/aStGB
+    ("@a") are shown but not counted twice. Names in `hnames.<lang>.json` (loaded with the time view). Not in the
+    network or matrix (no Ingress or cross-references of repealed acts were read). The panel of an earlier act says
+    "Heute unter dieser Nummer" (not "Heute gilt": a number can carry an unrelated act). Federal acts / treaties in
+    force by year (data): 1900 127/147; 1930 534/363; 1948 1,590/603; 1950 1,515/629; 1955 1,528/747; 1960
+    1,498/869; 1970 1,696/1,203; 1980 1,947/1,543; 1990 2,092/1,777; 2000 2,107/2,203; 2010 1,904/2,626; 2020
+    2,141/2,975; 2026 2,022/3,098 (2,013 in force + 9 earlier acts repealed only from 2027 or still in force). The dip
+    1948–1960 is consistent with the end of the wartime full-powers law (1,195 acts without SR number repealed in
+    the 1950s). Found on the way: `#de/101@1874` (BV 1874) was read as "time view, year 1874" — the year now stands
+    next to the language (`#de@1975/net`; the first links `#de/net@1975` still work); six earlier acts labelled with a
+    month ("916.310@1958-08", two acts of one year) were matched to the wrong Fedlex record (title and adoption of
+    the first act, shown only in the last year): matched by date prefix and ELI now; an earlier act without a repeal
+    date on Fedlex ends when its successor starts (VEZL 2002 → 2013).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -516,6 +549,8 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
       in headless Chromium at 1440×900 (DE, IT) and 390×844 (FR), no console errors.
 - [x] Step 13 time view (decision 31): `pipeline/fetch_fedlex_dates.py`, `08_web.py` → `docs/data/time.json` (0.16 MB);
       `docs/js/time.js` (state, bar, chart) with hooks in treemap.js, net.js, matrix.js, app.js (hash `@year`).
+- [x] Step 13′ federal history (decision 32): `pipeline/fetch_fedlex_history.py` → `data/fedlex_history.json` (11 MB);
+      08 adds 9,355 repealed acts (kind o, `_y`), `hnames.<lang>.json`; step 1 fix for acts never in force.
 
 ## Reports
 - `reports/opencaselaw-anomalies.md` — anomalies in OpenCaseLaw for Jonas to fix there (duplicates,
@@ -526,9 +561,10 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - Jonas: make the repository public (Settings → General → Danger Zone) and enable Pages (Settings → Pages →
   Deploy from a branch → this branch or main after merging, folder `/docs`). Pages on a private repository
   needs a paid plan and publishes the site publicly anyway.
-- Time view: the law of the past itself (repealed acts) is known only for the 305 earlier federal acts courts cite.
-  A full federal history needs every consolidation abstract ever in the SR (Fedlex SPARQL, ~20k acts, SR since
-  1970; earlier only via the AS/BS) placed by SR number; cantonal history is not published as data.
+- Time view: cantonal history (repealed cantonal acts) is not published as data by the cantons; the network and
+  matrix show repealed federal acts only where courts cite them (fetching the consolidated texts of repealed acts
+  would add their bases and references); 2,513 federal acts without a repeal date (decision 32) could be dated from
+  the AS notes of the acts that repealed them.
 - Network: the angle inside a ring is a force-layout position (designed); a measured alternative would be
   community detection (Leiden) per canton with communities as sectors. Treaties are a dense legislative
   cluster of their own (3,304 pairs) with few links to the rest; a "law in force only" filter and a time

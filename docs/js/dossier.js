@@ -104,8 +104,9 @@ function groupHTML(i) {
     `<div class="stackkey">${parts.map((c) => `<span>${sw(c)}${esc(clsName(c))}</span><span class="num">${esc(num(comp[o + c]))}</span>`).join("")}</div>` : "";
   const top = topActsBelow(i);
   return `${kick ? `<div class="k">${kick}</div>` : ""}<h1${h1.length > 42 ? ' class="long"' : ""}>${esc(h1)}</h1>` +
-    (i === 0 ? `<p class="lede">${esc(t("description"))}</p>` : k === KIND.g ? `<p class="lede">${esc(t("codeNote"))}</p>` : "") +
+    (i === 0 ? `<p class="lede">${esc(t("description"))}</p>` : k === KIND.g ? `<p class="lede">${esc(t(M.HG[i] ? "noSrNote" : "codeNote"))}</p>` : "") +
     `<div class="stat2">${acts ? `<div class="stat"><b>${esc(num(acts))}</b><span>${esc(t("inForceActs"))}</span></div>` : ""}` +
+    `${M.HG[i] ? `<div class="stat"><b>${esc(num(M.val.hist[i]))}</b><span>${esc(t("nRepealed"))}</span></div>` : ""}` +
     `${M.DD[i] ? `<div class="stat"><b>${esc(num(M.DD[i]))}</b><span>${esc(t("referring"))}</span></div>` : ""}</div>` + stack +
     section(t("topActs"), rowsHTML(top, (j) => actRow(j, num(M.D[j])), 12));
 }
@@ -128,8 +129,9 @@ export async function node(i, o = {}) {
   const BY = { Bundesversammlung: "byFA", Bundesrat: "byFC", Gericht: "byCourt", "Departement, Amt oder andere Behörde": "byDept" };
   if (BY[M.BY[i]]) facts.push([t("enactedBy"), esc(t(BY[M.BY[i]]))]);
   if (M.AD[i]) facts.push([t("adopted"), esc(date(M.AD[i]))]);
+  if (M.RP[i]) facts.push([t("repealedOn"), esc(date(M.RP[i]))]);
   if (M.A[i]) facts.push([t("articles"), `<span class="num">${esc(num(M.A[i]))}</span>`]);
-  if (k === KIND.o) { const today = M.byId.get(M.S[i].split("@")[0]); if (today != null) facts.push([t("today"), `<a href="${href(idOf(today))}">${esc(label(today))}</a>`]); }
+  if (k === KIND.o) { const sr = srOf(i), today = sr ? M.byId.get(sr) : null; if (today != null) facts.push([t("sameNumber"), `<a href="${href(idOf(today))}">${esc(label(today))}</a>`]); }
   const head = `<div class="k">${kick}</div><h1${h1.length > 42 ? ' class="long"' : ""}>${esc(h1)}</h1>` +
     (lede && lede !== h1 ? `<p class="lede">${esc(lede)}</p>` : "") +
     (pooled ? `<p class="lede">${esc(t("pooledNote", num(M.MM[i])))}</p>` : k === KIND.x ? `<p class="lede">${esc(t("codeNote"))}</p>` : "") +

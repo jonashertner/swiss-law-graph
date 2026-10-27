@@ -26,11 +26,12 @@ function children(id) {
   if (OA && id === OA.i && !isLeaf(id)) return OA.top.filter((c) => value(c) > 0);
   if (isAct(id)) return [];
   const out = [];
-  for (const c of kids(id)) if (M.val[mode][c] > 0) out.push(c);
+  const V = vals();
+  for (const c of kids(id)) if (V[c] > 0) out.push(c);
   return out;
 }
 export function value(id) {
-  if (!isStr(id)) return M.val[mode][id];
+  if (!isStr(id)) return vals()[id];
   return (mode === "acts" ? OA.va : OA.vd).get(id) || 0;
 }
 // an act is a tile, except the open act while the map shows its inside
@@ -41,7 +42,10 @@ export function parentOf(id) {
   const p = OA.par.get(id);
   return p == null ? OA.i : p;
 }
-function clsOf(id) { return isStr(id) ? -1 : M.cls[id]; }
+function clsOf(id) { return isStr(id) ? -1 : TSH ? M.hcls[id] : M.cls[id]; }
+// the time view's map holds every act that was ever in force: today's and the earlier federal acts (decision 32)
+const hist = () => TSH && mode === "acts";
+const vals = () => (hist() ? M.val.hist : M.val[mode]);
 
 // colours
 function readColours() {
@@ -81,7 +85,7 @@ function inkOf(id) {
 // the dominant colour class of a group too small to subdivide
 function groupFill(id) {
   if (isStr(id)) return heatColour(heatOf(id));
-  const comp = M.comp[mode], o = id * 7;
+  const comp = hist() ? M.comp.hist : M.comp[mode], o = id * 7;
   let best = 6, bv = -1;
   for (let c = 0; c < 7; c++) if (comp[o + c] > bv) { bv = comp[o + c]; best = c; }
   return best === 5 ? hatch : COL.fill[best];
@@ -250,7 +254,11 @@ function drawFill(it, r, alpha) {
   ctx.fillRect(x0, y0, Math.max(0.5, w - g), Math.max(0.5, h - g));
 }
 const shareOf = (id) => (!TSH ? 1 : isStr(id) ? (OA ? TSH[OA.i] : 1) : TSH[id]);
-export function setTime(share) { TSH = share; redraw(); }
+export function setTime(share) {
+  const was = hist();
+  TSH = share;
+  if (hist() !== was) relayout(true, "resize"); else redraw();     // the past makes room on the map, and gives it back
+}
 function drawLabel(it, alpha, r = it) {
   const x0 = snap(r.x), y0 = snap(r.y), x1 = snap(r.x + r.w), y1 = snap(r.y + r.h);
   const w = x1 - x0, h = y1 - y0;

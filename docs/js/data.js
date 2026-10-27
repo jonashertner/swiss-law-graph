@@ -26,7 +26,7 @@ export function build(atlas) {
     K: new Uint8Array(n), P: new Int32Array(n), S: new Array(n), F: new Int8Array(n).fill(-1),
     D: new Float64Array(n), A: new Int32Array(n), PK: new Int16Array(n).fill(-1), AD: new Array(n), BY: new Array(n),
     U: new Array(n), AB: new Array(n), CT: new Array(n), FB: new Array(n), MM: new Int32Array(n), DD: new Float64Array(n),
-    SR: new Array(n), HD: new Uint8Array(n),
+    SR: new Array(n), HD: new Uint8Array(n), RP: new Array(n), HG: new Uint8Array(n),
   });
   for (let i = 0; i < n; i++) {
     const r = rows[i], g = (k) => r[at[k]];
@@ -36,6 +36,7 @@ export function build(atlas) {
     const pk = g("pk"); if (pk != null) M.PK[i] = pk;
     M.AD[i] = g("ad") || ""; M.BY[i] = g("by") || ""; M.U[i] = g("u") || ""; M.AB[i] = g("ab") || "";
     M.CT[i] = g("ct") || ""; M.FB[i] = g("fb") || ""; M.MM[i] = g("m") || 0; M.DD[i] = g("dd") || 0; M.SR[i] = g("sr") || ""; M.HD[i] = g("hd") ? 1 : 0;
+    M.RP[i] = g("rp") || ""; M.HG[i] = g("hg") ? 1 : 0;
   }
   // children, as slices of one array
   const cnt = new Int32Array(n);
@@ -57,21 +58,25 @@ export function build(atlas) {
     if (M.SR[i]) M.byId.set(M.SR[i], i);
   }
   // values per mode (acts in force; decisions) and the colour classes of what lies below
-  M.val = { acts: new Float64Array(n), dec: new Float64Array(n) };
-  M.comp = { acts: new Float32Array(n * 7), dec: new Float32Array(n * 7) };
-  M.cls = new Int8Array(n).fill(-1);
+  // hist: the time view's map, every act that was ever in force (today's and the earlier federal acts), each
+  // earlier act in the colour of who made it (hcls) rather than hatched
+  M.val = { acts: new Float64Array(n), dec: new Float64Array(n), hist: new Float64Array(n) };
+  M.comp = { acts: new Float32Array(n * 7), dec: new Float32Array(n * 7), hist: new Float32Array(n * 7) };
+  M.cls = new Int8Array(n).fill(-1); M.hcls = new Int8Array(n).fill(-1);
   for (let i = n - 1; i >= 0; i--) {
     const k = M.K[i];
     if (k === KIND.a || k === KIND.o || k === KIND.x) {
-      const c = classOf(i); M.cls[i] = c;
-      const va = k === KIND.a ? 1 : 0, vd = M.D[i];
-      M.val.acts[i] = va; M.val.dec[i] = vd;
-      M.comp.acts[i * 7 + c] += va; M.comp.dec[i * 7 + c] += vd;
+      const c = classOf(i), h = k === KIND.o ? floorClass(M.F[i]) : c; M.cls[i] = c; M.hcls[i] = h;
+      const va = k === KIND.a ? 1 : 0, vd = M.D[i], vh = k === KIND.x ? 0 : 1;
+      M.val.acts[i] = va; M.val.dec[i] = vd; M.val.hist[i] = vh;
+      M.comp.acts[i * 7 + c] += va; M.comp.dec[i * 7 + c] += vd; M.comp.hist[i * 7 + h] += vh;
     }
     if (i) {
       const p = M.P[i];
-      M.val.acts[p] += M.val.acts[i]; M.val.dec[p] += M.val.dec[i];
-      for (let c = 0; c < 7; c++) { M.comp.acts[p * 7 + c] += M.comp.acts[i * 7 + c]; M.comp.dec[p * 7 + c] += M.comp.dec[i * 7 + c]; }
+      M.val.acts[p] += M.val.acts[i]; M.val.dec[p] += M.val.dec[i]; M.val.hist[p] += M.val.hist[i];
+      for (let c = 0; c < 7; c++) {
+        M.comp.acts[p * 7 + c] += M.comp.acts[i * 7 + c]; M.comp.dec[p * 7 + c] += M.comp.dec[i * 7 + c]; M.comp.hist[p * 7 + c] += M.comp.hist[i * 7 + c];
+      }
     }
   }
   M.root = 0;
@@ -79,8 +84,11 @@ export function build(atlas) {
 
 // The five colours: who made the rule (legend), plus "not in the collection" and "level not recorded"
 function classOf(i) {
-  const k = M.K[i], f = M.F[i];
+  const k = M.K[i];
   if (k === KIND.o || k === KIND.x) return 5;
+  return floorClass(M.F[i]);
+}
+function floorClass(f) {
   if (f === 0 || f === 4) return 0;
   if (f === 1 || f === 5) return 1;
   if (f === 2 || f === 6) return 2;
@@ -111,6 +119,13 @@ export async function loadNames(lg) {
   M.L = nm.l.map(cap); M.T = nm.t.map(cap); M.lang = lg;
   shortTab = new Map();
   searchIndex = null;
+}
+// the names of the repealed acts only the time view shows: their own file, loaded with it (decision 32)
+export async function loadHistNames(lg) {
+  const h = await getJSON(`data/hnames.${lg}.json`).catch(() => null);      // without them the past keeps its numbers only
+  if (!h) return;
+  h.i.forEach((i, k) => { M.L[i] = h.l[k]; M.T[i] = h.t[k]; });
+  shortTab = new Map();
 }
 export function label(i) {
   const k = M.K[i];
@@ -222,7 +237,7 @@ function buildSearch() {
   const ab = [], ti = [], nodes = [];
   for (let i = 0; i < M.n; i++) {
     const k = M.K[i];
-    if (k === KIND.r || k === KIND.g) continue;
+    if (k === KIND.r || k === KIND.g || (k === KIND.o && !M.D[i])) continue;     // repealed acts no court cites: the time view only
     nodes.push(i);
     const a = new Set();
     if (M.AB[i]) for (const x of M.AB[i].split("|")) a.add(fold(x));

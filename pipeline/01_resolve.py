@@ -177,6 +177,8 @@ def act_intervals(code_sr: pd.DataFrame, acts: dict, alias_sets: dict, former: d
         match = [a for a in hist if code in {strip_year(x) for x in a["abbr"].values()}
                  or (a is cur and code in alias_sets.get(sr, ()))]
         cand = match or hist
+        if any(a.get("in_force") for a in cand):       # an act that never entered into force governs nothing
+            cand = [a for a in cand if a.get("in_force")]  # (CO2-Gesetz 2020, rejected on 13 June 2021)
         if len(cand) == 1:
             rows.append((code, sr, regime[cand[0]["eli"]], "0001-01-01", "9999-12-31"))
             continue

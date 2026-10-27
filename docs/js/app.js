@@ -15,7 +15,7 @@ let views = {};                                      // lazily loaded modules: h
 
 // ---------- language
 function pickLang() {
-  const h = location.hash.slice(1).split("/")[0];
+  const h = location.hash.slice(1).split("/")[0].split("@")[0];
   if (LANGS.includes(h)) return h;
   const s = store("atlas-lang");
   if (LANGS.includes(s)) return s;
@@ -49,6 +49,7 @@ async function switchLang(lg) {
   if (lg === lang()) return;
   setLang(lg); store("atlas-lang", lg);
   await loadNames(lg);
+  await TV.relabel(lg);
   staticText();
   TM.refreshLabels();
   refreshSearch();
@@ -60,11 +61,15 @@ function parseHash() {
   let h = decodeURIComponent(location.hash.slice(1));
   const old = /^SR_(.+?)(?:--(.+))?$/.exec(h);              // links of the previous map: #SR_220--art_41
   if (old) return { lang: lang(), rest: old[1] + (old[2] ? ":" + old[2] : "") };
-  const ym = /@(\d{4})$/.exec(h);                            // the year of the time view: #de/net@1975
-  if (ym) h = h.slice(0, -ym[0].length);
-  const year = ym ? +ym[1] : null, parts = h.split("/");
-  if (LANGS.includes(parts[0])) return { lang: parts[0], rest: parts.slice(1).join("/"), year };
-  return { lang: lang(), rest: h, year };
+  // the year of the time view stands next to the language (#de@1975/net): an id may end in a year itself (101@1874)
+  const m = /^([a-z]{2})(?:@(\d{4}))?(?:\/(.*))?$/.exec(h);
+  if (m && LANGS.includes(m[1])) {
+    let rest = m[3] || "", year = m[2] ? +m[2] : null;
+    const old31 = /^(net|matrix|hierarchy|)@(\d{4})$/.exec(rest);        // the first links of the time view: #de/net@1975
+    if (old31 && !year) { rest = old31[1]; year = +old31[2]; }
+    return { lang: m[1], rest, year };
+  }
+  return { lang: lang(), rest: h, year: null };
 }
 function go(target, replace = false) {
   const h = href(target);
@@ -187,7 +192,8 @@ function renderCrumbs() {
   });
   const mode = TM.getMode();
   let tot = "";
-  if (typeof f === "number" && !isAct(f)) tot = mode === "acts" ? t("nActsInForce", num(M.val.acts[f])) : M.DD[f] ? t("nDec", num(M.DD[f])) : "";
+  if (typeof f === "number" && !isAct(f)) tot = mode === "acts" ? (TV.TIME.on ? t("nActsAt", num(TV.actsUnder(f)), TV.TIME.year) :
+    t("nActsInForce", num(M.val.acts[f]))) : M.DD[f] ? t("nDec", num(M.DD[f])) : "";
   else if (oa) tot = mode === "acts" ? t("nArts", num(oa.va.get(typeof f === "string" ? f : null) ?? oa.arts.filter((a) => !a[4]).length)) : "";
   if (tot) out.push(`<span class="tot">${esc(tot)}</span>`);
   $("crumbs").setAttribute("aria-label", t("root"));
@@ -247,13 +253,14 @@ function onHover(id, e, it) {
 }
 
 // ---------- the time view (decision 31): on the map, an act not yet there is an empty plot of its size; with
-// "decisions" as area, a tile fills as its case law accrues. The year rides on the hash (#de/net@1975).
+// "decisions" as area, a tile fills as its case law accrues. The year rides on the hash, next to the language (#de@1975/net).
 function mapShare() {
   if (!TV.TIME.on) return null;
   const n = M.n, mode = TM.getMode(), y = TV.TIME.year, a = new Float32Array(n), tot = new Float32Array(n), sh = new Float32Array(n).fill(1);
+  const V = mode === "acts" ? M.val.hist : M.val.dec;            // with acts as area: every act that was ever in force
   for (let i = n - 1; i >= 1; i--) {                  // children follow their parent: sum upwards from the end
     if (isAct(i)) {
-      const v = M.val[mode][i];
+      const v = V[i];
       // with decisions as area: an act that exists but has none yet is faint, not an empty plot
       if (v > 0) { tot[i] = v; a[i] = TV.exists(i, y) ? (mode === "acts" ? v : Math.max(v * 0.001, Math.min(v, TV.decTo(i, y)))) : 0; }
     }
@@ -263,12 +270,12 @@ function mapShare() {
   return sh;
 }
 function syncHash() {
-  const base = (location.hash || `#${lang()}/`).replace(/@\d{4}$/, ""), h = TV.TIME.on ? `${base}@${TV.TIME.year}` : base;
+  const { lang: lg, rest } = parseHash(), h = `#${lg}${TV.TIME.on ? "@" + TV.TIME.year : ""}/${rest}`;
   if (h !== location.hash) history.replaceState(null, "", h);
 }
 let hashT = 0;
 TV.subscribe(() => {
-  if (S.view === "map") TM.setTime(mapShare());
+  if (S.view === "map") { TM.setTime(mapShare()); renderCrumbs(); }
   if (!hashT) hashT = setTimeout(() => { hashT = 0; syncHash(); }, 400);   // at most every 400 ms, also while playing
 });
 
