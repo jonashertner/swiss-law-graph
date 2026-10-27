@@ -81,6 +81,16 @@ export function build(atlas) {
   }
   // the time view's layout (hl): a group of acts without an SR number (hg, decision 32) has no place in the SR tree; drawn
   // act by act it took a fifth of federal law. It gets HG_SHARE of its block instead, drawn as one gauge (counts stay exact)
+  // likewise with decisions as area (dl): a canton's codes not in its collection (decision 17; 2,723 codes) are one gauge
+  M.XG = new Uint8Array(n);
+  for (let i = 1; i < n; i++) if (M.K[i] === KIND.g && !M.HG[i] && M.K[M.P[i]] === KIND.t) M.XG[i] = 1;
+  M.val.dl = Float64Array.from(M.val.dec);
+  for (let i = 0; i < n; i++) {
+    if (!M.XG[i] || !(M.val.dec[i] > 0)) continue;
+    const p = M.P[i], v = ((M.val.dl[p] - M.val.dl[i]) * HG_SHARE) / (1 - HG_SHARE), dv = v - M.val.dl[i];
+    M.val.dl[i] = v;
+    for (let q = p; ; q = M.P[q]) { M.val.dl[q] += dv; if (!q) break; }
+  }
   M.val.hl = Float64Array.from(M.val.hist);
   for (let i = 0; i < n; i++) {
     if (!M.HG[i] || !(M.val.hist[i] > 0)) continue;

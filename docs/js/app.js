@@ -156,9 +156,9 @@ async function showMap(target) {
   } else if (isAct(i)) {
     const cur = TM.getFocus(), r = TM.itemRect(i);
     f = typeof cur === "number" && cur !== i && !isAct(cur) && isAncestor(cur, i) && r && r.lab ? cur : M.P[i];
-    if (M.HG[f] && TV.TIME.on) f = M.P[f];             // an act without SR number: its block, the bar marked (no mosaic)
+    if (TM.isGauge(f)) f = M.P[f];                     // an act inside a bar: its block or canton, the bar marked (no mosaic)
     s = i;
-  } else if (M.HG[i] && TV.TIME.on) { f = M.P[i]; s = i; }   // the bar of acts without an SR number: selected, not entered
+  } else if (TM.isGauge(i)) { f = M.P[i]; s = i; }   // a bar (acts without SR number, codes not in the collection): selected
   else { f = i; s = null; }
   TM.setFocus(f);
   S.sel = s;
@@ -239,7 +239,7 @@ function renderLegend() {
   const vis = TM.visibleClasses();
   const cls = [0, 1, 2, 3, 4, 5, 6].filter((c) => c <= 4 ? true : vis.has(c));
   $("legend").innerHTML = cls.map((c) => `<button class="it" data-cls="${c}">${sw(c)}<span>${esc(t(c === 6 ? "levelUnknown" : "c" + c))}</span></button>`).join("")
-    + (TM.getMode() === "dec" ? `<span class="note">${esc(t("cantonFloor", String(TM.CANTON_FLOOR * 100).replace(".", t("dec"))))}</span>` :
+    + (TM.getMode() === "dec" ? `<span class="note">${esc(t("cantonFloor", String(TM.CANTON_FLOOR * 100).replace(".", t("dec"))))}. ${esc(t("xgScale"))}</span>` :
       TV.TIME.on ? `<span class="note">${esc(t("noSrScale"))}</span>` : "");
 }
 
@@ -257,6 +257,9 @@ function tipHtml(id) {
   } else if (M.HG[id] && TV.TIME.on) {                // acts without an SR number: the gauge's numbers
     const G = TM.gaugeOf(id);
     meta = `${esc(num(G.n))} ${esc(t("gaugeIn", TV.TIME.year))} · ${esc(num(G.top))} ${esc(t("gaugeTop", G.topY))}`;
+  } else if (M.XG[id] && TM.isGauge(id)) {             // a canton's codes not in its collection
+    const G = TM.gaugeOf(id), p = Math.round(G.share * 100);
+    meta = esc(t("codesIn", num(G.n), p < 1 && G.share > 0 ? "<1" : String(p)));
   } else {
     meta = esc(t("nActsInForce", num(M.val.acts[id])));
     if (M.DD[id]) meta += " · " + esc(t("nDec", num(M.DD[id])));

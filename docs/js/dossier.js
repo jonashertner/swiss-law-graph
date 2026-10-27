@@ -153,7 +153,7 @@ function groupHTML(i) {
     `<div class="stackkey">${parts.map((c) => `<span>${sw(c)}${esc(clsName(c))}</span><span class="num">${esc(num(comp[o + c]))}</span>`).join("")}</div>` : "";
   const top = topActsBelow(i);
   return `${kick ? `<div class="k">${kick}</div>` : ""}<h1${h1.length > 42 ? ' class="long"' : ""}>${esc(h1)}</h1>` +
-    (i === 0 ? `<p class="lede">${esc(t("description"))}</p>` + asks() : k === KIND.g ? `<p class="lede">${esc(t(M.HG[i] ? "noSrNote" : "codeNote"))}</p>` : "") +
+    (i === 0 ? `<p class="lede">${esc(t("description"))}</p>` + asks() : k === KIND.g ? `<p class="lede">${esc(t(M.HG[i] ? "noSrNote" : M.XG[i] ? "xgNote" : "codeNote"))}</p>` : "") +
     `<div class="stat2">${acts ? `<div class="stat"><b>${esc(num(acts))}</b><span>${esc(t("inForceActs"))}</span></div>` : ""}` +
     `${M.HG[i] ? `<div class="stat"><b>${esc(num(M.val.hist[i]))}</b><span>${esc(t("nRepealed"))}</span></div>` : ""}` +
     `${M.DD[i] ? `<div class="stat"><b>${esc(num(M.DD[i]))}</b><span>${esc(t("referring"))}</span></div>` : ""}</div>` + stack +

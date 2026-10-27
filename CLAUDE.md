@@ -636,7 +636,13 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     11,443 acts of the federal history too (their names, `hnames.<lang>.json`, load with the first search; each hit shows
     its period: "Rationierung" → the wartime rationing ordinances, "… von Salatsaucen 1940–1948"); opening an earlier act
     outside the time view enters it in the act's year of adoption (it has no place on today's map), an act without SR
-    number with its block in view and the bar marked.
+    number with its block in view and the bar marked. (e) The cantons likewise (Jonas: "build the no-SR bar for the cantons
+    too"): with "Fläche: Entscheide" each canton's group "Nicht in der geltenden Sammlung" (2,723 codes courts cite that its
+    collection in force does not hold, mostly repealed law, decision 17) was a hatched mosaic — in Bern 317 tiles, a third of
+    the canton. Now one strip at its bottom (`M.XG`, layout values `M.val.dl`, 5 %; a block under 80 px gets a thin strip
+    without text): "Nicht in der Sammlung · 317 Codes · 21 % der Verweise" — the share of the canton's references (decisions
+    per act, summed) that go to these codes, in the time view up to the year (1995: VD 67 %, GE 60 %); the panel lists the
+    codes by decisions.
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.

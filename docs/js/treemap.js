@@ -4,7 +4,7 @@
 // animates every tile from where it was to where it goes, so the eye can follow.
 import { M, kids, KIND, label as nodeLabel, shortLabel, isAct } from "./data.js";
 import { t, pick } from "./i18n.js";
-import { TIME, exists } from "./time.js";
+import { TIME, exists, decTo } from "./time.js";
 import { num } from "./util.js";
 
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -42,7 +42,8 @@ export function value(id) {
 }
 // an act is a tile, except the open act while the map shows its inside; in the time view a group without SR numbers
 // is one gauge (decision 32: its acts have no place in the SR tree, so a mosaic of them says nothing)
-const isGauge = (id) => !isStr(id) && TSH && M.HG[id] === 1;
+// a canton's codes not in its collection, with decisions as area, likewise (the share of the canton's references they hold)
+export const isGauge = (id) => !isStr(id) && ((TSH && mode === "acts" && M.HG[id] === 1) || (mode === "dec" && M.XG[id] === 1));
 const isLeaf = (id) => (isStr(id) ? id[0] === "A" : isGauge(id) || (isAct(id) && !(OA && OA.i === id && (focus === id || isStr(focus)))));
 export function parentOf(id) {
   if (!isStr(id)) return id > 0 ? M.P[id] : -1;
@@ -53,10 +54,26 @@ export function parentOf(id) {
 function clsOf(id) { return isStr(id) ? -1 : TSH ? M.hcls[id] : M.cls[id]; }
 // the time view's map holds every act that was ever in force: today's and the earlier federal acts (decision 32)
 const hist = () => TSH && mode === "acts";
-const vals = () => (hist() ? M.val.hl : M.val[mode]);
+const vals = () => (hist() ? M.val.hl : mode === "dec" ? M.val.dl : M.val[mode]);
+// codes not in the collection: how many courts had cited by the year shown, and their share of the canton's references
+const codeGauges = new Map();
+function codesOf(id, y) {
+  const on = TIME.on, key = on ? y : 0;
+  let g = codeGauges.get(id);
+  if (!g) { g = { codes: Array.from(kids(id)), ct: M.P[id], y: null }; codeGauges.set(id, g); }
+  if (g.y !== key) {
+    let mine = 0, n = 0;                             // a pooled node stands for M.MM codes with fewer than 5 decisions each
+    for (const c of g.codes) { const d = on ? decTo(c, y) : M.D[c]; mine += d; if (d > 0) n += M.S[c] === "*" ? M.MM[c] || 1 : 1; }
+    const all = on ? under(g.ct, y) : M.val.dec[g.ct];
+    g.n = n; g.share = all > 0 ? Math.min(1, mine / all) : 0; g.y = key;
+  }
+  return g;
+}
+const under = (c, y) => { let s = 0; for (const k of kids(c)) s += isAct(k) ? decTo(k, y) : under(k, y); return s; };
 // a gauge: acts of the group in force in the year shown, by level, and the most there ever were (cached per group)
 const gauges = new Map();
 export function gaugeOf(id, y = TIME.year) {
+  if (M.XG[id]) return codesOf(id, y);
   let g = gauges.get(id);
   if (!g) {
     const acts = Array.from(kids(id)).filter((c) => M.K[c] === KIND.o), per = new Int32Array(TIME.y1 - TIME.y0 + 1);
@@ -215,7 +232,8 @@ function layout(f) {
     }
     const gk = order.findIndex(isGauge);
     if (gk >= 0) {                                   // the gauge: a strip across the bottom of its block, tall enough for a line
-      const tot = vals.reduce((a, b) => a + b, 0), gh = Math.min(ih * 0.3, Math.max(18, (ih * vals[gk]) / (tot || 1)));
+      const tot = vals.reduce((a, b) => a + b, 0), sh = (ih * vals[gk]) / (tot || 1);
+      const gh = ih >= 80 ? Math.min(ih * 0.3, Math.max(18, sh)) : Math.max(3, sh);   // a small block: a thin strip, no text
       rects.push([order[gk], ix, iy + ih - gh, iw, gh]);
       ih -= gh + 1;
       order.splice(gk, 1); vals.splice(gk, 1);
@@ -295,10 +313,28 @@ function drawFill(it, r, alpha) {
   ctx.fillRect(x0, y0, Math.max(0.5, w - g), Math.max(0.5, h - g));
 }
 const shareOf = (id) => (!TSH ? 1 : isStr(id) ? (OA ? TSH[OA.i] : 1) : TSH[id]);
+// "Nicht in der Sammlung · 317 Codes · 30 % der Verweise": the strip hatched as these codes are elsewhere, the bar their share
+function drawCodes(id, x, y, w, h, alpha) {
+  const G = codesOf(id, TIME.year), pad = 6, bh = Math.max(4, Math.min(10, Math.round(h * 0.18)));
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = COL.wash; ctx.fillRect(x, y, w, h);
+  const f1 = font(620, w < 160 ? 11 : 12), pct = Math.round(G.share * 100);
+  const cnt = t("codesIn", num(G.n), pct < 1 && G.share > 0 ? "<1" : String(pct));
+  const room = Math.max(0, w * 0.62 - pad), alone = Math.max(0, w - 2 * pad - 28);
+  const s1 = [[`${t("xgShort")} · ${cnt}`, room], [cnt, room], [t("xgShort"), alone]].find(([c, r]) => textW(c, f1) <= r)?.[0] || "";
+  ctx.font = f1; ctx.fillStyle = COL.ink; ctx.textBaseline = "alphabetic";
+  if (s1) ctx.fillText(s1, x + pad, y + Math.min(h - 4, 15));
+  const tx = s1 ? textW(s1, f1) + 2 * pad : 0, bx = x + pad + tx, bw = w - 2 * pad - tx, by = y + Math.max(3, (Math.min(h, 22) - bh) / 2);
+  if (bw < 12) return;
+  ctx.fillStyle = COL.rule; ctx.fillRect(bx, by, bw, bh);               // the track: all the canton's references
+  ctx.fillStyle = hatch; ctx.fillRect(bx, by, bw * G.share, bh);
+  ctx.strokeStyle = COL.ink3; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw * G.share - 1), bh - 1);
+}
 // "Nicht mehr in Kraft, ohne SR-Nummer · 1'239 in Kraft 1945": a bar of the acts in force by level against the most
 // there ever were (the faint track); not to scale with the map (HG_SHARE of its block, stated in the legend)
 function drawGauge(id, x, y, w, h, alpha) {
   if (w < 4 || h < 4) return;
+  if (M.XG[id]) { drawCodes(id, x, y, w, h, alpha); return; }
   const G = gaugeOf(id);
   ctx.globalAlpha = alpha;
   ctx.fillStyle = COL.wash; ctx.fillRect(x, y, w, h);
