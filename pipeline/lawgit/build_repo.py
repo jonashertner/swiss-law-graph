@@ -571,6 +571,10 @@ def main() -> None:
                      if e["kind"] in ("version", "fix") and not e["path"].startswith(("beschlossen/", "vernehmlassung/"))})
     mark = write_extra(p.stdin, mark, "main", readme.files(snaps, facts, kacts, START, TODAY, future),
                        f"README und Verzeichnisse: Stand {de_date(TODAY)}", TODAY)
+    # for the atlas (08_web.py): where each act in force lives at the end of main, and in which languages
+    where = {"ch": {a["sr"]: [a["path"], sorted(snaps[a["path"]])] for a in facts.values() if a.get("sr") and a["path"] in snaps},
+             "kt": {f"{a['ct']}/{a['nr']}": [a["path"], sorted(snaps[a["path"]])] for a in kacts.values() if a["path"] in snaps}}
+    json.dump(where, open(B / "repo_paths.json", "w"), ensure_ascii=False)
     main_mark = mark
     mark = stream(p.stdin, fut_ev, "future", mark, f":{main_mark}", snaps)
     p.stdin.write(b"done\n")
