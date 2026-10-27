@@ -673,6 +673,36 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     ♥ is the text glyph U+2665 + VS15 in the ink of the page, not the emoji; phones drop the sources). Link preview: Open
     Graph tags and `docs/og.png` (1200×627, today's map without interface, rendered by Playwright).
 
+39. The law repository keeps itself current (2026-10-27, Jonas: "yes, start the weekly refresh"; `pipeline/refresh.py`,
+    `build_repo.py --append`, `pipeline/lawgit/weekly.sh`, workflow `.github/workflows/update.yml` in swisslaw-git, written by
+    `readme.UPDATE_WORKFLOW`). Twice a week (Monday and Thursday 03:41 UTC; twice so the Actions cache, evicted after 7 days
+    unused, stays warm). main is never rewritten: the tip must equal the replay of every version known today. (a) Fetching:
+    lists, headers and texts in force are re-read (`refresh.fresh`: with SWISSLAW_REFRESH=<start of the run> a cached copy
+    counts only if written in this run) — Fedlex history and version lists, LexWork index and act headers, BLV lists and
+    version lists (not the atlas adapter's copies), ZH listing pages, every GE/NE/JU page; the document of a version stays
+    cached (Fedlex XML, LexWork version JSON and PDFs, BLV XHTML, ZH Nachtrag PDFs). Texts in force are converted again
+    only when their source changed (`convert.stale`: SHA-1 of the source in check_sil/check_pdfcur.json). The run day is
+    SWISSLAW_TODAY or today in Zürich (`refresh.TODAY`; it was the fixed 2026-10-26 in convert.py). ZH/GE/NE/JU act lists
+    come from the adapters' own output (`build_repo.in_force_acts`: identical to cantonal_basis.json for all four,
+    checked), so the weekly job needs no 26-canton assembly. (b) Appending: the last run is main's commit date; the state
+    the known versions give on that day is compared with main's tree; an act that differs got a version (or a repeal)
+    published after the day it applies from: committed first ("Nachträglich veröffentlicht"), author date = that day,
+    committer date = the first day of this window, so `rev-list --before` keeps meaning "as this repository showed it";
+    then the window's events by day exactly as a full build writes them; then README and indexes (never `.github/`: the
+    workflow's token may not change workflows — by hand); future rebuilt on the new tip and force-pushed; the monthly tags
+    written by the job (its own pushes do not trigger stand.yml). An act no source mentions this time stays; GE/NE/JU
+    acts in force only: an amended text whose day is in the window keeps main's text until then; ZH/GE/NE/JU acts that
+    leave the list end on the window's first day ("nicht mehr in der Sammlung"), at most max(5, 3 %) per canton, else the
+    list is taken as incomplete and all are kept. Guards stop the run before anything is pushed: repeals of more than
+    max(25, 3 %) of a jurisdiction's acts (SWISSLAW_ALLOW_DROPS=1 after checking), more than 400 late acts (a converter
+    changed: SWISSLAW_REFORMAT=1 writes them as one commit "Neu umgesetzt"). Commits of the job carry a link to its run
+    instead of the session trailer. (c) Checked (scratchpad test_build.py, compare_test.py): a build as of 2026-10-13
+    appended to 2026-10-27 gives the full build's 39,330 law files byte for byte (0 differ) and its 64 commits of
+    14–27 October with the same dates, messages and files; with 80 acts' versions after 2026-09-01 hidden in the first
+    build, the append adds exactly 80 late commits, one per hidden act, and the same tree; a second run on the same day
+    adds nothing. Found on the way: index and README tables sorted with ties (311.1 / 311.01), so their order followed the
+    load order — the path now breaks ties.
+
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
       Deterministic (ties broken explicitly); two runs give identical reports.

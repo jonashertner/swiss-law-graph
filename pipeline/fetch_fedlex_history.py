@@ -18,6 +18,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from refresh import fresh
+
 ROOT = Path(__file__).resolve().parents[1]
 SPARQL = "https://fedlex.data.admin.ch/sparqlendpoint"
 PRE = """PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
@@ -66,7 +68,7 @@ def sparql(query: str) -> list[dict]:
 
 def segment(seg: str) -> dict[str, dict]:
     f = CACHE / f"{seg}.json"
-    if f.exists():
+    if fresh(f):
         return json.load(open(f))
     acts: dict[str, dict] = {}
     for v in sparql(Q_META % (PAGE % seg)):
@@ -91,7 +93,7 @@ def segment(seg: str) -> dict[str, dict]:
 
 def ends(seg: str) -> dict[str, str]:
     f = CACHE / f"{seg}.end.json"
-    if f.exists():
+    if fresh(f):
         return json.load(open(f))
     out: dict[str, str] = {}
     for v in sparql(Q_END % (PAGE % seg)):

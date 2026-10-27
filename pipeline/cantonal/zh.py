@@ -35,6 +35,9 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh import fresh  # noqa: E402  (weekly refresh)
+
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "build" / "cantonal" / "raw" / "ZH"
 OUT = ROOT / "build" / "cantonal" / "ZH.json"
@@ -89,8 +92,9 @@ def get(url: str, **kw) -> requests.Response:
     return r
 
 
-def cached(path: Path, fetch) -> bytes:
-    if path.exists() and path.stat().st_size > 0:
+def cached(path: Path, fetch, changes: bool = False) -> bytes:
+    """changes: a listing (it changes) — in a weekly refresh only a copy written in this run counts (refresh.py)."""
+    if (fresh(path) if changes else path.exists()) and path.stat().st_size > 0:
         return path.read_bytes()
     data = fetch()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -108,7 +112,7 @@ def enumerate_acts() -> list[dict]:
         page, pages = 1, 1
         while page <= pages:
             p = RAW / "list" / f"folder{f:02d}_p{page:02d}.json"
-            d = json.loads(cached(p, lambda: get(LIST_URL, params={"fileNumber": f, "page": page}).content))
+            d = json.loads(cached(p, lambda: get(LIST_URL, params={"fileNumber": f, "page": page}).content, changes=True))
             if d.get("moreSearchResultsThanAllowed"):
                 raise SystemExit(f"folder {f}: listing truncated by the portal")
             pages = d.get("numberOfResultPages") or 1

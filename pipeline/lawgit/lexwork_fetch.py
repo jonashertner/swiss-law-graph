@@ -21,6 +21,8 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cantonal"))
 from lexwork import HOSTS, LANG  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh import fresh  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "build/lawgit/kt"
@@ -73,7 +75,7 @@ def act(ct: str, host: str, lang: str, stub: dict) -> dict:
     nr = stub["systematic_number"]
     d = OUT / ct / slug(nr)
     head = d / "_act.json.gz"
-    if head.exists():
+    if fresh(head):                                     # the header lists the versions: read again in a refresh
         t = json.load(gzip.open(head, "rt", encoding="utf-8"))
     else:
         j = get(f"https://{host}/api/{lang}/texts_of_law/{quote(nr, safe='')}/show_as_json")
@@ -107,7 +109,7 @@ def act(ct: str, host: str, lang: str, stub: dict) -> dict:
 def canton(ct: str) -> str:
     host, lang = HOSTS[ct], LANG.get(ct, "de")
     ip = OUT / ct / "_index.json"
-    if ip.exists():
+    if fresh(ip):
         idx = json.load(open(ip))
     else:
         idx = get(f"https://{host}/api/{lang}/texts_of_law/lightweight_index?show_abrogated=true")

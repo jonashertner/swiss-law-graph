@@ -21,6 +21,9 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh import fresh  # noqa: E402  (weekly refresh)
+
 ROOT = Path(__file__).resolve().parents[2]
 BUILD = ROOT / "build" / "cantonal"
 USER_AGENT = "swiss-law-graph/1.0 (legal research; +https://opencaselaw.ch)"
@@ -48,9 +51,9 @@ class Fetcher:
         p = self.raw_dir / name
         miss = p.with_name(p.name + ".404")
         if not (self.refresh if refresh is None else refresh):
-            if p.exists():
+            if fresh(p):                                 # GE, NE publish the text in force: re-read in a refresh
                 return p.read_bytes()
-            if miss.exists():
+            if fresh(miss):
                 return None
         p.parent.mkdir(parents=True, exist_ok=True)
         delay, err = 2.0, None
