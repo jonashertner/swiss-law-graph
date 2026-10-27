@@ -644,8 +644,10 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     per act, summed) that go to these codes, in the time view up to the year (1995: VD 67 %, GE 60 %); the panel lists the
     codes by decisions. (f) Dated and signed (Jonas: "shall we date the atlas?", "a minimalist footer made with ❤️ by
     jonashertner.com (monochrome)"): one footer line on every view, "Stand 26. Oktober 2026 · Fedlex, kantonale Sammlungen,
-    OpenCaseLaw · Mit ♥ gemacht von jonashertner.com" (the date is the pipeline's run, `meta.run`; the sources link to the
-    method page; ♥ is the text glyph U+2665 + VS15 in the ink of the page, not the emoji; phones drop the sources).
+    OpenCaseLaw · built with ♥ by Jonas Hertner" (Jonas: the byline in English in every language, the name linked to
+    jonashertner.com; the date is the pipeline's run, `meta.run`, and the sources link to the method page, both localized;
+    ♥ is the text glyph U+2665 + VS15 in the ink of the page, not the emoji; phones drop the sources). Link preview: Open
+    Graph tags and `docs/og.png` (1200×627, today's map without interface, rendered by Playwright).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
