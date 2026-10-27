@@ -448,8 +448,9 @@ def message(e, prev_text: dict) -> str:
     return head + ("\n\n" + body if body else "")
 
 
-def stream(out, events: list, branch: str, start_mark: int, parent: str | None, snapshots: dict):
-    """Write the commits of `events` to fast-import. snapshots: path -> {lang: text} (the files now in the tree)."""
+def stream(out, events: list, branch: str, start_mark: int, parent: str | None, snapshots: dict, days: list | None = None):
+    """Write the commits of `events` to fast-import. snapshots: path -> {lang: text} (the files now in the tree).
+    days: if given, receives (day, mark of the last commit of that day) for the tags."""
     mark = start_mark
     first = True
     by_day = defaultdict(list)
@@ -516,7 +517,24 @@ def stream(out, events: list, branch: str, start_mark: int, parent: str | None, 
                 else:
                     b = txt.encode()
                     out.write(f"M 100644 inline {path}\ndata {len(b)}\n".encode() + b + b"\n")
+        if days is not None and mark > start_mark:
+            days.append((day, mark))
     return mark
+
+
+def month_tags(out, days: list) -> int:
+    """stand/<YYYY-MM-01>: the law as it applied on the first of every month (the last commit of that day or before)."""
+    n, k = 0, 0
+    y, m = int(START[:4]), int(START[5:7])
+    while f"{y:04d}-{m:02d}-01" <= TODAY:
+        d = f"{y:04d}-{m:02d}-01"
+        while k + 1 < len(days) and days[k + 1][0] <= d:
+            k += 1
+        if days and days[k][0] <= d:
+            out.write(f"reset refs/tags/stand/{d}\nfrom :{days[k][1]}\n\n".encode())
+            n += 1
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return n
 
 
 def write_extra(out, mark: int, branch: str, files: dict, msg: str, day: str) -> int:
@@ -546,7 +564,9 @@ def main() -> None:
     import readme
     p = subprocess.Popen(["git", "fast-import", "--quiet", "--done"], cwd=target, stdin=subprocess.PIPE)
     snaps: dict = {}
-    mark = stream(p.stdin, main_ev, "main", 0, None, snaps)
+    days: list = []
+    mark = stream(p.stdin, main_ev, "main", 0, None, snaps, days)
+    ntags = month_tags(p.stdin, days)
     future = sorted({(e["d"], e["jur"], e["path"], e.get("label") or e["path"]) for e in fut_ev
                      if e["kind"] in ("version", "fix") and not e["path"].startswith(("beschlossen/", "vernehmlassung/"))})
     mark = write_extra(p.stdin, mark, "main", readme.files(snaps, facts, kacts, START, TODAY, future),
@@ -560,7 +580,7 @@ def main() -> None:
     subprocess.run(["git", "checkout", "-q", "main"], cwd=target, check=True)
     n = subprocess.run(["git", "rev-list", "--count", "main"], cwd=target, capture_output=True, text=True).stdout.strip()
     nf = subprocess.run(["git", "rev-list", "--count", "main..future"], cwd=target, capture_output=True, text=True).stdout.strip()
-    print(f"main: {n} commits; future: {nf} more; {len(snaps)} acts in the last tree", file=sys.stderr)
+    print(f"main: {n} commits; future: {nf} more; {len(snaps)} acts in the last tree; {ntags} tags stand/<day>", file=sys.stderr)
 
 
 if __name__ == "__main__":

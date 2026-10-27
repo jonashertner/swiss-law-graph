@@ -632,7 +632,11 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     page and the page head. (c) Found on the way: an earlier federal act took missing names from the SR taxonomy, i.e. from
     the act now under its number — 466 English titles were today's act's ("BV1874: Federal Constitution of 18 April 1999",
     "PSPV 2001" titled as the ordinance of 2011) and the 1949 ANAV was labelled "VZAE 1949". An earlier act now uses its own
-    Fedlex record only (German where no English exists; its title where it has no abbreviation).
+    Fedlex record only (German where no English exists; its title where it has no abbreviation). (d) Search finds the
+    11,443 acts of the federal history too (their names, `hnames.<lang>.json`, load with the first search; each hit shows
+    its period: "Rationierung" → the wartime rationing ordinances, "… von Salatsaucen 1940–1948"); opening an earlier act
+    outside the time view enters it in the act's year of adoption (it has no place on today's map), an act without SR
+    number with its block in view and the bar marked.
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.

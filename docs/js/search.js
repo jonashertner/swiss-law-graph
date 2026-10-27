@@ -1,7 +1,7 @@
 // Search: acts in any language ("OR", "CO", "SR 220", "Planungs- und Baugesetz ZH"), articles
 // ("Art. 41 OR", "8 EMRK"), and the headings of divisions ("Mietrecht").
-import { t, cantonName } from "./i18n.js";
-import { M, KIND, idOf, label, labelCt, title, srOf, isAct, searchActs, exactActs, parseArticle, searchTopics, normNum, getJSON, fold } from "./data.js";
+import { t, cantonName, lang } from "./i18n.js";
+import { M, KIND, idOf, label, labelCt, title, srOf, isAct, searchActs, exactActs, parseArticle, searchTopics, normNum, getJSON, fold, loadHistNames } from "./data.js";
 import { $, esc, sw } from "./util.js";
 
 let ctx = {}, items = [], cur = -1, seq = 0;
@@ -13,7 +13,13 @@ function metaOf(i) {
   if (k === KIND.t) return M.S[i];
   if (k === KIND.b) return "";
   if (M.CT[i]) return M.CT[i];
-  return srOf(i) ? `SR ${srOf(i)}` : "";
+  const per = k === KIND.o && M.AD[i] && (M.RP[i] || M.LE[i]) ? `${M.AD[i].slice(0, 4)}–${(M.RP[i] || M.LE[i]).slice(0, 4)}` : "";
+  return [srOf(i) ? `SR ${srOf(i)}` : "", per].filter(Boolean).join(" · ");   // an earlier act: when it applied
+}
+let hist = null;                                     // the names of the repealed acts, fetched with the first search
+function withHistory() {
+  if (M.histLang === lang() || (hist && hist.lg === lang())) return;
+  hist = { lg: lang(), p: loadHistNames(lang()).then(() => { if (!box().hidden && input().value.trim()) run(input().value); }) };
 }
 function render(groups) {
   items = [];
@@ -55,6 +61,7 @@ const nodeItem = (i) => ({ lab: labelCt(i), sub: M.K[i] === KIND.c ? M.L[i] : is
 
 async function run(q) {
   const my = ++seq;
+  withHistory();
   const inNet = ctx.net && ctx.net();                // the network is open: acts in it first, the others marked
   let acts = searchActs(q, inNet ? 24 : 10).filter((i) => !(M.K[i] === KIND.c && M.val.acts[i] === 0 && M.val.dec[i] === 0));
   if (inNet) acts = acts.filter((i) => M.K[i] !== KIND.c).sort((a, b) => !inNet(a) - !inNet(b)).slice(0, 10);

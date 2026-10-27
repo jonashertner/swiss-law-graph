@@ -225,7 +225,8 @@ Ein Projekt von [jonashertner.com](https://jonashertner.com); die Karte dazu: [A
 cat ch/2/220/de.md                                        # das Obligationenrecht, heute
 git log --follow -p -- ch/2/220/de.md                     # jede Fassung seit {start[:4]}, mit Änderungen
 git blame ch/2/220/de.md                                  # welche Fassung jede Zeile geschrieben hat
-git show "$(git rev-list -1 --before='2023-06-30 12:00 +0200' main)":ch/2/220/de.md   # das OR, wie es am 30. Juni 2023 galt
+git show stand/2023-07-01:ch/2/220/de.md                  # das OR am 1. Juli 2023 (Git-Tag stand/… für jeden Monatsersten)
+git show "$(git rev-list -1 --before='2023-06-30 12:00 +0200' main)":ch/2/220/de.md   # … an einem beliebigen Tag (30. Juni 2023)
 git diff "$(git rev-list -1 --before='2022-01-01 12:00 +0100' main)" main -- ch/2/220/de.md     # seit dem 1. Januar 2022
 grep ',220,' index.csv                                    # Datei, Sprachen, Fassung, Quelle jedes Erlasses (auch index.jsonl)
 git log --since=2025-01-01 --oneline -- 'zh/*' 'be/*'     # was sich in einem Kanton geändert hat
@@ -374,7 +375,9 @@ later day.
 ## Recipes
 
 ```sh
-# the file as it applied on a day: the last commit at or before noon of that day, Zurich time (any machine time zone)
+# the law on the first of a month: a tag per month (the law only; README and indexes are in the last commit)
+git show stand/2023-07-01:ch/2/220/de.md;  git worktree add /tmp/law-2023-07 stand/2023-07-01
+# the file as it applied on any day: the last commit at or before noon of that day, Zurich time (any machine time zone)
 git show "$(git rev-list -1 --before='2023-06-30 12:00 +0200' main)":ch/2/220/de.md
 # every version of an act, with what changed
 git log --follow -p -- ch/2/220/de.md

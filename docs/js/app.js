@@ -144,6 +144,11 @@ async function showMap(target) {
   const nid = ci >= 0 ? target.slice(0, ci) : target, eid = ci >= 0 ? target.slice(ci + 1) : null;
   let i = nid === "" ? 0 : M.byId.get(nid);
   if (i == null) i = 0;
+  // an earlier act has no place on today's map (unless courts cite it and the area is decisions): show it in its own time
+  const y0 = +(M.AD[i] || "").slice(0, 4);
+  if (!TV.TIME.on && M.K[i] === KIND.o && y0 && !(TM.getMode() === "dec" && M.D[i] > 0)) {
+    await TV.enter(y0); syncHash(); TM.setTime(mapShare());
+  }
   let f, s;
   if (eid !== null && isAct(i) && M.PK[i] >= 0 && (await ensureAct(i))) {
     const oa = TM.openActState(), sid = eid ? oa.byEid.get(eid) : null;
@@ -151,6 +156,7 @@ async function showMap(target) {
   } else if (isAct(i)) {
     const cur = TM.getFocus(), r = TM.itemRect(i);
     f = typeof cur === "number" && cur !== i && !isAct(cur) && isAncestor(cur, i) && r && r.lab ? cur : M.P[i];
+    if (M.HG[f] && TV.TIME.on) f = M.P[f];             // an act without SR number: its block, the bar marked (no mosaic)
     s = i;
   } else if (M.HG[i] && TV.TIME.on) { f = M.P[i]; s = i; }   // the bar of acts without an SR number: selected, not entered
   else { f = i; s = null; }

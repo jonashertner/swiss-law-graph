@@ -136,6 +136,8 @@ export async function loadHistNames(lg) {
   if (!h) return;
   h.i.forEach((i, k) => { M.L[i] = h.l[k]; M.T[i] = h.t[k]; });
   shortTab = new Map();
+  searchIndex = null;                                  // findable from now on
+  M.histLang = lg;
 }
 export function label(i) {
   const k = M.K[i];
@@ -247,7 +249,7 @@ function buildSearch() {
   const ab = [], ti = [], nodes = [];
   for (let i = 0; i < M.n; i++) {
     const k = M.K[i];
-    if (k === KIND.r || k === KIND.g || (k === KIND.o && !M.D[i])) continue;     // repealed acts no court cites: the time view only
+    if (k === KIND.r || k === KIND.g || (k === KIND.o && !M.D[i] && !M.L[i])) continue;   // repealed acts no court cites: once their names are loaded
     nodes.push(i);
     const a = new Set();
     if (M.AB[i]) for (const x of M.AB[i].split("|")) a.add(fold(x));
