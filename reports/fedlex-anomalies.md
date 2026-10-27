@@ -36,6 +36,15 @@ works around them as stated; nothing here is corrected silently.
    (`eli/oc/2022/776`, EnEV annexes); a reader taking the first heading loses the title. The converter joins all
    headings of an element.
 
+## Two statuses for one act (found 2026-10-27, decision 39)
+
+9. **Eleven temporary acts carry two `inForceStatus` values at once**, 0 (in force) and 3 (no longer in force), on the
+   same consolidation abstract. All are in force by their own dates (end of applicability 2026-12-31 to 2032-12-31, no
+   repeal): SR 861 KBFHG (`eli/cc/2003/31`), 951.26 Covid-19-SBüG (`eli/cc/2020/982`), 734.91 FiREG, 818.102,
+   812.121.5 BetmPV, 531.81 VOGW, 952.3, 311.039.5, 221.215.329.4, 831.201.74 and the treaty 0.946.293.671.2 SMA. A
+   reader that takes one value gets either answer depending on the order of the SPARQL results. The pipeline keeps both
+   (`fetch_fedlex_history.py`: `statuses`; `sr_eli.csv`: one row each), so they count as in force.
+
 ## Status lagging behind the dates
 
 See `reports/counts-check.md` and decision 33: 265 acts in force without a status, 29 marked in force although their
