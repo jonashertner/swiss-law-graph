@@ -105,7 +105,7 @@ def index_rows(snaps: dict) -> list[dict]:
     """One row per file of the last tree: what an agent needs to find a file without opening it."""
     rows = []
     val = lambda x: ", ".join(x) if isinstance(x, list) else (x or "")
-    for path in sorted(snaps, key=srkey):
+    for path in sorted(snaps, key=lambda q: (srkey(q), q)):          # ties (311.1 / 311.01): the path decides
         kind = kind_of(path)
         for lg in sorted(snaps[path]):
             f = front_of(snaps[path][lg])
@@ -197,22 +197,22 @@ T = {
              "kantonales Recht; Ordner nach dem ersten Zeichen der Nummer der kantonalen Sammlung",
              "in der AS veröffentlicht, noch nicht in Kraft (bis zum Inkrafttreten); Referendumsvorlagen aus dem BBl (bis zur AS, zum Ablauf der Frist oder zur Ablehnung)",
              "Vernehmlassungsvorlagen des Bundes, ab Eröffnung; nach dem Ende der Frist «abgeschlossen»",
-             "`main` gilt bis heute; `future` enthält zusätzlich die bereits veröffentlichten künftigen Fassungen; Tags `stand/JJJJ-MM-01` den Stand jedes Monatsersten."),
+             "`main` gilt bis heute und wird zweimal pro Woche ergänzt, nie umgeschrieben; `future` enthält zusätzlich die bereits veröffentlichten künftigen Fassungen und wird bei jedem Lauf neu aufgebaut; Tags `stand/JJJJ-MM-01` den Stand jedes Monatsersten. Autor-Datum eines Commits = Tag, ab dem die Fassung gilt; Commit-Datum = Tag, ab dem dieses Repository sie zeigt (eine erst danach veröffentlichte Fassung folgt mit dem nächsten Lauf)."),
             ("Chemin", "Contenu", "droit fédéral en vigueur ; domaine = premier chiffre du numéro RS, traités 0.1 – 0.9",
              "droit cantonal ; dossiers selon le premier caractère du numéro du recueil cantonal",
              "publié au RO, pas encore en vigueur (jusqu’à l’entrée en vigueur) ; projets soumis au référendum (FF) jusqu’au RO, à l’échéance du délai ou au rejet",
              "projets mis en consultation par la Confédération, dès l’ouverture ; « clos » après le délai",
-             "`main` vaut jusqu’à aujourd’hui ; `future` contient en plus les versions futures déjà publiées ; les tags `stand/AAAA-MM-01` l’état au premier de chaque mois."),
+             "`main` vaut jusqu’à aujourd’hui et s’enrichit deux fois par semaine, sans jamais être réécrite ; `future` contient en plus les versions futures déjà publiées et est reconstruite à chaque mise à jour ; les tags `stand/AAAA-MM-01` l’état au premier de chaque mois. Date d’auteur d’un commit = jour dès lequel la version s’applique ; date de commit = jour dès lequel ce dépôt la montre (une version publiée plus tard suit avec la mise à jour suivante)."),
             ("Percorso", "Contenuto", "diritto federale in vigore; settore = prima cifra del numero RS, trattati 0.1 – 0.9",
              "diritto cantonale; cartelle secondo il primo carattere del numero della raccolta cantonale",
              "pubblicato nella RU, non ancora in vigore (fino all’entrata in vigore); progetti soggetti a referendum (FF) fino alla RU, alla scadenza del termine o al rifiuto",
              "progetti posti in consultazione dalla Confederazione, dall’apertura; «chiusa» dopo il termine",
-             "`main` vale fino a oggi; `future` contiene in più le versioni future già pubblicate; i tag `stand/AAAA-MM-01` lo stato al primo di ogni mese."),
+             "`main` vale fino a oggi ed è completato due volte alla settimana, mai riscritto; `future` contiene in più le versioni future già pubblicate ed è ricostruito a ogni aggiornamento; i tag `stand/AAAA-MM-01` lo stato al primo di ogni mese. Data d’autore di un commit = giorno da cui la versione si applica; data di commit = giorno da cui questo repository la mostra (una versione pubblicata più tardi segue con l’aggiornamento successivo)."),
             ("Path", "Content", "federal law in force; area = first digit of the SR number, treaties 0.1 – 0.9",
              "cantonal law; folders by the first character of the number in the cantonal collection",
              "published in the Official Compilation, not yet in force (until it enters into force); bills subject to referendum (Federal Gazette) until the Official Compilation, the deadline or a rejection",
              "federal consultation drafts, from their opening; “closed” after the deadline",
-             "`main` applies up to today; `future` adds the versions already published for a later day; tags `stand/YYYY-MM-01` the state on the first of every month.")),
+             "`main` applies up to today and is extended twice a week, never rewritten; `future` adds the versions already published for a later day and is rebuilt on every run; tags `stand/YYYY-MM-01` the state on the first of every month. A commit's author date is the day its version applies from; its commit date is the day this repository shows it from (a version published later follows with the next run).")),
     "file": (("Eine Datei", "Kopf (YAML): Nummer, Titel, Kurztitel, Sprache, Fassung (gilt ab), Beschluss, Inkrafttreten, Quelle",
               "Titel, Ingress, Gliederung als Überschriften, jeder Artikel `#### Art. N`", "jeder Absatz eine Zeile (`<sup>1</sup> …`), damit Diffs und `blame` genau sind",
               "Fussnoten (Änderungen mit Fundstelle) gleich nach ihrem Artikel; Tabellen als HTML"),
@@ -400,10 +400,30 @@ def cantons_readme(kt, today, nver):
 # ---------------------------------------------------------------- every file of the repository's own
 # The tags stand/YYYY-MM-01 are written on GitHub's side: the build's own tags cannot be pushed from where it runs.
 # Same rule as build_repo.month_tags (checked: identical for all 70 months of the run of 2026-10-27).
+# the tags: stand/YYYY-MM-01 = the last commit of main whose commit date is on or before that day, 00:00 Zurich
+TAG_SCRIPT = """\
+root=$(git rev-list --max-parents=0 HEAD)
+first=$(git log -1 --format=%cd --date=format-local:%Y-%m "$root")
+y=${first%-*}; m=$((10#${first#*-})); now=$(date +%Y-%m-%d)
+while :; do
+  d=$(printf '%04d-%02d-01' "$y" "$m"); [[ "$d" > "$now" ]] && break
+  c=$(git rev-list -1 --before="$d 00:00:00" HEAD || true)
+  [[ -n "$c" ]] && git tag -f "stand/$d" "$c" >/dev/null
+  if (( m == 12 )); then y=$((y + 1)); m=1; else m=$((m + 1)); fi
+done
+git push -f origin 'refs/tags/stand/*:refs/tags/stand/*'
+"""
+
+
+def _indent(txt: str, n: int) -> str:
+    return "".join((" " * n + l if l else l) for l in txt.splitlines(True))
+
+
 STAND_WORKFLOW = """\
 # stand/YYYY-MM-01: the law as it applied on the first of every month –
-# the last commit of main dated on or before that day, 00:00 Zurich time
-# (every commit is dated on the day its version applies).
+# the last commit of main whose commit date is on or before that day, 00:00 Zurich time
+# (a commit is dated on the day its version applies; one published later, on the day it arrived).
+# For pushes by hand; the twice-weekly run (update.yml) writes the tags itself.
 name: stand
 on:
   push:
@@ -424,17 +444,105 @@ jobs:
         env:
           TZ: Europe/Zurich
         run: |
-          root=$(git rev-list --max-parents=0 HEAD)
-          first=$(git log -1 --format=%cd --date=format-local:%Y-%m "$root")
-          y=${first%-*}; m=$((10#${first#*-})); now=$(date +%Y-%m-%d)
-          while :; do
-            d=$(printf '%04d-%02d-01' "$y" "$m"); [[ "$d" > "$now" ]] && break
-            c=$(git rev-list -1 --before="$d 00:00:00" HEAD || true)
-            [[ -n "$c" ]] && git tag -f "stand/$d" "$c" >/dev/null
-            if (( m == 12 )); then y=$((y + 1)); m=1; else m=$((m + 1)); fi
-          done
-          git push -f origin 'refs/tags/stand/*:refs/tags/stand/*'
+""" + _indent(TAG_SCRIPT, 10)
+
+UPDATE_WORKFLOW = """\
+# Twice a week the repository brings itself up to date: what Fedlex and the cantonal collections published since the
+# last run is fetched, converted and appended to main (never rewritten); future is rebuilt; the monthly tags follow.
+# The code: jonashertner/swiss-law-graph, pipeline/lawgit/weekly.sh (decision 39 in its CLAUDE.md). A source that
+# fails leaves its acts as they are; a guard (many repeals at once, many texts changed after the fact) or the check
+# against a replay of every known version stops the run before anything is pushed. Caches: the versions already
+# fetched and converted (~6 GB); without them the run starts cold (~4–5 h, may take two runs).
+name: update
+on:
+  schedule:
+    - cron: "41 3 * * 1,4"                 # Monday and Thursday, 03:41 UTC
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: update
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - name: disk space (the caches need ~12 GB while they are restored)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: jonashertner/swiss-law-graph
+          path: code
+          sparse-checkout: |
+            pipeline
+            data
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: code/pipeline/lawgit/requirements.txt
+      - run: pip install -r code/pipeline/lawgit/requirements.txt
+      - name: caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            code/build/lawgit
+            code/build/fedlex_history
+            code/build/cantonal
+          key: lawgit-${{ github.run_id }}
+          restore-keys: lawgit-
+      - name: fetch, convert, append
+        id: run
+        working-directory: code
+        env:
+          DEADLINE: "290"
+        run: |
+          set +e
+          pipeline/lawgit/weekly.sh ../repo 2>&1 | tee ../run.log
+          echo "rc=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+      - name: save the caches
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            code/build/lawgit
+            code/build/fedlex_history
+            code/build/cantonal
+          key: lawgit-${{ github.run_id }}
+      - name: push
+        if: steps.run.outputs.rc == '0'
+        working-directory: repo
+        run: |
+          git push origin main
+          git push --force origin future
+      - name: tags
+        if: steps.run.outputs.rc == '0'
+        working-directory: repo
+        env:
+          TZ: Europe/Zurich
+        run: |
+""" + _indent(TAG_SCRIPT, 10) + """\
+      - name: summary
+        if: always()
+        run: |
+          { echo "## swisslaw-git: update ($(TZ=Europe/Zurich date +%F))"; echo
+            grep -E "append:|: ok,|::warning::|::notice::|done in" run.log 2>/dev/null | sed -E 's/^::(warning|notice):://; s/^/- /' || true
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: the result
+        if: steps.run.outputs.rc != '0'
+        run: |
+          echo "weekly.sh ended with ${{ steps.run.outputs.rc }} (1: a guard or the check stopped the append; 3: fetching not finished, the caches are saved and the next run goes on)"
+          exit 1
 """
+
+
 
 
 def files(snaps: dict, facts: dict, kacts: dict, start: str, today: str, future=(), nver=None) -> dict:
@@ -455,9 +563,9 @@ def files(snaps: dict, facts: dict, kacts: dict, start: str, today: str, future=
             kt[path.split("/")[1].upper()].append((a.get("nr") or path.split("/")[3], a.get("short") or "", a.get("title") or "", path, sorted(langs),
                                                     "pdf" if any("\ntext: pdf\n" in snaps[path][lg] for lg in langs) else ""))
     for grp, rows in fed.items():
-        rows.sort(key=lambda r: srkey(r[0]))
+        rows.sort(key=lambda r: (srkey(r[0]), r[3]))
         out[f"ch/{grp}/README.md"] = area_readme(grp, rows, today, names)
-    order = sorted(fed, key=lambda g: (g.startswith("0."), srkey(g)))
+    order = sorted(fed, key=lambda g: (g.startswith("0."), srkey(g), g))
     t = ["# Bundesrecht · Droit fédéral · Diritto federale", "",
          f"{n(sum(len(v) for v in fed.values()))} Erlasse in Kraft am {day(today, 'de')}, in den Bereichen der Systematischen Rechtssammlung (SR). "
          "[Schweizer Recht](../README.md)", "", "| SR | Bereich · domaine · settore | Erlasse |", "|:---|:---|---:|"]
@@ -466,7 +574,7 @@ def files(snaps: dict, facts: dict, kacts: dict, start: str, today: str, future=
         t.append(f"| [{g}]({g}/README.md) | {' · '.join(dict.fromkeys(x for x in (nm.get('de'), nm.get('fr'), nm.get('it')) if x))} | {n(len(fed[g]))} |")
     out["ch/README.md"] = "\n".join(t) + "\n"
     for ct, rows in kt.items():
-        rows.sort(key=lambda r: srkey(r[0]))
+        rows.sort(key=lambda r: (srkey(r[0]), r[3]))
         out[f"cantons/{ct.lower()}/README.md"] = canton_readme(ct, rows, today)
     out["cantons/README.md"] = cantons_readme(kt, today, nver)
 
@@ -528,6 +636,7 @@ def files(snaps: dict, facts: dict, kacts: dict, start: str, today: str, future=
     out["CITATION.cff"] = citation(today)
     out[".gitattributes"] = "* text=auto eol=lf\nindex.csv linguist-generated=true\nindex.jsonl linguist-generated=true\n"
     out[".github/workflows/stand.yml"] = STAND_WORKFLOW
+    out[".github/workflows/update.yml"] = UPDATE_WORKFLOW
     return out
 
 
@@ -595,9 +704,14 @@ One row per file of the last tree of `main` (the same rows in both files; `futur
 | `consultations/<year>/<nr>/` | federal consultation drafts from their opening; `status: Vernehmlassung abgeschlossen` once closed |
 | `README.md` in each directory | human-readable lists |
 
-Branches and tags: `main` = the law as it applied each day up to {today}; `future` = `main` plus versions already
-published for a later day; `stand/YYYY-MM-01` = the law on the first of every month (the law only: README and indexes
-are in the last commit).
+Branches and tags: `main` = the law as it applied each day up to {today}, extended twice a week by
+`.github/workflows/update.yml` and never rewritten; `future` = `main` plus versions already published for a later day,
+rebuilt on every run (do not build on it); `stand/YYYY-MM-01` = the law on the first of every month (the law only:
+README and indexes are in the last commit). Dates: a commit's author date is the day its version applies from; its
+committer date is the day this repository shows it from. Up to 2026-10-27 both are the same; since then a version
+published only after the day it applies from arrives with the next run (author date: that day; committer date: the
+first day of the run's window). `git rev-list -1 --before=<day> main` is the state this repository showed on that day;
+`git log --format='%ad %s'` lists when each version applies.
 
 ## Inside a file
 

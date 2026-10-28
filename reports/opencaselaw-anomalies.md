@@ -237,6 +237,42 @@ successor ("Bundesgesetz über Lebensmittel … vom 9. Oktober 1992", footnote S
 The canton's text is outdated, not opencaselaw; listed here because a citation resolver that trusts the
 footnote alone lands on the successor. Flagged `"old"` in `data/cantonal_basis.json`.
 
+## F. Snapshots on Hugging Face (found by the weekly refresh, 2026-10-28)
+
+### F1. Obwalden: three published series missing from the export of 2026-10-26
+`structure/structure.parquet` and `graph/statute_references.parquet` of `voilaj/swiss-caselaw` (night of 2026-10-26)
+hold 2,192 Obwalden decisions against 3,460 the night before. Whole series are gone (decision id prefix
+`ow_gerichte_<series>_`; structure / decisions with a statute reference, before → after):
+
+| Series | structure | statute references |
+|---|---|---|
+| VVGE (Verwaltungs- und Verwaltungsgerichtsentscheide) | 732 → 0 | 598 → 0 |
+| AbR (Amtsbericht über die Rechtspflege) | 441 → 0 | 398 → 0 |
+| OGVE | 32 → 1 | 25 → 1 |
+| without a series prefix | 2,255 → 2,191 | 2,205 → 2,141 |
+
+The cite index of the same night still lists all 3,473 Obwalden decisions, so the export is partial, not the corpus.
+In the atlas, 1,081 Obwalden decisions would have lost every reference (the canton's tile 1,946 → 1,495 decisions).
+`pipeline/fetch_opencaselaw.py` now refuses a snapshot in which a court with ≥ 200 decisions loses more than 10 % and
+keeps the previous one whole.
+
+### F2. New court groups carry canton codes that are not cantons
+Since 2026-10-26 the cite index has `EU` (`cjeu`, 5,618 decisions) and `UN` (`icj`, `untb_*`, `unwgad`, 10,786) in the
+canton column, beside `CH` and `CE`. A consumer that reads every value other than CH and CE as a canton (as this atlas
+did: CJEU "AEUV" became a cantonal act "EU AEUV") breaks. The dataset card should list the values of the column.
+
+### F3. The statute extractor runs on CJEU texts in translation
+In CJEU judgments (German and French versions) the extractor emits Swiss abbreviations for the law of the state
+concerned and German words as codes. Read from the codes and articles, not from the texts:
+- **Swiss abbreviations, foreign law:** `CPC` (C-354/15 Art. 188–230; C-70/15), `ZPO` (C-467/16), `AO` (C-396/98,
+  C-151/94), `MWSTG` (C-203/10, C-16/14, C-108/17), `ASYLG` (62023CJ0123), `ZGB` (C-604/19 Art. 233–238), `ZSV`
+  (62023CJ0313), `LEC` (C-413/12), `WFV`, `ENG`, `LNM`, `WAV`, `OM`, `ON`. They resolve to SR 272, 210, 641.20 … in a
+  Swiss reading. The ECtHR set has the same problem in two judgments (`CPC` in 27756/05, `CST` Art. 10a in 68537/13).
+  The atlas now counts international courts for treaties (SR 0.…) only.
+- **Words as codes:** `NR` 1,112 references in 814 decisions ("Nr."), `BUCHSTABE` 141, `DIESER` 60, `DIESES`,
+  `UNTERABSATZ`, `GENANNTEN`, `TEIL`, `AUF`, `BESTIMMT`.
+Treaties the CJEU applies are cited correctly (EMRK 62 decisions, CMR 6, FZA 3, CISG 1).
+
 ---
 
 ## C. Not an error, but worth documenting in the dataset card

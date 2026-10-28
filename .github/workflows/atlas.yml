@@ -1,0 +1,144 @@
+# Every week the atlas is built anew from its sources and published to GitHub Pages; the data is not committed, so the
+# repository does not grow with it (decision 39). pipeline/atlas.sh: Fedlex and the 26 cantons in parallel, then the
+# build and a guard against the live site (totals −3 %, a canton's acts in force −5 %, the decisions of an area or a
+# canton −10 % stop the deployment; so does an OpenCaseLaw snapshot in which a court lost decisions: the one before is
+# kept). After checking a fall, run it by hand with allow_drops.
+name: atlas
+on:
+  schedule:
+    - cron: "17 6 * * 2"                   # Tuesday 06:17 UTC, the day after the law repository's Monday run
+  workflow_dispatch:
+    inputs:
+      allow_drops:
+        description: "Deploy although counts fell (checked by hand)"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: atlas
+  cancel-in-progress: false
+jobs:
+  day:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.d.outputs.run }}
+    steps:
+      - id: d
+        run: echo "run=$(TZ=Europe/Zurich date +%F)" >> "$GITHUB_OUTPUT"
+
+  fedlex:
+    needs: day
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      SWISSLAW_RUN_DATE: ${{ needs.day.outputs.run }}
+      ATLAS_ALLOW_DROPS: ${{ inputs.allow_drops && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r pipeline/requirements.txt
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            build/fedlex_history
+            build/fedlex_xml_urls.json
+          key: atlas-fedlex-${{ github.run_id }}
+          restore-keys: atlas-fedlex-
+      - run: pipeline/atlas.sh fedlex
+      - if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/fedlex_history
+            build/fedlex_xml_urls.json
+          key: atlas-fedlex-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fedlex
+          retention-days: 3
+          path: |
+            data/
+            pipeline/acts_to_validate.txt
+
+  cantons:
+    needs: day
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      SWISSLAW_RUN_DATE: ${{ needs.day.outputs.run }}
+      ATLAS_ALLOW_DROPS: ${{ inputs.allow_drops && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r pipeline/requirements.txt
+      - uses: actions/cache/restore@v4
+        with:
+          path: build/cantonal/raw
+          key: atlas-cantons-${{ github.run_id }}
+          restore-keys: atlas-cantons-
+      - run: pipeline/atlas.sh cantons
+      - if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: build/cantonal/raw
+          key: atlas-cantons-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cantons
+          retention-days: 3
+          path: build/cantonal/*.json
+
+  build:
+    needs: [day, fedlex, cantons]
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      SWISSLAW_RUN_DATE: ${{ needs.day.outputs.run }}
+      ATLAS_ALLOW_DROPS: ${{ inputs.allow_drops && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: layout/package-lock.json
+      - run: pip install -r pipeline/requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: fedlex
+          path: .
+      - uses: actions/download-artifact@v4
+        with:
+          name: cantons
+          path: build/cantonal
+      - run: pipeline/atlas.sh build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

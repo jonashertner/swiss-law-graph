@@ -16,12 +16,14 @@ Statuses 1–4 stand as Fedlex gives them (checked 2026-10-27: no act marked 4 h
 0 enters into force later). Every consumer reads `rows()` instead of the CSV, so the rule lives here only.
 """
 import csv
+import os
 import json
 from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN_DATE = "2026-10-26"                     # the day sr_eli.csv and the consolidated texts were read
+RUN_DATE = os.environ.get("SWISSLAW_RUN_DATE") or "2026-10-26"   # the day sr_eli.csv and the texts were read: the
+                                                                  # weekly refresh sets it (decision 39), else the first run
 IN_FORCE = "https://fedlex.data.admin.ch/vocabulary/enforcement-status/0"
 SINCE = "2000-01-01"
 

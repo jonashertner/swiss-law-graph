@@ -44,7 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cantons import CANTON_CONSTITUTION  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN_DATE = "2026-10-26"
+from inforce import RUN_DATE  # noqa: E402  (one run date: decision 39)
 CANTONS = sorted(CANTON_CONSTITUTION)
 
 # ---------- dates ----------

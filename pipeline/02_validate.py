@@ -34,6 +34,7 @@ import duckdb
 import pandas as pd
 
 from artnum import LATIN, TOKEN, parse_eid, sort_key
+from cantons import CANTONS_SQL
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build"
@@ -107,7 +108,7 @@ def main() -> None:
         from r left join valid_nums vn on vn.act_id = r.act_id and vn.section = coalesce(r.section, '')
              and vn.num = r.num""")
     # Former cantonal procedure codes applied to pending cases after 2011.
-    transitional = """status = 'not_in_text' and act_id in ('SR 272', 'SR 312.0') and canton not in ('CH', 'CE')
+    transitional = f"""status = 'not_in_text' and act_id in ('SR 272', 'SR 312.0') and canton in {CANTONS_SQL}
                       and dt between date '2011-01-01' and date '2013-12-31'"""
     c.sql(f"create table moved as select * from v where {transitional}")
     print("transitional cantonal procedure by canton/year:")

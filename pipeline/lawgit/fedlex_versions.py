@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fetch_fedlex_history import PRE, Q_SEG, sparql  # noqa: E402
+from refresh import fresh  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "build/lawgit"
@@ -28,7 +29,7 @@ Q = PRE + """SELECT ?act ?cons ?d ?e ?l ?url WHERE {
 
 def segment(seg: str) -> list[dict]:
     f = CACHE / f"{seg}.json"
-    if f.exists():
+    if fresh(f):
         return json.load(open(f))
     rows = sparql(Q % seg)
     json.dump(rows, open(f, "w"))

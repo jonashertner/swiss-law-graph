@@ -34,6 +34,9 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh import fresh  # noqa: E402  (weekly refresh)
+
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "build" / "cantonal" / "raw" / "SZ"
 OUT = ROOT / "build" / "cantonal" / "SZ.json"
@@ -96,7 +99,7 @@ def get(url: str, **kw) -> requests.Response:
 
 
 def cached(path: Path, fetch) -> bytes:
-    if path.exists() and path.stat().st_size > 0:
+    if fresh(path) and path.stat().st_size > 0:          # lists and texts in force: re-read in a weekly refresh
         return path.read_bytes()
     data = fetch()
     path.parent.mkdir(parents=True, exist_ok=True)

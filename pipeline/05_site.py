@@ -20,6 +20,7 @@ decisions / most cited article of the act); uncited articles are drawn small.
 import csv
 import gzip
 import json
+import os
 import math
 import re
 import urllib.parse
@@ -36,7 +37,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build"
 G = BUILD / "graph"
 SITE = ROOT / "site" / "data"
-OCL = ROOT.parent / "jonashertner/opencaselaw"
+OCL = Path(os.environ.get("OPENCASELAW") or ROOT.parent / "jonashertner/opencaselaw")   # atlas.sh exports it
 PACK_BYTES = 300_000
 TOP_ART, TOP_ACT = 10, 25
 LANGS = ("de", "fr", "it", "en")
@@ -139,6 +140,14 @@ def article_grid(cx, cy, R, n_items, breaks):
         best = (lo, fill(lo))
     p, (pos, heads) = best
     return p, pos, heads
+
+
+def snapshot_day() -> str:
+    """The day of the OpenCaseLaw snapshot read (its cite index), not of the run: a run can keep last week's."""
+    try:
+        return json.load(open(ROOT / "data/index.json"))["generated"][:10]
+    except (OSError, KeyError, ValueError):
+        return inforce.RUN_DATE
 
 
 def main() -> None:
@@ -530,7 +539,7 @@ def main() -> None:
                                               ("validation", BUILD / "validation_report.json"),
                                               ("citations", G / "citations_report.json"))}
     method = {
-        "snapshot": "2026-10-26",
+        "snapshot": snapshot_day(),
         "resolution": rep["resolution"]["by_resolution"],
         "total_references": rep["resolution"]["total_references"],
         "duplicates": rep["resolution"]["duplicate_decisions"],

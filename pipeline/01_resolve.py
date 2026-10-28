@@ -36,6 +36,10 @@ Rules (each one is disclosed on the page):
     cantonal act node keyed (canton, code). Cited only by federal courts and
     unknown: excluded as unresolved.
   * Abbreviations shared by two federal acts (32 in the table) are excluded.
+  * A decision is cantonal only if its court sits in one of the 26 cantons; CH, CE (ECtHR), EU
+    (CJEU) and UN (treaty bodies, ICJ) are not. An international court counts for treaties
+    (SR 0.…) only: in its translated texts "ZPO", "CPC", "AO", "MWStG" name the law of the state
+    concerned, not a Swiss act.
   * A judgment held twice in the corpus (published BGE + the BGer docket
     version; a few cantonal duplicates with the same label and date) counts once.
   * Source dates that cannot be right (more than a year before the decision's
@@ -51,7 +55,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from cantons import CANTON_CONSTITUTION
+from cantons import CANTON_CONSTITUTION, CANTONS_SQL
 
 ROOT = Path(__file__).resolve().parents[1]
 OCL = Path(sys.argv[1] if len(sys.argv) > 1 else ROOT.parent / "jonashertner/opencaselaw")
@@ -136,7 +140,7 @@ DATED_ALIASES = {"KLV": ("832.112.31", "2025-01-01")}
 # Same act, earlier edition with different numbering: references dated before the
 # cut-over go to `SR <n>@a`.
 EDITION_CUTOVERS = {"311.0": "2007-01-01"}   # StGB general part revision in force 1.1.2007
-SNAPSHOT = "2026-10-26"
+from inforce import RUN_DATE as SNAPSHOT  # noqa: E402  (the day of the OpenCaseLaw snapshot and of the run)
 
 
 def strip_year(a: str) -> str:
@@ -313,14 +317,16 @@ def main() -> None:
           when r.code in (select code from notk) then 'excluded_not_a_cantonal_act'
           when exists (select 1 from dated where dated.code = r.code and (r.dt is null or r.dt >= cast(dated.until as date)))
             then 'excluded_shared_abbreviation'
-          when r.code in (select code from hom) and canton not in ('CH','CE') then 'cantonal_homonym'
+          when r.code in (select code from hom) and canton in {CANTONS_SQL} then 'cantonal_homonym'
           when r.code in (select code from hom) then 'excluded_ambiguous_in_federal_court'
           when al.kind = 'shared_abbreviation' then 'excluded_shared_abbreviation'
+          when al.kind = 'federal' and canton <> 'CH' and canton not in {CANTONS_SQL} and al.sr not like '0.%'
+            then 'excluded_domestic_act_in_international_court'
           when al.kind = 'federal' then 'federal'
-          when canton not in ('CH','CE') then 'cantonal_unmapped'
+          when canton in {CANTONS_SQL} then 'cantonal_unmapped'
           else 'excluded_unresolved'
         end resolution
-      from (select r.*, case when r.code in (select code from kvg) and r.canton not in ('CH','CE') then r.canton
+      from (select r.*, case when r.code in (select code from kvg) and r.canton in {CANTONS_SQL} then r.canton
                              else nullif(regexp_extract(r.code, '{KV_NAMED.pattern}', 1), '') end kvcanton from r) r
       left join kvc kv on kv.kv_canton = r.kvcanton
       left join al on al.code = r.code left join sec on sec.code = r.code""")
@@ -339,7 +345,7 @@ def main() -> None:
            and coalesce(res.dt, date '9999-12-30') >= cast(iv.start as date)
            and coalesce(res.dt, date '9999-12-30') < cast(iv."end" as date)
       left join cut on cut.sr = res.sr and res.resolution = 'federal'""")
-    c.sql("""update res2 set resolution = case when canton in ('CH','CE')
+    c.sql(f"""update res2 set resolution = case when canton not in {CANTONS_SQL}
                  then 'excluded_pre2011_procedure_in_federal_court' else 'cantonal_pre2011_procedure' end
              where resolution = 'federal' and sr in ('272','312.0') and regime = '' and dt < date '2011-01-01'""")
     c.sql("""create table out as select decision_id, dt,
@@ -384,9 +390,9 @@ def main() -> None:
                        where act_id like 'SR %@%' group by 1 order by 2 desc""").df()
     print(regimes.head(30).to_string())
     dups = c.sql("select rule, count(*) n from alias_map group by 1").df()
-    dates = c.sql("""select count(*) decisions, count(*) filter (where dt_src is null) no_date,
+    dates = c.sql(f"""select count(*) decisions, count(*) filter (where dt_src is null) no_date,
                         count(*) filter (where dt_src is not null and not dt_ok) implausible_date,
-                        count(*) filter (where dt_src > date '2026-10-26') future_date from meta""").df()
+                        count(*) filter (where dt_src > date '{SNAPSHOT}') future_date from meta""").df()
     print(dates.to_string())
     print(dups.to_string())
     json.dump({"total_references": int(tot),

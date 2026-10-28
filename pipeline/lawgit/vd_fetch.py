@@ -15,6 +15,8 @@ from urllib.parse import quote
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cantonal"))
 import vd  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh import SINCE, fresh  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "build/lawgit/vd"
@@ -31,9 +33,10 @@ def iso(d):
     return f"{p[2]}-{p[1]}-{p[0]}" if len(p) == 3 else d
 
 
-def cached(path: Path, url: str, gz=False) -> bytes:
-    for p in (path, RAW / path.relative_to(OUT)):
-        if p.exists():
+def cached(path: Path, url: str, gz=False, changes=False) -> bytes:
+    """changes: a list that changes (an act's versions) — in a refresh only a copy written in this run counts."""
+    for p in ((path,) if changes and SINCE else (path, RAW / path.relative_to(OUT))):
+        if (fresh(p) if changes else p.exists()):
             b = p.read_bytes()
             return gzip.decompress(b) if gz else b
     b = vd.fetch(url, False)
@@ -49,14 +52,14 @@ def main() -> None:
     acts = []
     for st in ("EN_VIGUEUR", "ABROGE", "CADUC"):
         f = OUT / f"list_{st}.json"
-        if not f.exists():
+        if not fresh(f):
             f.write_bytes(vd.fetch(LIST.format(st=st), False))
         acts += [a for a in json.load(open(f)) if a.get("categorie") == "CONSOLIDE"]
     print(f"{len(acts)} consolidated acts", file=sys.stderr)
 
     def work(a):
         vs = json.loads(cached(OUT / "versions" / f"{a['id']}.json",
-                               vd.VERSIONS_URL.format(id=quote(a["id"]), cote=quote(a["cote"], safe="."))))
+                               vd.VERSIONS_URL.format(id=quote(a["id"]), cote=quote(a["cote"], safe=".")), changes=True))
         ab = max((iso(v.get("dateAbrogation") or v.get("dateCaducite")) for v in vs), default="")
         keep = []
         for v in vs:

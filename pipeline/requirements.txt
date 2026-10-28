@@ -1,0 +1,9 @@
+# the atlas's weekly build (pipeline/atlas.sh) and the law repository's run (pipeline/lawgit/weekly.sh);
+# versions as tested on 2026-10-27
+-r lawgit/requirements.txt
+duckdb==2.0.0
+pandas==3.0.5
+numpy==2.5.3
+pyarrow==26.0.0
+python-dateutil==2.9.0.post0
+six==1.17.0

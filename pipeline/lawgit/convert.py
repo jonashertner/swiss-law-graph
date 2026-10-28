@@ -23,6 +23,9 @@ import lexwork2md  # noqa: E402
 import pdf2md  # noqa: E402
 import sil2md  # noqa: E402
 import vd2md  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh import TODAY, digest  # noqa: E402
+from build_repo import in_force_acts  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 B = ROOT / "build/lawgit"
@@ -301,7 +304,12 @@ def vaud():
 
 
 # ---- Geneva, Neuchâtel (SIL)
-RUN_DATE = "2026-10-26"
+RUN_DATE = TODAY                                         # the day of the run (refresh.py)
+
+
+def stale(src: Path, out: Path, chk: dict) -> bool:
+    """A text in force (GE, NE, JU, ZH): convert again when its source differs from the one converted last."""
+    return FORCE or not out.exists() or (chk.get(str(out.relative_to(B))) or {}).get("src") != digest(src)
 
 
 def sil_convert(args):
@@ -318,17 +326,17 @@ def sil_convert(args):
     write_gz(out, md)
     miss, extra = a_ - b_, b_ - a_
     return {"f": str(out.relative_to(B)), "n": sum(a_.values()), "miss": sum(miss.values()), "extra": sum(extra.values()),
-            "ex": [w for w, _ in (miss + extra).most_common(6)], "version": ver}
+            "ex": [w for w, _ in (miss + extra).most_common(6)], "version": ver, "src": digest(src)}
 
 
 def sil():
-    K = json.load(open(ROOT / "data/cantonal_basis.json"))["cantons"]
+    chk = json.load(open(B / "check_sil.json")) if (B / "check_sil.json").exists() else {}
     jobs = []
     for ct in ("GE", "NE"):
-        for nr, a in K[ct]["acts"].items():
+        for nr, a in in_force_acts(ct).items():
             src = ROOT / "build/cantonal/raw" / ct / "htm" / a["url"].rsplit("/", 1)[1]
             out = B / "md" / ct.lower() / re.sub(r"[^\w.\-]", "_", nr) / "current.fr.md.gz"
-            if src.exists() and (FORCE or not out.exists()):
+            if src.exists() and stale(src, out, chk):
                 jobs.append((ct, nr, a, src, out))
     print(f"sil: {len(jobs)} acts", file=sys.stderr)
     merge_check("sil", run(sil_convert, jobs))
@@ -466,24 +474,25 @@ def pdfcur_convert(args):
     write_gz(out, md)
     miss = want - got
     return {"f": str(out.relative_to(B)), "pdf": 1, "n": sum(want.values()), "miss": sum(miss.values()),
-            "extra": sum((got - want).values()), "ex": [w for w, _ in miss.most_common(6)], "version": ver}
+            "extra": sum((got - want).values()), "ex": [w for w, _ in miss.most_common(6)], "version": ver, "src": digest(src)}
 
 
 def pdfcur():
-    K = json.load(open(ROOT / "data/cantonal_basis.json"))["cantons"]
+    KZ = in_force_acts("ZH")
+    chk = json.load(open(B / "check_pdfcur.json")) if (B / "check_pdfcur.json").exists() else {}
     jobs = []
     for m in json.load(open(RAWK / "ZH/meta.json")):
         key = m["page"].rsplit("/", 1)[1].replace(".html", "")
         src, nr = RAWK / "ZH/pdf" / f"{key}.pdf", m["sr"]
         out = B / "md/zh" / re.sub(r"[^\w.\-]", "_", nr) / "current.de.md.gz"
-        a = K["ZH"]["acts"].get(nr) or {"title": "", "url": m.get("page") or ""}
-        if src.exists() and (FORCE or not out.exists()):
+        a = KZ.get(nr) or {"title": "", "url": m.get("page") or ""}
+        if src.exists() and stale(src, out, chk):
             jobs.append(("ZH", nr, a, src, out, "de", zh_since(key) or ""))
-    for nr, a in K["JU"]["acts"].items():
+    for nr, a in in_force_acts("JU").items():
         m = re.search(r"[?&]id=(\d+)", a.get("url") or "")
         src = RAWK / "JU/pdf" / f"{m.group(1)}.pdf" if m else None
         out = B / "md/ju" / re.sub(r"[^\w.\-]", "_", nr) / "current.fr.md.gz"
-        if src and src.exists() and (FORCE or not out.exists()):
+        if src and src.exists() and stale(src, out, chk):
             jobs.append(("JU", nr, a, src, out, "fr", ""))
     print(f"pdfcur: {len(jobs)} acts", file=sys.stderr)
     merge_check("pdfcur", run(pdfcur_convert, jobs))
@@ -509,7 +518,7 @@ def zh_convert(args):
 
 
 def zhhist():
-    K = json.load(open(ROOT / "data/cantonal_basis.json"))["cantons"]["ZH"]["acts"]
+    K = in_force_acts("ZH")
     jobs = []
     for r in json.load(open(B / "zh/acts.json")):
         nr = r["sr"]
@@ -518,7 +527,7 @@ def zhhist():
                 continue
             out = B / "md/zh" / re.sub(r"[^\w.\-]", "_", nr) / f"{v['key']}.de.md.gz"
             if FORCE or not out.exists():
-                jobs.append((nr, K.get(nr) or {}, v, Path(v["pdf"]), out))
+                jobs.append((nr, K.get(nr) or {}, v, RAWK / "ZH/pdf" / f"{v['key']}.pdf", out))   # not v["pdf"]: an absolute path
     print(f"zh: {len(jobs)} versions", file=sys.stderr)
     merge_check("zh", run(zh_convert, jobs))
 

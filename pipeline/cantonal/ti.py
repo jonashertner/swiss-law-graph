@@ -35,6 +35,9 @@ from pathlib import Path
 
 import requests
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh import fresh  # noqa: E402  (weekly refresh)
+
 try:
     import pymupdf
 except ImportError:  # older PyMuPDF
@@ -63,8 +66,8 @@ def _session():
 
 
 def fetch(url, path, params=None, accept="application/json"):
-    """GET url (cached at path). Retries 5xx / timeouts with backoff. Returns bytes or None."""
-    if path.exists():
+    """GET url (cached at path; re-read in a weekly refresh). Retries 5xx / timeouts with backoff. Returns bytes or None."""
+    if fresh(path):
         return path.read_bytes()
     err = None
     for attempt in range(6):

@@ -621,6 +621,9 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     tags are written on GitHub's side by `.github/workflows/stand.yml` (from `readme.STAND_WORKFLOW`; same rule as `month_tags`, run
     locally and on GitHub: 70 of 70 identical) on every push to main. Pushing a rebuild: `git push -f origin main future` — the
     workflow re-tags. GitHub renders even the OR (1.2 MB, 1,685 article headings) with working `#art-N` anchors.
+    Commits are authored with Jonas' GitHub noreply address (130315719+jonashertner@users.noreply.github.com, Jonas:
+    "use my github noreply address"); the first push's commits were rewritten once (fast-export --no-data, trees, dates and
+    messages identical, checked commit by commit) and force-pushed on Jonas' instruction.
 
 37. All cantons named on the map; search and closing in the network (2026-10-27, Jonas: "can we have all cantons, and name of
     canton, on the Karte?"; "i want to be able to search for laws in the Netz, without losing the position of the law in the Netz
@@ -669,6 +672,51 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     jonashertner.com; the date is the pipeline's run, `meta.run`, and the sources link to the method page, both localized;
     ♥ is the text glyph U+2665 + VS15 in the ink of the page, not the emoji; phones drop the sources). Link preview: Open
     Graph tags and `docs/og.png` (1200×627, today's map without interface, rendered by Playwright).
+
+39. The law repository keeps itself current (2026-10-27, Jonas: "yes, start the weekly refresh"; `pipeline/refresh.py`,
+    `build_repo.py --append`, `pipeline/lawgit/weekly.sh`, workflow `.github/workflows/update.yml` in swisslaw-git, written by
+    `readme.UPDATE_WORKFLOW`). Twice a week (Monday and Thursday 03:41 UTC; twice so the Actions cache, evicted after 7 days
+    unused, stays warm). main is never rewritten: the tip must equal the replay of every version known today. (a) Fetching:
+    lists, headers and texts in force are re-read (`refresh.fresh`: with SWISSLAW_REFRESH=<start of the run> a cached copy
+    counts only if written in this run) — Fedlex history and version lists, LexWork index and act headers, BLV lists and
+    version lists (not the atlas adapter's copies), ZH listing pages, every GE/NE/JU page; the document of a version stays
+    cached (Fedlex XML, LexWork version JSON and PDFs, BLV XHTML, ZH Nachtrag PDFs). Texts in force are converted again
+    only when their source changed (`convert.stale`: SHA-1 of the source in check_sil/check_pdfcur.json). The run day is
+    SWISSLAW_TODAY or today in Zürich (`refresh.TODAY`; it was the fixed 2026-10-26 in convert.py). ZH/GE/NE/JU act lists
+    come from the adapters' own output (`build_repo.in_force_acts`: identical to cantonal_basis.json for all four,
+    checked), so the weekly job needs no 26-canton assembly. (b) Appending: the last run is main's commit date; the state
+    the known versions give on that day is compared with main's tree; an act that differs got a version (or a repeal)
+    published after the day it applies from: committed first ("Nachträglich veröffentlicht"), author date = that day,
+    committer date = the first day of this window, so `rev-list --before` keeps meaning "as this repository showed it";
+    then the window's events by day exactly as a full build writes them; then README and indexes (never `.github/`: the
+    workflow's token may not change workflows — by hand); future rebuilt on the new tip and force-pushed; the monthly tags
+    written by the job (its own pushes do not trigger stand.yml). An act no source mentions this time stays; GE/NE/JU
+    acts in force only: an amended text whose day is in the window keeps main's text until then; ZH/GE/NE/JU acts that
+    leave the list end on the window's first day ("nicht mehr in der Sammlung"), at most max(5, 3 %) per canton, else the
+    list is taken as incomplete and all are kept. Guards stop the run before anything is pushed: repeals of more than
+    max(25, 3 %) of a jurisdiction's acts (SWISSLAW_ALLOW_DROPS=1 after checking), more than 400 late acts (a converter
+    changed: SWISSLAW_REFORMAT=1 writes them as one commit "Neu umgesetzt"). Commits of the job carry a link to its run
+    instead of the session trailer. (c) Checked (scratchpad test_build.py, compare_test.py): a build as of 2026-10-13
+    appended to 2026-10-27 gives the full build's 39,330 law files byte for byte (0 differ) and its 64 commits of
+    14–27 October with the same dates, messages and files; with 80 acts' versions after 2026-09-01 hidden in the first
+    build, the append adds exactly 80 late commits, one per hidden act, and the same tree; a second run on the same day
+    adds nothing. Found on the way: index and README tables sorted with ties (311.1 / 311.01), so their order followed the
+    load order — the path now breaks ties.
+    (d) The atlas (Jonas: "build the atlas in a workflow and deploy to pages"; `pipeline/atlas.sh`, `.github/workflows/atlas.yml`
+    in this repository, Tuesday 06:17 UTC): jobs fedlex ‖ cantons → build → deploy to Pages (upload-pages-artifact; Pages
+    source "GitHub Actions"); docs/data is not committed, so the repository stops growing with each refresh (data/ in git
+    stays the starting copy each run compares with). New fetchers: `fetch_opencaselaw.py` (Hugging Face; the snapshot is taken
+    whole or not at all: SHA-256 of the cite index, ≥ 95 % of the rows, and no court with ≥ 200 decisions losing more than 10 %
+    of its decisions or of those with a statute reference — the night of 2026-10-26 lost Obwalden's VVGE/AbR/OGVE series,
+    report F1, and was refused), `fetch_fedlex_srs.py` (sr_eli.csv from the history, sr_taxonomy.csv: both reproduce the
+    committed copies, + 4 acts). One run date `SWISSLAW_RUN_DATE` (`inforce.RUN_DATE`); the method page's OpenCaseLaw date is
+    its cite index's (`data/index.json`). Guard after the build, against the live atlas.json: totals −3 %, a canton's acts in
+    force −5 % (≥ 10), the decisions of a block, SR area or canton −10 % (≥ 100) stop the deployment; `allow_drops` (manual run,
+    `ATLAS_ALLOW_DROPS=1`) after checking. Found by the first end-to-end run (2026-10-28, test worktree): the new snapshot adds
+    the CJEU (canton column `EU`) and UN bodies and ICJ (`UN`); every value but CH/CE had counted as a canton (08 failed on
+    "EU"). Now `cantons.CANTONS` decides what is cantonal (01, 02, 03, 08), and an international court (ECtHR, CJEU, UN) counts
+    for treaties (SR 0.…) only — in translation "CPC", "ZPO", "AO", "MWStG" name the law of the state concerned (17 decisions;
+    category `excluded_domestic_act_in_international_court`, method page).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
@@ -760,9 +808,9 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
 - `reports/counts-check.md` — the number of acts in force checked against Fedlex's pages and LexFind (decision 33).
 
 ## Next
-- Jonas: make the repository public (Settings → General → Danger Zone) and enable Pages (Settings → Pages →
-  Deploy from a branch → this branch or main after merging, folder `/docs`). Pages on a private repository
-  needs a paid plan and publishes the site publicly anyway.
+- Live since 2026-10-27: https://jonashertner.github.io/swiss-law-graph/ (repository public, Pages from `main` → `/docs`,
+  merged in jonashertner/swiss-law-graph#1). Checked live in Chromium: start page, deep links, DE/FR/IT/EN, phone, no
+  console errors, no failed requests; og.png served as image/png. Later work: branch from `main`, merge by pull request.
 - Time view: cantonal history (repealed cantonal acts) is not published as data by the cantons; the network and
   matrix show repealed federal acts only where courts cite them (fetching the consolidated texts of repealed acts
   would add their bases and references).
@@ -799,7 +847,6 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
   article co-citation graph.
 
 ## Open questions for Jonas
-- Public at launch, or private preview first? (Preview above is private.)
 - TI and SZ come via LexFind (Institute of Federalism, academic service): only Ingress text (official,
   Art. 5 URG) and metadata are republished, links go to ti.ch / sz.ch. Acceptable for the public page?
 - VD shows only the BLV's "majeur" acts (895 of 2,747); the 1,852 "mineur" decrees are left out.
