@@ -26,6 +26,8 @@ from pathlib import Path
 
 import duckdb
 
+from cantons import CANTONS_SQL
+
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build"
 OUT = BUILD / "graph"
@@ -64,9 +66,9 @@ def main() -> None:
 
     # --- Acts. ---
     c.sql("""create table ad as select distinct act_id, decision_id from rv""")
-    c.sql("""create table acts as select rv.act_id,
+    c.sql(f"""create table acts as select rv.act_id,
                count(distinct rv.decision_id) decisions,
-               count(distinct rv.decision_id) filter (where m.canton in ('CH','CE')) decisions_federal,
+               count(distinct rv.decision_id) filter (where m.canton not in {CANTONS_SQL}) decisions_federal,
                count(distinct rv.decision_id) filter (where rv.status = 'valid') decisions_valid_article,
                count(*) filter (where rv.status = 'valid') refs_valid,
                count(*) filter (where rv.status = 'not_in_text') refs_not_in_text,
@@ -82,8 +84,8 @@ def main() -> None:
 
     # --- Articles. ---
     c.sql("""create table artd as select distinct act_id, art, decision_id from rv where status = 'valid'""")
-    c.sql("""create table articles as select act_id, art, count(*) decisions,
-               count(*) filter (where m.canton in ('CH','CE')) decisions_federal,
+    c.sql(f"""create table articles as select act_id, art, count(*) decisions,
+               count(*) filter (where m.canton not in {CANTONS_SQL}) decisions_federal,
                min(year(m.dt)) first_year, max(year(m.dt)) last_year
              from artd join meta m using (decision_id) group by 1, 2""")
     c.sql("""create table art_years as select act_id, art, year(m.dt) y, count(*) n

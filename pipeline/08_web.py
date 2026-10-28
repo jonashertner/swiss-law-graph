@@ -33,6 +33,7 @@ from collections import Counter, defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 import inforce
+from cantons import CANTONS_SQL
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "site" / "data"
@@ -552,8 +553,8 @@ def main():
                 break
         cy.append(y)
     con = duckdb.connect()
-    dec = con.sql(f"""select year(m.dt) y, count(distinct r.decision_id) filter (where m.canton in ('CH', 'CE')) f,
-                        count(distinct r.decision_id) filter (where m.canton not in ('CH', 'CE')) k
+    dec = con.sql(f"""select year(m.dt) y, count(distinct r.decision_id) filter (where m.canton not in {CANTONS_SQL}) f,
+                        count(distinct r.decision_id) filter (where m.canton in {CANTONS_SQL}) k
                       from '{ROOT}/build/refs_valid.parquet' r join '{ROOT}/build/meta.parquet' m using (decision_id)
                       where m.dt is not null group by 1 order by 1""").fetchall()
     undated = con.sql(f"""select count(distinct decision_id) from '{ROOT}/build/refs_valid.parquet' r
