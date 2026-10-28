@@ -20,6 +20,7 @@ decisions / most cited article of the act); uncited articles are drawn small.
 import csv
 import gzip
 import json
+import os
 import math
 import re
 import urllib.parse
@@ -36,7 +37,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build"
 G = BUILD / "graph"
 SITE = ROOT / "site" / "data"
-OCL = ROOT.parent / "jonashertner/opencaselaw"
+OCL = Path(os.environ.get("OPENCASELAW") or ROOT.parent / "jonashertner/opencaselaw")   # atlas.sh exports it
 PACK_BYTES = 300_000
 TOP_ART, TOP_ACT = 10, 25
 LANGS = ("de", "fr", "it", "en")

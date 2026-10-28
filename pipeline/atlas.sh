@@ -15,7 +15,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export SWISSLAW_REFRESH=${SWISSLAW_REFRESH:-$(date +%s)} PYTHONUNBUFFERED=1
 export SWISSLAW_RUN_DATE=${SWISSLAW_RUN_DATE:-$(TZ=Europe/Zurich date +%F)}
-OCL=${OPENCASELAW:-../jonashertner/opencaselaw}        # the alias tables (docs/data/law_codes.json, docs/api/law_aliases.json)
+export OPENCASELAW=${OPENCASELAW:-../jonashertner/opencaselaw}   # the alias tables (law_codes.json, law_aliases.json): 01, 05
+OCL=$OPENCASELAW
 SITE=${SITE_URL:-https://jonashertner.github.io/swiss-law-graph/}
 failed=()
 
@@ -64,17 +65,16 @@ cantons() {
   done
 }
 
-build() {
+build() {                   # stops at the first step that fails: nothing after it could be right
   [ -d "$OCL/.git" ] || git clone -q --depth 1 https://github.com/jonashertner/opencaselaw "$OCL"
-  local ok=1
   for s in "cantonal_basis.py" "01_resolve.py $OCL" "02_validate.py" "03_graph.py" "04_hierarchy.py"; do
-    step "build: ${s%% *}" python3 pipeline/$s || ok=0
+    step "build: ${s%% *}" python3 pipeline/$s || return 1
   done
-  step "build: layout"   bash -c "cd layout && npm ci --silent && node pack.mjs" || ok=0
-  for s in 05_site.py 07_tree.py 08_web.py; do step "build: $s" python3 pipeline/$s || ok=0; done
-  step "Fedlex: dates (time view)" python3 pipeline/fetch_fedlex_dates.py && step "build: 08_web.py (dates)" python3 pipeline/08_web.py || ok=0
-  step "build: network layout" node layout/net.mjs || ok=0
-  (( ok )) || { echo "::error::a build step failed: ${failed[*]}"; return 1; }
+  step "build: layout"   bash -c "cd layout && npm ci --silent && node pack.mjs" || return 1
+  for s in 05_site.py 07_tree.py 08_web.py; do step "build: $s" python3 pipeline/$s || return 1; done
+  step "Fedlex: dates (time view)" python3 pipeline/fetch_fedlex_dates.py || return 1
+  step "build: 08_web.py (dates)" python3 pipeline/08_web.py || return 1
+  step "build: network layout" node layout/net.mjs || return 1
   guard
 }
 
