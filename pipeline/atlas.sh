@@ -5,12 +5,14 @@
 #                                and the OpenCaseLaw snapshot                                        ~1.5–2 h
 #   pipeline/atlas.sh cantons    the 26 cantonal collections (pipeline/cantonal/*.py)                ~1.5 h
 #   pipeline/atlas.sh build      cantonal_basis, steps 01–08, the layouts, the dates; then the guard  ~40 min
+#   pipeline/atlas.sh guard      the guard alone, on what docs/data holds
 #   pipeline/atlas.sh all        the three in turn
 #
 # Every fetcher re-reads what changes (refresh.py); a source that fails keeps the copy in data/ (the one committed, or
 # the last run's) and the run says so. The run date is SWISSLAW_RUN_DATE (default: today in Zürich): the day the
-# sources were read, shown on the site. The guard stops a build whose counts fell by more than 3 % against the live
-# site (a source answered partly): nothing is deployed then. Exit: 0 built; 1 a build step or the guard failed.
+# sources were read, shown on the site. The guard stops a build whose counts fell against the live site (a source
+# answered partly): totals by 3 %, a canton's acts in force by 5 %, the decisions of an area or a canton by 10 %;
+# nothing is deployed then (ATLAS_ALLOW_DROPS=1 after checking). Exit: 0 built; 1 a build step or the guard failed.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export SWISSLAW_REFRESH=${SWISSLAW_REFRESH:-$(date +%s)} PYTHONUNBUFFERED=1
@@ -80,27 +82,47 @@ build() {                   # stops at the first step that fails: nothing after 
 
 guard() {                   # the counts of this build against the site that is live
   python3 - "$SITE" <<'EOF'
-import json, sys, urllib.request
+import json, os, sys, urllib.request
+from collections import Counter
 site = sys.argv[1]
-new = json.load(open("docs/data/atlas.json"))["meta"]
+new = json.load(open("docs/data/atlas.json"))
 try:
     with urllib.request.urlopen(site + "data/atlas.json", timeout=120) as r:
-        old = json.load(r)["meta"]
+        old = json.load(r)
 except Exception as e:                                   # noqa: BLE001 — no live site to compare with: say so, go on
     print(f"::warning::no live atlas to compare with ({e})"); sys.exit(0)
 rows, bad = [], []
+def fell(name, a, b, share, least):
+    if a - b >= least and b < (1 - share) * a:
+        bad.append(f"{name} {a:,} → {b:,}")
+mo, mn = old["meta"], new["meta"]
 for k in ("fed_in_force", "int_in_force", "kt_in_force", "history"):
-    a, b = old["counts"].get(k, 0), new["counts"].get(k, 0)
+    a, b = mo["counts"].get(k, 0), mn["counts"].get(k, 0)
     rows.append(f"{k} {a:,} → {b:,}")
-    if b < 0.97 * a:
-        bad.append(k)
-a, b = old.get("decisions", 0), new.get("decisions", 0)
-rows.append(f"decisions {a:,} → {b:,}")
-if b < 0.97 * a:
-    bad.append("decisions")
-print(f"run {old.get('run')} → {new.get('run')}: " + "; ".join(rows))
+    fell(k, a, b, 0.03, 1)
+rows.append(f"decisions {mo.get('decisions', 0):,} → {mn.get('decisions', 0):,}")
+fell("decisions", mo.get("decisions", 0), mn.get("decisions", 0), 0.03, 1)
+# per canton and per area, so that one source answering in part cannot hide in the totals (a canton's collection,
+# one court's decisions in the OpenCaseLaw export): acts in force of a canton −5 % (at least 10), decisions of a
+# block, an SR area or a canton −10 % (at least 100)
+def parts(x):
+    I = {f: i for i, f in enumerate(x["meta"]["fields"])}
+    g = lambda r, f: r[I[f]] if I[f] < len(r) else None
+    acts = Counter(g(r, "ct") for r in x["nodes"] if g(r, "k") == "a" and g(r, "ct"))
+    dec = {f"{g(r, 'k')}:{g(r, 's')}": g(r, "dd") or 0 for r in x["nodes"] if g(r, "k") in ("b", "c", "t")}
+    return acts, dec
+(ao, do), (an, dn) = parts(old), parts(new)
+for ct in sorted(ao):
+    fell(f"acts in force {ct}", ao[ct], an.get(ct, 0), 0.05, 10)
+for k in sorted(do):
+    fell(f"decisions {k}", do[k], dn.get(k, 0), 0.10, 100)
+print(f"run {mo.get('run')} → {mn.get('run')}: " + "; ".join(rows))
 if bad:
-    print(f"::error::fell by more than 3 % against the live site: {', '.join(bad)} — not deployed"); sys.exit(1)
+    msg = "fell against the live site: " + "; ".join(bad)
+    if os.environ.get("ATLAS_ALLOW_DROPS"):
+        print(f"::warning::{msg} — deployed all the same (ATLAS_ALLOW_DROPS)")
+    else:
+        print(f"::error::{msg} — not deployed (ATLAS_ALLOW_DROPS=1 after checking)"); sys.exit(1)
 EOF
 }
 
@@ -108,8 +130,9 @@ case ${1:-all} in
   fedlex)  fedlex ;;
   cantons) cantons ;;
   build)   build || exit 1 ;;
+  guard)   guard || exit 1 ;;
   all)     fedlex; cantons; build || exit 1 ;;
-  *)       echo "usage: $0 fedlex|cantons|build|all"; exit 2 ;;
+  *)       echo "usage: $0 fedlex|cantons|build|guard|all"; exit 2 ;;
 esac
 (( ${#failed[@]} )) && echo "::warning::failed: ${failed[*]} — their copies in data/ were used"
 exit 0

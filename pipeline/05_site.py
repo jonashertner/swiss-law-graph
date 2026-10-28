@@ -142,6 +142,14 @@ def article_grid(cx, cy, R, n_items, breaks):
     return p, pos, heads
 
 
+def snapshot_day() -> str:
+    """The day of the OpenCaseLaw snapshot read (its cite index), not of the run: a run can keep last week's."""
+    try:
+        return json.load(open(ROOT / "data/index.json"))["generated"][:10]
+    except (OSError, KeyError, ValueError):
+        return inforce.RUN_DATE
+
+
 def main() -> None:
     SITE.mkdir(parents=True, exist_ok=True)
     (SITE / "p").mkdir(exist_ok=True)
@@ -531,7 +539,7 @@ def main() -> None:
                                               ("validation", BUILD / "validation_report.json"),
                                               ("citations", G / "citations_report.json"))}
     method = {
-        "snapshot": inforce.RUN_DATE,
+        "snapshot": snapshot_day(),
         "resolution": rep["resolution"]["by_resolution"],
         "total_references": rep["resolution"]["total_references"],
         "duplicates": rep["resolution"]["duplicate_decisions"],

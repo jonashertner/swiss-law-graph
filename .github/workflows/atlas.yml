@@ -1,11 +1,18 @@
 # Every week the atlas is built anew from its sources and published to GitHub Pages; the data is not committed, so the
 # repository does not grow with it (decision 39). pipeline/atlas.sh: Fedlex and the 26 cantons in parallel, then the
-# build and a guard against the live site (counts that fell by more than 3 % stop the deployment).
+# build and a guard against the live site (totals −3 %, a canton's acts in force −5 %, the decisions of an area or a
+# canton −10 % stop the deployment; so does an OpenCaseLaw snapshot in which a court lost decisions: the one before is
+# kept). After checking a fall, run it by hand with allow_drops.
 name: atlas
 on:
   schedule:
     - cron: "17 6 * * 2"                   # Tuesday 06:17 UTC, the day after the law repository's Monday run
   workflow_dispatch:
+    inputs:
+      allow_drops:
+        description: "Deploy although counts fell (checked by hand)"
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -26,6 +33,7 @@ jobs:
     timeout-minutes: 330
     env:
       SWISSLAW_RUN_DATE: ${{ needs.day.outputs.run }}
+      ATLAS_ALLOW_DROPS: ${{ inputs.allow_drops && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -63,6 +71,7 @@ jobs:
     timeout-minutes: 330
     env:
       SWISSLAW_RUN_DATE: ${{ needs.day.outputs.run }}
+      ATLAS_ALLOW_DROPS: ${{ inputs.allow_drops && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -94,6 +103,7 @@ jobs:
     timeout-minutes: 150
     env:
       SWISSLAW_RUN_DATE: ${{ needs.day.outputs.run }}
+      ATLAS_ALLOW_DROPS: ${{ inputs.allow_drops && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

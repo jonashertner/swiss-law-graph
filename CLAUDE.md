@@ -702,6 +702,21 @@ previewed. Licence: code MIT (`LICENSE`), data CC0, official texts Art. 5 URG, f
     build, the append adds exactly 80 late commits, one per hidden act, and the same tree; a second run on the same day
     adds nothing. Found on the way: index and README tables sorted with ties (311.1 / 311.01), so their order followed the
     load order — the path now breaks ties.
+    (d) The atlas (Jonas: "build the atlas in a workflow and deploy to pages"; `pipeline/atlas.sh`, `.github/workflows/atlas.yml`
+    in this repository, Tuesday 06:17 UTC): jobs fedlex ‖ cantons → build → deploy to Pages (upload-pages-artifact; Pages
+    source "GitHub Actions"); docs/data is not committed, so the repository stops growing with each refresh (data/ in git
+    stays the starting copy each run compares with). New fetchers: `fetch_opencaselaw.py` (Hugging Face; the snapshot is taken
+    whole or not at all: SHA-256 of the cite index, ≥ 95 % of the rows, and no court with ≥ 200 decisions losing more than 10 %
+    of its decisions or of those with a statute reference — the night of 2026-10-26 lost Obwalden's VVGE/AbR/OGVE series,
+    report F1, and was refused), `fetch_fedlex_srs.py` (sr_eli.csv from the history, sr_taxonomy.csv: both reproduce the
+    committed copies, + 4 acts). One run date `SWISSLAW_RUN_DATE` (`inforce.RUN_DATE`); the method page's OpenCaseLaw date is
+    its cite index's (`data/index.json`). Guard after the build, against the live atlas.json: totals −3 %, a canton's acts in
+    force −5 % (≥ 10), the decisions of a block, SR area or canton −10 % (≥ 100) stop the deployment; `allow_drops` (manual run,
+    `ATLAS_ALLOW_DROPS=1`) after checking. Found by the first end-to-end run (2026-10-28, test worktree): the new snapshot adds
+    the CJEU (canton column `EU`) and UN bodies and ICJ (`UN`); every value but CH/CE had counted as a canton (08 failed on
+    "EU"). Now `cantons.CANTONS` decides what is cantonal (01, 02, 03, 08), and an international court (ECtHR, CJEU, UN) counts
+    for treaties (SR 0.…) only — in translation "CPC", "ZPO", "AO", "MWStG" name the law of the state concerned (17 decisions;
+    category `excluded_domestic_act_in_international_court`, method page).
 
 ## Pipeline status
 - [x] Step 1 `01_resolve.py`: 97.75 % of references resolve to an act; rest counted by category.
